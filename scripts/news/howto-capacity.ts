@@ -1,4 +1,4 @@
-import type { BillingCycle, BillingCycleResetBonus, BillingCyclesAccount } from "../../src/shared/billing-cycles";
+import type { BillingCycle, BillingCycleResetBonus, BillingCycleWindow, BillingCyclesAccount } from "../../src/shared/billing-cycles";
 import { resolvePlanFacts, type PlansCatalog } from "../../src/shared/plan-catalog";
 
 /**
@@ -18,10 +18,33 @@ export type EarlyResetKind = "automatic" | "banked" | "other";
 const kindOf = (cause: string | null): EarlyResetKind | null =>
   cause === "provider" || cause === "provider_probable" ? "automatic" : cause === "banked" ? "banked" : cause === "single" || cause === "unknown" ? "other" : null;
 
+/**
+ * How a main window started, from how the previous main window ended: a regular reset, a plan change, an automatic (provider) reset, a
+ * banked one, or another/unconfirmed end. A window after a split of one allowance (`not_reset`) continues the start of the one before it,
+ * and the first window of an account starts from a plan change. These are counts of windows, not the bonus time Σ(1 − f) of the resets.
+ */
+export type StartKind = "scheduled" | "plan_change" | "automatic" | "banked" | "other";
+export const START_KINDS: StartKind[] = ["scheduled", "plan_change", "automatic", "banked", "other"];
+const startKindOf = (cause: BillingCycleWindow["cause"]): StartKind | "continued" =>
+  cause === "scheduled" ? "scheduled" : cause === "plan_change" ? "plan_change" : cause === "provider" || cause === "provider_probable" ? "automatic"
+    : cause === "banked" ? "banked" : cause === "not_reset" ? "continued" : "other";
+const windowKey = (window: BillingCycleWindow) => `${window.start}|${window.end}`;
+export function windowStarts(windows: BillingCycleWindow[]): Map<string, StartKind> {
+  const sorted = [...new Map(windows.map(window => [windowKey(window), window])).values()].sort((a, b) => a.start.localeCompare(b.start));
+  const out = new Map<string, StartKind>();
+  sorted.forEach((window, index) => {
+    const previous = sorted[index - 1];
+    let kind: StartKind | "continued" = previous ? startKindOf(previous.cause) : "plan_change";
+    if (kind === "continued") kind = out.get(windowKey(previous!)) ?? "scheduled";
+    out.set(windowKey(window), kind);
+  });
+  return out;
+}
+
 /** Why a cycle has no capacity figure, from the application's own flags. */
 const missingReason = (cycle: BillingCycle) => cycle.flags.includes("no_windows") ? "no_windows" : cycle.flags.includes("capacity_uncalibrated") ? "uncalibrated" : "no_capacity";
 
-export function publicBillingCycle(cycle: BillingCycle, catalog: PlansCatalog, provider: string, promo: boolean) {
+export function publicBillingCycle(cycle: BillingCycle, catalog: PlansCatalog, provider: string, promo: boolean, startOf?: Map<string, StartKind>) {
   const resets = cycle.resets ?? {};
   const automatic = [bonus(resets.provider), bonus(resets.provider_probable)];
   const banked = bonus(resets.banked), other = [bonus(resets.single), bonus(resets.unknown)];
@@ -29,18 +52,33 @@ export function publicBillingCycle(cycle: BillingCycle, catalog: PlansCatalog, p
   const automaticWindows = sum(automatic), bankedWindows = banked.windows, otherWindows = sum(other);
   const capacity = cycle.capacity_usd;
   const money = (list: Array<{ apiUsd: number | null }>) => round(list.reduce((t, item) => t + (item.apiUsd ?? 0), 0), 0);
+  // The windows of the cycle by how each started, weighted by its own share inside the cycle; idle time is its own part.
+  const starts = startOf ?? windowStarts(cycle.main_windows ?? []);
+  const byStart = Object.fromEntries(START_KINDS.map(kind => [kind, { count: 0, windows: 0, share: 0 }])) as Record<StartKind, { count: number; windows: number; share: number }>;
+  const counted = (cycle.main_windows ?? []).filter(window => window.share > 0);
+  for (const window of counted) { const entry = byStart[starts.get(windowKey(window)) ?? "scheduled"]; entry.count++; entry.windows += window.share; entry.share += window.capacity_share ?? 0; }
+  const shared = counted.length > 0 && counted.every(window => finite(window.capacity_share));
   const split = capacity === null ? null : (() => {
-    const auto = money(automatic), bank = banked.apiUsd ?? 0, oth = money(other);
-    return { total: round(capacity, 0), base: round(capacity - auto - bank - oth, 0), automatic: auto, banked: bank, other: oth };
+    const total = round(cycle.windows.share + cycle.windows.idle, 3);
+    // By each window's stored part of the cycle's capacity; proportional by windows when a part is missing.
+    const usd = (kind: StartKind) => round(capacity * (shared ? byStart[kind].share : total > 0 ? byStart[kind].windows / total : 0), 0);
+    const parts = Object.fromEntries(START_KINDS.map(kind => [kind, usd(kind)])) as Record<StartKind, number>;
+    const rest = round(capacity, 0) - START_KINDS.reduce((sum, kind) => sum + parts[kind], 0);
+    return { total: round(capacity, 0), ...parts, idle: Math.max(0, rest),
+      // What the resets added, compared with a month without them (the application's stored bonus Σ(1 − f), valued).
+      gain: { automatic: money(automatic), banked: banked.apiUsd ?? 0, other: money(other) } };
   })();
   // Whole windows of the cycle with their stored share of its capacity: the spread of what one window was worth in this month.
   const whole = (cycle.main_windows ?? []).filter(window => window.share >= 0.9 && finite(window.capacity_share));
   const values = capacity === null ? [] : whole.map(window => capacity * window.capacity_share! / window.share);
   const used = cycle.used_pp;
   const early: Record<EarlyResetKind, { n: number; usedPct: number[] }> = { automatic: { n: 0, usedPct: [] }, banked: { n: 0, usedPct: [] }, other: { n: 0, usedPct: [] } };
+  const from = Date.parse(cycle.start), to = Date.parse(cycle.end);
   for (const window of cycle.main_windows ?? []) {
     const kind = kindOf(window.cause);
-    if (!kind) continue;
+    // Only a reset that ended inside the cycle (end in [start, end)) belongs to it, as in the application's own cycle resets.
+    const ended = Date.parse(window.end);
+    if (!kind || !(ended >= from && ended < to)) continue;
     early[kind].n++;
     // The meter's rise in the window that the reset ended: derived from stored readings, not announced by the provider.
     if (finite(window.used_pp)) early[kind].usedPct.push(round(window.used_pp, 0));
@@ -49,9 +87,11 @@ export function publicBillingCycle(cycle: BillingCycle, catalog: PlansCatalog, p
   return {
     start: cycle.start, end: cycle.end, plan: resolvePlanFacts(catalog, provider, cycle.plan, day(cycle.start)).display_label,
     priceUsd: cycle.price.usd ?? null, current: cycle.current, partial: cycle.shortened, promo,
-    windows: { total, scheduled: round(total - automaticWindows - bankedWindows - otherWindows, 3), idle: round(cycle.windows.idle, 3),
-      automatic: { count: automatic.reduce((t, item) => t + item.count, 0), windows: automaticWindows }, banked: { count: banked.count, windows: bankedWindows },
-      other: { count: other.reduce((t, item) => t + item.count, 0), windows: otherWindows } },
+    windows: { total, idle: round(cycle.windows.idle, 3),
+      starts: Object.fromEntries(START_KINDS.map(kind => [kind, { count: byStart[kind].count, windows: round(byStart[kind].windows, 3) }])) as Record<StartKind, { count: number; windows: number }>,
+      // The reset gain: windows the resets added beyond a month without them, Σ(1 − f) per kind, and how many resets ended inside the cycle.
+      gain: { automatic: { count: automatic.reduce((t, item) => t + item.count, 0), windows: automaticWindows }, banked: { count: banked.count, windows: bankedWindows },
+        other: { count: other.reduce((t, item) => t + item.count, 0), windows: otherWindows } } },
     capacityUsd: split, capacityReason: split ? null : missingReason(cycle),
     perWindowUsd: values.length ? { min: round(Math.min(...values), 0), median: round(median(values), 0), max: round(Math.max(...values), 0), n: values.length } : null,
     usedApiUsd: finite(cycle.api_usd) ? round(cycle.api_usd, 0) : null, usedPct: cycle.used_pct,
@@ -74,13 +114,15 @@ export function publicBilling(input: BillingInput, labelOf: (provider: string, a
   for (const account of input.accounts) {
     const detail = new Map((input.detail.get(`${account.provider}|${account.account}`) ?? []).map(cycle => [cycle.start, cycle]));
     const cycles = account.cycles.filter(cycle => cycle.windows.touched > 0 || cycle.capacity_usd !== null);
+    // A window's start comes from the end of the one before it, which may lie in the previous cycle: chain over every window of the account.
+    const starts = windowStarts([...detail.values()].flatMap(cycle => cycle.main_windows ?? []));
     if (!cycles.length) continue;
     let label = labelOf(account.provider, account.account);
     const taken = used.get(account.provider) ?? new Set<string>();
     if (!label) { let n = 0; do { label = `${String.fromCharCode(65 + n % 26)}${n >= 26 ? "2" : ""}`; n++; } while (taken.has(label)); label = `${label}*`; }
     taken.add(label); used.set(account.provider, taken);
     out.push({ id: `${account.provider}-${label}`, provider: account.provider, label,
-      cycles: cycles.map(cycle => publicBillingCycle(detail.get(cycle.start) ?? cycle, catalog, account.provider, promoOn(labelOf(account.provider, account.account), cycle.start, cycle.end))) });
+      cycles: cycles.map(cycle => publicBillingCycle(detail.get(cycle.start) ?? cycle, catalog, account.provider, promoOn(labelOf(account.provider, account.account), cycle.start, cycle.end), starts)) });
   }
   return out.sort((a, b) => a.provider.localeCompare(b.provider) || a.label.localeCompare(b.label));
 }
@@ -101,9 +143,30 @@ export function resetUse(subscriptions: ReturnType<typeof publicBilling>) {
 /* Change points of the weekly capacity                                                                         */
 /* ---------------------------------------------------------------------------------------------------------- */
 
-export interface WeeklyCycle { start: string; end: string; plan: string | null; observedPp: number | null; capacityUsd: number | null; lowerBound: boolean; promotionFactor: number | null }
+export interface WeeklyCycle { start: string; end: string; plan: string | null; observedPp: number | null; capacityUsd: number | null; lowerBound: boolean; promotionFactor: number | null; excluded?: "plan_change"; open?: boolean }
 export interface WeeklySubscription { provider: string; label: string; cycles: WeeklyCycle[] }
+const DAY_MS = 86_400_000;
 export const SHIFT_MIN = 0.15, SIDE_MIN = 2, SIDE_MAX = 4, MIN_PP = 10;
+/**
+ * A window that touches a plan change (the neighbouring window of the same subscription belongs to another plan and starts or ends within 36 h)
+ * and is only a fragment (under a day, under 50 pp of the meter) is the meter re-based at the change, not a weekly reading of either plan: it is
+ * left out of medians, trends and events and published as an excluded point. Full readings at a change (long, or near 100 pp) stay.
+ */
+export const PLAN_CHANGE_GAP = 36 * 3_600_000, FRAGMENT_MAX = DAY_MS, FRAGMENT_PP = 50;
+export function planChangeFragments<T extends { plan: string | null; start: string; end: string; observedPp: number | null }>(cycles: T[]): Set<T> {
+  const sorted = [...cycles].sort((a, b) => a.start.localeCompare(b.start)), out = new Set<T>();
+  // Free-tier flips are not plan changes (the same rule as the plan_change events).
+  const other = (a: T, b: T | undefined) => b !== undefined && b.plan !== null && a.plan !== null && b.plan !== a.plan && a.plan !== "Free" && b.plan !== "Free";
+  sorted.forEach((cycle, index) => {
+    const prev = sorted[index - 1], next = sorted[index + 1];
+    const touches = (other(cycle, prev) && Math.abs(Date.parse(cycle.start) - Date.parse(prev!.end)) <= PLAN_CHANGE_GAP) || (other(cycle, next) && Math.abs(Date.parse(next!.start) - Date.parse(cycle.end)) <= PLAN_CHANGE_GAP);
+    if (touches && Date.parse(cycle.end) - Date.parse(cycle.start) < FRAGMENT_MAX && (cycle.observedPp ?? 0) < FRAGMENT_PP) out.add(cycle);
+  });
+  return out;
+}
+/** The cycles with the fragments flagged, for changeEvents and planTrends. */
+export const markPlanChange = (cycles: WeeklyCycle[]): WeeklyCycle[] => { const fragments = planChangeFragments(cycles); return cycles.map(cycle => fragments.has(cycle) ? { ...cycle, excluded: "plan_change" as const } : cycle); };
+
 const level = (values: number[]) => ({ median: round(median(values), 0), min: round(Math.min(...values), 0), max: round(Math.max(...values), 0), n: values.length });
 
 interface Point { end: number; endIso: string; value: number; lowerBound: boolean; label: string }
@@ -147,7 +210,7 @@ export function changeEvents(subscriptions: WeeklySubscription[]): ChangeEvent[]
   const providers = [...new Set(subscriptions.map(item => item.provider))];
   for (const provider of providers) {
     const own = subscriptions.filter(item => item.provider === provider);
-    const usable = (item: WeeklySubscription, promo: boolean) => item.cycles.filter(c => c.capacityUsd !== null && c.plan !== null && (c.observedPp ?? 0) >= MIN_PP && (promo ? c.promotionFactor !== null : c.promotionFactor === null));
+    const usable = (item: WeeklySubscription, promo: boolean) => item.cycles.filter(c => c.capacityUsd !== null && c.plan !== null && !c.excluded && !c.open && (c.observedPp ?? 0) >= MIN_PP && (promo ? c.promotionFactor !== null : c.promotionFactor === null));
     const point = (c: WeeklyCycle, label: string): Point => ({ end: Date.parse(c.end), endIso: c.end, value: c.capacityUsd!, lowerBound: c.lowerBound, label });
     for (const plan of [...new Set(own.flatMap(item => item.cycles.map(c => c.plan)).filter((p): p is string => p !== null))]) {
       const promoPoints = own.flatMap(item => usable(item, true).filter(c => c.plan === plan).map(c => point(c, item.label)));
@@ -192,4 +255,56 @@ export function changeEvents(subscriptions: WeeklySubscription[]): ChangeEvent[]
     }
   }
   return events.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/* ---------------------------------------------------------------------------------------------------------- */
+/* Trend series per plan                                                                                        */
+/* ---------------------------------------------------------------------------------------------------------- */
+
+export const ROLLING = 4;
+export interface TrendPoint { date: string; value: number; n: number; lowerBound: boolean; min: number; max: number }
+export interface TrendCycle { date: string; value: number; perDollar: number | null; lowerBound: boolean; promo: boolean; pp: number }
+export interface ExcludedCycle { date: string; value: number; pp: number; reason: "plan_change" }
+
+/**
+ * Per plan: every eligible weekly cycle (as a dot; promotion cycles are marked and kept out of the line), and the rolling median of the last
+ * four eligible cycles at each cycle's end, in API-eq per 100% of the window and, with a price, per $1 of the plan (a weekly window carries
+ * 7/30.4375 of a month). A plan without a price (Free) has capacity series only, with the reason. Events are the plan's change events.
+ */
+export function planTrends(subscriptions: WeeklySubscription[], prices: Record<string, number | null>, events: ChangeEvent[], weeksPerMonth: number) {
+  const plans = new Map<string, { provider: string; plan: string; cycles: Array<WeeklyCycle & { end: string }>; excluded: ExcludedCycle[] }>();
+  for (const subscription of subscriptions) for (const cycle of subscription.cycles) {
+    if (cycle.capacityUsd === null || cycle.plan === null || (cycle.observedPp ?? 0) < MIN_PP || cycle.excluded || cycle.open) continue;
+    const key = `${subscription.provider}|${cycle.plan}`, entry = plans.get(key) ?? { provider: subscription.provider, plan: cycle.plan, cycles: [], excluded: [] };
+    entry.cycles.push(cycle); plans.set(key, entry);
+  }
+  // Fragments at a plan change stay visible as excluded points of the plan they were measured under.
+  for (const subscription of subscriptions) for (const cycle of subscription.cycles) {
+    if (!cycle.excluded || cycle.capacityUsd === null || cycle.plan === null) continue;
+    plans.get(`${subscription.provider}|${cycle.plan}`)?.excluded.push({ date: day(cycle.end), value: round(cycle.capacityUsd, 0), pp: round(cycle.observedPp ?? 0, 0), reason: "plan_change" });
+  }
+  return [...plans.values()].map(({ provider, plan, cycles, excluded }) => {
+    const price = prices[`${provider}|${plan}`] ?? null, perDollar = price !== null && price > 0 ? weeksPerMonth / price : null;
+    const sorted = [...cycles].sort((a, b) => a.end.localeCompare(b.end));
+    const eligible = sorted.filter(cycle => cycle.promotionFactor === null);
+    const series: TrendPoint[] = eligible.map((cycle, index) => {
+      const window = eligible.slice(Math.max(0, index - ROLLING + 1), index + 1), values = window.map(item => item.capacityUsd!);
+      return { date: day(cycle.end), value: round(median(values), 0), n: window.length, lowerBound: window.some(item => item.lowerBound), min: round(Math.min(...values), 0), max: round(Math.max(...values), 0) };
+    });
+    const own = events.filter(event => event.provider === provider && event.plan === plan && event.kind !== "plan_change");
+    // The takeaway's numbers: the highest rolling median with at least three cycles behind it, the latest eligible cycle itself, and the steps after the peak.
+    const solid = series.filter(point => point.n >= 3), peak = solid.length ? solid.reduce((best, point) => point.value > best.value ? point : best) : null;
+    // Open windows never reach this point (see `open`), so the newest eligible cycle is the newest finished one: the same definition as the table's latest.
+    const last = eligible.at(-1), latest = last ? { date: day(last.end), value: round(last.capacityUsd!, 0) } : null;
+    const after = peak ? own.filter(event => event.kind === "level_shift" && event.date >= peak.date) : [];
+    return {
+      provider, plan, usdPerMonth: price !== null && price > 0 ? price : null, perDollarReason: perDollar === null ? (price === 0 ? "free_plan" : "price_unknown") : null,
+      cycles: sorted.map((cycle): TrendCycle => ({ date: day(cycle.end), value: round(cycle.capacityUsd!, 0), perDollar: perDollar === null ? null : round(cycle.capacityUsd! * perDollar, 2),
+        lowerBound: cycle.lowerBound, promo: cycle.promotionFactor !== null, pp: round(cycle.observedPp ?? 0, 0) })), excluded,
+      capacity: series, perDollar: perDollar === null ? null : series.map(point => ({ ...point, value: round(point.value * perDollar, 2), min: round(point.min * perDollar, 2), max: round(point.max * perDollar, 2) })),
+      events: own.map(event => ({ kind: event.kind, date: event.date, changePct: event.changePct, subscriptions: event.subscriptions, lowerBound: event.lowerBound })),
+      takeaway: { peak: peak && { date: peak.date, value: peak.value }, latest: latest && { date: latest.date, value: latest.value },
+        changePct: peak && latest && peak.value > 0 ? round(latest.value / peak.value - 1, 3) : null, stepsDown: after.filter(event => (event.changePct ?? 0) < 0).length, stepsUp: after.filter(event => (event.changePct ?? 0) > 0).length },
+    };
+  }).sort((a, b) => a.provider.localeCompare(b.provider) || (a.usdPerMonth ?? 0) - (b.usdPerMonth ?? 0));
 }

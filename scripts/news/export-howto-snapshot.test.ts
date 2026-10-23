@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { duplicateCycles, publicCapacityHistory, publicCard, publicProviders, publicWindow, missingCapacityReason, HOWTO_SNAPSHOT_VERSION } from "./export-howto-snapshot";
+import { duplicateCycles, openWindows, publicCapacityHistory, publicCard, publicProviders, publicWindow, missingCapacityReason, HOWTO_SNAPSHOT_VERSION } from "./export-howto-snapshot";
 import type { CapacityCyclesResponse } from "../../src/shared/capacity-cycles";
 import type { CodexComparisonWindow } from "../../src/shared/codex-accounting";
 import type { PlansCatalog } from "../../src/shared/plan-catalog";
@@ -57,6 +57,8 @@ test("provider comparison keeps providers without cycles null with a reason, and
   // Both cycles ended 30-60 days ago; the 8 pp cycle is below the filter. One rule, so no canonical-vs-measured split.
   expect(pro.d30_60).toMatchObject({ value: 1200, count: 2 });
   expect(pro.cycles).toBe(2);
+  // The latest cycle: the newest finished eligible one, with its date and pp.
+  expect(pro.latest).toMatchObject({ end: "2026-09-14", pp: 50, lowerBound: false, reason: null });
   // Per $1 comes from the 0-30 d bucket only: nothing there, so a dash with the last measured date, not an older fallback.
   expect(pro.perDollar).toMatchObject({ value: null, reason: "no_cycle_in_period", lastMeasured: "2026-09-14" });
   expect(providers.find(item => item.provider === "grok")).toMatchObject({ plans: [], reason: "no_weekly_window" });
@@ -120,13 +122,14 @@ test("provider trend buckets are non-overlapping, empty ones are null with a rea
   const at = (daysAgo: number, api: number, extra: Partial<CodexComparisonWindow> = {}) =>
     cycle("a", iso(daysAgo + 6), iso(daysAgo), { reset: iso(daysAgo), usage: usage(100, api), ...extra });
   const plan = publicProviders(response([entry("a", "codex", [at(100, 600), at(75, 800), at(10, 400), at(3, 500, { reset: new Date(now + day).toISOString() })])]), catalog, now)[0]!.plans[0]!;
-  expect(plan.d30).toMatchObject({ value: 900, count: 2, reason: null });
+  // The cycle that ended 3 days ago but whose planned reset is ahead and has no successor is open: it is in no bucket.
+  expect(plan.d30).toMatchObject({ value: 800, count: 1, reason: null });
   expect(plan.d30_60).toMatchObject({ value: null, count: 0, reason: "no_cycle_in_period" });
   expect(plan.d60_90).toMatchObject({ value: 1600, count: 1 });
   expect(plan.older).toMatchObject({ value: 1200, count: 1 });
-  expect(plan.latest.value).toBe(800); // the open cycle is not "completed"
+  expect(plan.latest.value).toBe(800); // the newest finished eligible cycle; the open one never counts
   expect(plan.max).toMatchObject({ value: 1600 });
-  expect(plan.perDollar.value).toBeCloseTo(900 * (30.4375 / 7) / 200, 1);
+  expect(plan.perDollar.value).toBeCloseTo(800 * (30.4375 / 7) / 200, 1);
 });
 
 test("promotion cycles stay out of every median and per-dollar figure, and show only as the promo maximum", () => {
@@ -151,4 +154,12 @@ test("a manual measurement and the probe cycle of one window count once", () => 
   expect(history[0]!.cycles).toHaveLength(1);
   expect(history[0]!.cycles[0]!.start).toBe("2026-09-20T11:00:00.069Z");
   expect(duplicateCycles(response([entry("a", "codex", [manual, probe])]))).toBe(1);
+});
+
+test("a window is open when its reset is ahead and no later window of the subscription has started", () => {
+  const hour = 3_600_000, iso = (h: number) => new Date(now + h * hour).toISOString();
+  const early = cycle("a", iso(-60), iso(-30), { reset: iso(100) }), next = cycle("a", iso(-29.9), iso(-2), { reset: iso(100) });
+  const lastClosed = cycle("a", iso(-300), iso(-250), { reset: iso(-250) });
+  const open = openWindows([early, next, lastClosed], now);
+  expect([...open]).toEqual([next]);
 });
