@@ -38,7 +38,7 @@ import { isCanonicalMedianSample } from "../../src/web/lib/canonical-median";
 import { capacityFull, capacityIsLowerBound, capacityMedianSample, capacityPlanKey } from "../../src/web/lib/codex-capacity";
 import { handleProjectCost } from "../../src/server/api-projects";
 import { publicCompare, publicProjects } from "./howto-home";
-import { publicBilling, resetUse, changeEvents } from "./howto-capacity";
+import { publicBilling, resetUse, changeEvents, planTrends, markPlanChange, planChangeFragments } from "./howto-capacity";
 import { handleBillingCycles } from "../../src/server/api-projects";
 import type { BillingCycle, BillingCyclesAccount } from "../../src/shared/billing-cycles";
 import { mkdirSync, writeFileSync, renameSync } from "node:fs";
@@ -210,7 +210,7 @@ export function missingCapacityReason(window: CodexComparisonWindow): string {
   return "not_established";
 }
 
-function cycleRecord(window: CodexComparisonWindow) {
+function cycleRecord(window: CodexComparisonWindow, open = false) {
   const value = capacityFull(window, "api_standard");
   const factor = window.promotion?.status === "configured" ? window.promotion.factor : null;
   const sample = capacityMedianSample(window, "api_standard");
@@ -223,11 +223,20 @@ function cycleRecord(window: CodexComparisonWindow) {
     capacityUsd: value === null ? null : round(value, 2), capacityReason: value === null ? missingCapacityReason(window) : null,
     lowerBound: value !== null && capacityIsLowerBound(window, "api_standard"),
     promotionFactor: finite(factor) ? factor : null,
+    // A window that has not finished: its planned reset lies ahead and no later window of the subscription has started. A reading in progress, never a result.
+    open,
     medianEligible: plan !== null && isCanonicalMedianSample(sample, plan),
   };
 }
 
 type Cycle = ReturnType<typeof cycleRecord>;
+
+/** The windows of one subscription (any order) that have not finished at `now`: planned reset ahead and no later window has started. */
+export function openWindows(windows: CodexComparisonWindow[], now: number): Set<CodexComparisonWindow> {
+  const open = new Set<CodexComparisonWindow>();
+  for (const window of windows) if (Date.parse(window.reset) > now && !windows.some(other => other !== window && Date.parse(other.start) >= Date.parse(window.end) - 60_000)) open.add(window);
+  return open;
+}
 
 /**
  * One real window can be published twice: a manual capacity measurement (id "manual:...", start rounded to the hour) and the
@@ -273,8 +282,8 @@ function anonymousSubscriptions(response: CapacityCyclesResponse) {
   return out;
 }
 
-export function publicCapacityHistory(response: CapacityCyclesResponse) {
-  return anonymousSubscriptions(response).map(({ id, provider, label, windows }) => ({ id, provider, label, cycles: windows.map(cycleRecord) }));
+export function publicCapacityHistory(response: CapacityCyclesResponse, now = Number.NEGATIVE_INFINITY) {
+  return anonymousSubscriptions(response).map(({ id, provider, label, windows }) => { const open = openWindows(windows, now); return { id, provider, label, cycles: windows.map(window => cycleRecord(window, open.has(window))) }; });
 }
 
 /**
@@ -289,19 +298,27 @@ export function publicProviders(response: CapacityCyclesResponse, catalog: Plans
     windows.set(entry.provider, windows.get(entry.provider) ?? []);
     if (!entry.windows.length) reasons.set(entry.provider, entry.preparing ? "preparing" : entry.error ? "unreadable" : "no_weekly_window");
   }
-  for (const subscription of anonymousSubscriptions(response)) windows.get(subscription.provider)!.push(...subscription.windows);
+  // Fragments at a plan change are left out of every median and bucket; they are counted per plan.
+  const fragments = new Set<CodexComparisonWindow>(), open = new Set<CodexComparisonWindow>();
+  for (const subscription of anonymousSubscriptions(response)) {
+    for (const window of openWindows(subscription.windows, now)) open.add(window);
+    windows.get(subscription.provider)!.push(...subscription.windows);
+    const records = subscription.windows.map(window => ({ window, plan: capacityPlanKey(window), start: window.start, end: window.end, observedPp: window.observed_pp }));
+    for (const record of planChangeFragments(records)) fragments.add(record.window);
+  }
   const med = (values: number[]) => { const s = [...values].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2; };
   return [...windows].sort(([a], [b]) => a.localeCompare(b)).map(([provider, all]) => {
     const plans = [...new Set(all.map(capacityPlanKey).filter((plan): plan is string => plan !== null))].flatMap(plan => {
       const promoOf = (window: CodexComparisonWindow) => window.promotion?.status === "configured" && finite(window.promotion.factor) ? window.promotion.factor : null;
       const ownAll = all.filter(window => capacityPlanKey(window) === plan).sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
       // Cycles measured under a declared promotion carry its bonus: they stay out of every median, bucket and per-dollar figure.
-      const own = ownAll.filter(window => promoOf(window) === null);
+      const own = ownAll.filter(window => promoOf(window) === null && !fragments.has(window) && !open.has(window));
+      const planChangeCycles = ownAll.filter(window => fragments.has(window) && capacityFull(window, "api_standard") !== null && window.observed_pp >= MIN_OBSERVED_PP).length;
       const toPoints = (list: CodexComparisonWindow[]) => list.map(window => ({ window, value: capacityFull(window, "api_standard") }))
         .filter(item => item.value !== null && item.window.observed_pp >= MIN_OBSERVED_PP)
-        .map(item => ({ value: item.value!, end: Date.parse(item.window.end), endIso: item.window.end, done: Date.parse(item.window.reset) <= now,
+        .map(item => ({ value: item.value!, pp: item.window.observed_pp, end: Date.parse(item.window.end), endIso: item.window.end, done: Date.parse(item.window.reset) <= now,
           lowerBound: capacityIsLowerBound(item.window, "api_standard"), factor: promoOf(item.window) }));
-      const points = toPoints(own), allPoints = toPoints(ownAll);
+      const points = toPoints(own), allPoints = toPoints(ownAll.filter(window => !fragments.has(window) && !open.has(window)));
       if (!points.length) return [];
       const promoCycles = allPoints.length - points.length;
       const newestWindow = own.at(-1)!;
@@ -315,7 +332,8 @@ export function publicProviders(response: CapacityCyclesResponse, catalog: Plans
         : { value: null, count: 0, lowerBound: false, reason: "no_cycle_in_period", min: null, max: null, values: [] as number[] };
       const within = (from: number, to: number | null) => points.filter(item => item.end <= now - from * DAY && (to === null || item.end > now - to * DAY));
       const d90 = bucket(within(0, 90)), d30 = bucket(within(0, 30)), d30_60 = bucket(within(30, 60)), d60_90 = bucket(within(60, 90)), older = bucket(within(90, null));
-      const newestDone = points.filter(item => item.done).sort((a, b) => b.end - a.end)[0];
+      // Open windows are already out of `points`: the newest point is the newest finished eligible cycle, the one definition the trends use too.
+      const newestDone = [...points].sort((a, b) => b.end - a.end)[0];
       const lastAny = [...points].sort((a, b) => b.end - a.end)[0]!;
       const highest = (list: typeof points) => list.reduce<(typeof points)[number] | null>((best, item) => !best || item.value > best.value ? item : best, null);
       const top = highest(points)!, topAny = highest(allPoints)!;
@@ -327,9 +345,10 @@ export function publicProviders(response: CapacityCyclesResponse, catalog: Plans
       const byMonth = new Map<string, typeof points>();
       for (const item of points) byMonth.set(item.endIso.slice(0, 7), [...byMonth.get(item.endIso.slice(0, 7)) ?? [], item]);
       return [{
-        plan, promoCycles, usdPerMonth: price !== null && price > 0 ? price : null, priceReason,
+        plan, promoCycles, planChangeCycles, usdPerMonth: price !== null && price > 0 ? price : null, priceReason,
         cycles: points.length, from: day(points.reduce((a, b) => a.end < b.end ? a : b).endIso), to: day(lastAny.endIso),
-        latest: newestDone ? { ...pick(newestDone), reason: null } : { value: null, end: null, lowerBound: false, reason: "no_completed_cycle" },
+        // The newest finished eligible cycle, with the meter points it observed.
+        latest: newestDone ? { ...pick(newestDone), pp: round(newestDone.pp, 0), reason: null } : { value: null, end: null, pp: null, lowerBound: false, reason: "no_completed_cycle" },
         d30, d30_60, d60_90, older, d90,
         max: pick(top),
         // The highest cycle overall when it was a promotion cycle, shown beside the highest without one.
@@ -348,19 +367,23 @@ export function publicProviders(response: CapacityCyclesResponse, catalog: Plans
 }
 
 /** Monthly capacity with resets by kind, the used % at each early reset, and the change events of the weekly capacity. */
-function capacitySection(inputs: HowtoInputs, now: number) {
+function capacitySection(inputs: HowtoInputs, now: number, providers: ReturnType<typeof publicProviders>) {
   if (!inputs.billing) return null;
-  const subscriptions = anonymousSubscriptions(inputs.weekly), history = publicCapacityHistory(inputs.weekly);
+  const subscriptions = anonymousSubscriptions(inputs.weekly), history = publicCapacityHistory(inputs.weekly, now);
   const labelOf = (provider: string, account: string) => subscriptions.find(item => item.provider === provider && item.account.toLowerCase() === account.toLowerCase())?.label ?? null;
   // A billing cycle is a promotion cycle when a weekly cycle of the same subscription inside it carried a promotion factor.
   const promoOn = (label: string | null, start: string, end: string) => history.some(item => item.label === label && item.cycles.some(cycle => cycle.promotionFactor !== null && cycle.end > start && cycle.start < end));
   const billing = publicBilling(inputs.billing, labelOf, inputs.catalog, promoOn);
-  return { billing, resetUse: resetUse(billing), changes: changeEvents(history.map(item => ({ provider: item.provider, label: item.label, cycles: item.cycles }))),
+  const weekly = history.map(item => ({ provider: item.provider, label: item.label, cycles: markPlanChange(item.cycles) })), changes = changeEvents(weekly);
+  const prices: Record<string, number | null> = {};
+  for (const provider of providers) for (const plan of provider.plans) prices[`${provider.provider}|${plan.plan}`] = plan.usdPerMonth ?? (plan.priceReason === "free_plan" ? 0 : null);
+  return { billing, resetUse: resetUse(billing), changes, trends: planTrends(weekly, prices, changes, WEEKS_PER_MONTH),
     method: { shiftMin: 0.15, sideMin: 2, sideMax: 4, minObservedPp: MIN_OBSERVED_PP, note: "Level shifts are observations on these accounts, not provider announcements." } };
 }
 
 export function publicHowtoSnapshot(inputs: HowtoInputs, now: number) {
   const cards = buildRoster(inputs.roster, now);
+  const providers = publicProviders(inputs.weekly, inputs.catalog, now);
   const example = pickCardExample(cards);
   return {
     version: HOWTO_SNAPSHOT_VERSION, generatedAt: new Date(now).toISOString(),
@@ -369,10 +392,10 @@ export function publicHowtoSnapshot(inputs: HowtoInputs, now: number) {
       .find(item => item.provider === example.vendor && item.account.toLowerCase() === example.id.toLowerCase())?.label ?? null) : null,
     window: inputs.claude ? publicWindow(inputs.claude, inputs.catalog, now, anonymousSubscriptions(inputs.weekly)
       .find(item => item.provider === "claude" && item.account.toLowerCase() === inputs.claude!.windows.account.toLowerCase())?.label ?? null) : null,
-    capacityHistory: publicCapacityHistory(inputs.weekly),
+    capacityHistory: publicCapacityHistory(inputs.weekly, now),
     capacityHistory5h: inputs.fiveHour ? publicCapacityHistory(inputs.fiveHour) : null,
-    providers: publicProviders(inputs.weekly, inputs.catalog, now),
-    capacity: capacitySection(inputs, now),
+    providers,
+    capacity: capacitySection(inputs, now, providers),
     // Inputs of the landing's home-page instruments: the compare band and ranked anonymous projects.
     home: {
       compare: inputs.cardWindows && example ? publicCompare(inputs.cardWindows, now, anonymousSubscriptions(inputs.weekly)
