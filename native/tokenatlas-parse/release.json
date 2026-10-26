@@ -1,7 +1,7 @@
 {
-  "source_hash": "019adcdfd6892555d9dae7b56fb9a03f201c5b4331e9b06b1004d563e7fc89ce",
-  "tag": "parser-019adcdfd689",
+  "source_hash": "6cdd17a43630ea2ba601e6eb18a6d8c1076a798c8b0d162150d3f7f3f5992e43",
+  "tag": "parser-6cdd17a43630",
   "repo": "KNODEdev/tokenAtlas",
   "asset": "tokenatlas-parse-windows-x64.exe",
-  "sha256": "01d7cb04b6df3b72b060c26deea8ef066d2ad7860a413e205dcb41227bffd441"
+  "sha256": "b05af14de122a6b884a5562bc02bf86fc4e4763eeb211dff76ba7a5ead63345d"
 }

@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import type { ChildProcess } from "node:child_process";
 import { ParsePool, NativeParserError, ParseWorkerError, type ParseFormat, type ParseFormats } from "./parse-pool";
 import { identityCompanion } from "./claude-companion";
+import { codexFirstTokenAdapter } from "../providers/first-token/codex";
 import { verifySourceSqliteRead } from "./source-sqlite";
 import { Database } from "../db/sqlite";
 import { createOtherSqliteGoldens } from "../../native/tokenatlas-parse/tests/golden/other/fixtures";
@@ -26,6 +27,20 @@ function replacePaths(value: unknown, replacements: Array<[string, string]>): an
   return value;
 }
 
+function expectedResult(entry: typeof stored.cases[number], replacements: Array<[string, string]>) {
+  const expected = replacePaths(entry.expected, replacements);
+  if (entry.format === "codex" && expected?.kind === "ok") {
+    const input = replacePaths(entry.input, replacements);
+    const prefix = fs.readFileSync(input.file).subarray(0, input.size).toString("utf8").replace(/^\uFEFF/, "");
+    const records = prefix.split("\n").flatMap(line => {
+      try { return [JSON.parse(line)]; } catch { return []; }
+    });
+    // Keep the stored usage golden exact and verify companion timing through the independent reader.
+    expected.parse.firstToken = { version: 1, turns: codexFirstTokenAdapter.parse(records) };
+  }
+  return expected;
+}
+
 test("native providers match stored goldens, byte prefixes, errors and concurrent repeats", async () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "tokenatlas-golden-"));
   const files = createOtherSqliteGoldens(temp), pool = new ParsePool(4);
@@ -39,7 +54,7 @@ test("native providers match stored goldens, byte prefixes, errors and concurren
         expect(error.message).toBe(replacePaths(entry.error, replacements));
       }
       else {
-        const expected = replacePaths(entry.expected, replacements);
+        const expected = expectedResult(entry, replacements);
         if (entry.format==="claude") {
           // The stored corpus was captured on Windows; cwd basename is a host path contract.
           for (const event of expected.events) if (typeof event.cwd==="string" && event.cwd)
@@ -68,7 +83,7 @@ test("native restarts preserve in-flight results without Bun provider workers", 
   try {
     for (const format of ["codex", "claude", "grok", "gaugesJournal"] as const) {
       const entry = stored.cases.find(entry => entry.format === format && !entry.error)!;
-      const input = replacePaths(entry.input, [["$GOLDEN", golden]]), expected = replacePaths(entry.expected, [["$GOLDEN", golden]]);
+      const input = replacePaths(entry.input, [["$GOLDEN", golden]]), expected = expectedResult(entry, [["$GOLDEN", golden]]);
       expect(await pool.run(format, input)).toEqual(expected);
       const work = Array.from({ length: 12 }, () => pool.run(format, input));
       (Reflect.get(pool, "native") as ChildProcess).kill();
