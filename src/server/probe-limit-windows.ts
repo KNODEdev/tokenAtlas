@@ -1,6 +1,13 @@
+import { canonicalTime, sameReset, segmentationInputs, type ProbeLimitReading, type ProbeLimitWindow, type RawSegment } from "./limit-window-segments";
+import { probeWindowPlan } from "./window-plan-periods";
+import { segmentLimitReadings } from "./window-lifecycle";
+export { RESET_JOIN_MS, segmentReadings, segmentationInputs, type ProbeLimitReading, type ProbeLimitWindow,
+  type RawSegment, type SegmentInput, type SegmenterState } from "./limit-window-segments";
+export { probeWindowPlan } from "./window-plan-periods";
+export { segmentLimitReadings } from "./window-lifecycle";
 import type { Database } from "bun:sqlite";
 import type { ManualCapacityMeasurement } from "../shared/manual-capacity";
-import { effectiveDatedPeriods, periodInstant, planPeriodIndex, type DatedPeriod, type PeriodIndex } from "./account-periods";
+import { effectiveDatedPeriods, planPeriodIndex, type DatedPeriod, type PeriodIndex } from "./account-periods";
 import { claudeEventOwnedBySql } from "./claude-event-account";
 import type { AccountResolver } from "./account-resolver";
 import { readPreparedProbeAccountHistory, readPreparedProbeAccountingRevision, ProbeAccountIndexUnavailable } from "./current/probe-account-reader";
@@ -10,8 +17,6 @@ import { addLimitHitReadings, type LimitHit, type RailGroup, type RailSample } f
 import { subscriptionAccountingAdapter, limitHitTableOf } from "./subscription-accounting-adapters";
 import type { ClaudeCounterReset } from "../shared/claude-code-capacity";
 import { readLimitWindowStarts, readLimitWindowsWhere } from "../db/limit-windows";
-import { canonicalPeriodPlan } from "../shared/period-end";
-import type { WindowActivity } from "../shared/window-activity";
 
 export interface ProbeLimitSample extends RailSample {
   provider: string; subject: string; plan: string | null;
@@ -22,15 +27,6 @@ export interface ProbeLimitEvidence {
   /** Account-wide prepared revisions plus owned limit hits, independent of a screen's date range. */
   revision: unknown;
 }
-
-/**
- * Two reset instants of one counter this close are the same window: the vendor reports one reset a second or
- * so apart from reading to reading. The segmenter joins readings into a window by it; every reader that asks
- * "the same reset" uses it.
- */
-export const RESET_JOIN_MS = 120_000;
-const sameReset = (left: string | null, right: string | null): boolean => left != null && right != null
-  && Math.abs(Date.parse(left) - Date.parse(right)) <= RESET_JOIN_MS;
 
 /** Prepared probe rows as limit samples: successful readings at accounting time, in reading order. */
 export function probeLimitSamples(rows: readonly Record<string, unknown>[], provider: string): ProbeLimitSample[] {
@@ -116,7 +112,8 @@ export function counterReadings(samples: readonly ProbeLimitSample[], account: s
   return samples.filter(sample => sample.resets_at && probeLimitCounter(sample, account, cycles) === counter
     && sample.used_percent != null).map(sample => ({ ts: sample.ts, used_percent: sample.used_percent!,
       resets_at: sample.resets_at!, window_minutes: JSON.parse(counter)[2] as number,
-      source: sample.limitHit ? "limit_hit" : "probe", ...(sample.provider === "claude" ? { plan: sample.plan } : {}),
+      source: sample.limitHit ? "limit_hit" : "probe", ...(sample.plan ? { plan: sample.plan } : {}),
+      ...(sample.allowance != null ? { allowance: sample.allowance } : {}), ...(sample.used != null ? { used: sample.used } : {}),
       ...(sample.limitHit ? { limit_hit: { call_id: sample.limitHit.callId } } : {}) }));
 }
 
@@ -159,36 +156,6 @@ export function claudeWeeklyRegisterWindows(sqlite: Database, account: string): 
   }).sort((a, b) => a.start.localeCompare(b.start));
 }
 
-export interface ProbeLimitReading {
-  ts: string;
-  used_percent: number;
-  resets_at: string;
-  window_minutes: number;
-  source?: "probe" | "session" | "manual" | "limit_hit";
-  /** Plan reported by this meter, independent of the account's paid billing period. */
-  plan?: string | null;
-  limit_hit?: { call_id: string };
-}
-export interface ProbeLimitWindow {
-  activity?: WindowActivity;
-  id: string;
-  account: string;
-  counter: string;
-  start: string;
-  end: string;
-  reset: string;
-  cycle_end_basis: "scheduled" | "reset" | "uncertain";
-  window_minutes: number;
-  plan: string | null;
-  plan_detail: { label: string; multiplier: null; status: "mixed" } | null;
-  declared_plan_meter_mismatch: boolean;
-  readings: Array<{ ts: string; percent: number; source: "probe" | "session" | "manual" | "limit_hit"; plan?: string | null; limit_hit?: { call_id: string } }>;
-  manual_measurement?: { id: string; approximate_time: boolean; note: string };
-  manual_measurements?: Array<{ id: string; approximate_time: boolean; note: string }>;
-  startDrop: { before: number; after: number } | null;
-  endDrop: { before: number; after: number } | null;
-}
-
 /** Compatibility descriptor for the drop that began this register segment. */
 export function probeWindowCounterReset(window: ProbeLimitWindow, windows: readonly ProbeLimitWindow[]): ClaudeCounterReset | null {
   if (!window.startDrop) return null;
@@ -198,235 +165,6 @@ export function probeWindowCounterReset(window: ProbeLimitWindow, windows: reado
     last_before: { at: lastBefore?.ts ?? window.start, percent: window.startDrop.before },
     first_after: { at: window.start, percent: window.startDrop.after } };
 }
-const canonicalTime = (value: string): string => /\.\d{4,}Z$/.test(value)
-  ? value : new Date(Date.parse(value)).toISOString();
-const subtractMinutes = (value: string, minutes: number): string => {
-  const shifted = new Date(Date.parse(value) - minutes * 60_000).toISOString();
-  const extra = /\.\d{3}(\d+)Z$/.exec(value)?.[1];
-  return extra ? shifted.slice(0, -1) + extra + "Z" : shifted;
-};
-
-/** The same dated plan resolution for measured and cadence-only windows. */
-export function probeWindowPlan(index: PeriodIndex | null, periods: readonly DatedPeriod[],
-  provider: string, account: string, start: string, end: string):
-  Pick<ProbeLimitWindow, "plan" | "plan_detail" | "declared_plan_meter_mismatch"> {
-  const startMs = Date.parse(start), endMs = Date.parse(end);
-  const instants = [startMs];
-  for (const period of periods) {
-    if (period.provider !== provider || period.subject.toLowerCase() !== account.toLowerCase()) continue;
-    for (const edge of [period.from, period.until]) {
-      if (!edge) continue;
-      const at = periodInstant(edge, "plan period edge");
-      if (at > startMs && at < endMs) instants.push(at);
-    }
-  }
-  // A stretch no period covers is an unknown plan, not a plan change: it adds nothing.
-  const plans = [...new Set(instants.sort((a, b) => a - b)
-    .map(at => index?.resolve(provider, account, new Date(at).toISOString()).value ?? null)
-    .filter((plan): plan is string => plan !== null))];
-  const mixed = plans.length > 1;
-  return { plan: mixed ? null : plans[0] ?? null,
-    plan_detail: mixed ? { label: plans.join(" → "), multiplier: null, status: "mixed" } : null,
-    declared_plan_meter_mismatch: mixed };
-}
-
-
-/** A segmentation input after validation: canonical instants, and its order among equal instants (grp, ord). */
-export interface SegmentInput extends ProbeLimitReading { grp?: string; ord: number }
-/** A segment before plan and manual resolution, with the segmenter state its creation recorded. */
-export interface RawSegment extends Omit<ProbeLimitWindow, "plan" | "plan_detail" | "declared_plan_meter_mismatch"
-  | "manual_measurement" | "manual_measurements"> {
-  /** Its start entered the set of seen resets (it began with a changed reset). */
-  seenReset: boolean;
-  /** The last accepted input: the segmenter's `last` once this segment stops receiving readings. */
-  lastInput: SegmentInput;
-}
-/** Everything the segmenter carries from one input to the next. `out` needs only the open (last) segment. */
-export interface SegmenterState { last: SegmentInput | null; seenResets: number[]; out: RawSegment[] }
-
-/** Validated, canonical and ordered segmentation input, exactly as the segmenter consumes it. */
-export function segmentationInputs(readings: readonly ProbeLimitReading[]): SegmentInput[] {
-  const sorted = readings.filter(p => p.resets_at && Number.isFinite(Date.parse(p.ts))
-    && Number.isFinite(Date.parse(p.resets_at)) && Number.isFinite(p.used_percent)
-    && p.used_percent >= 0 && p.used_percent <= 100 && p.window_minutes > 0)
-    .map(p => ({ ...p, ts: canonicalTime(p.ts), resets_at: canonicalTime(p.resets_at) }))
-    .sort((a, b) => a.ts.localeCompare(b.ts));
-  const out: SegmentInput[] = [];
-  for (const [index, p] of sorted.entries())
-    out.push({ ...p, ord: index > 0 && sorted[index - 1]!.ts === p.ts ? out[index - 1]!.ord + 1 : 0 });
-  return out;
-}
-
-/**
- * The segmentation rules of one account/counter register. It continues `state`, so a register can resume
- * from the state saved with an earlier segment instead of reading the account's whole history again.
- */
-export function segmentReadings(account: string, counter: string, meter: readonly SegmentInput[],
-  state: SegmenterState = { last: null, seenResets: [], out: [] }): RawSegment[] {
-  const { out, seenResets } = state;
-  let last = state.last;
-  for (const point of meter) {
-    const resetMs = Date.parse(point.resets_at);
-    const prior = out.at(-1);
-    const resetChanged = !last || Math.abs(Date.parse(last.resets_at) - resetMs) > RESET_JOIN_MS;
-    if (resetChanged && seenResets.some(value => Math.abs(value - resetMs) <= RESET_JOIN_MS)) continue;
-    if (!resetChanged && point.source === "session" && last && point.used_percent < last.used_percent) continue;
-    const drop = !resetChanged && last && point.used_percent < last.used_percent - 1
-      ? { before: last.used_percent, after: point.used_percent } : null;
-    if (!prior || resetChanged || drop) {
-      const scheduled = subtractMinutes(point.resets_at, point.window_minutes);
-      const confirmedReset = resetChanged && (!last || Date.parse(scheduled) >= Date.parse(last.ts));
-      const start = drop || !confirmedReset ? point.ts : scheduled;
-      if (prior) {
-        prior.end = drop ? start : new Date(Math.min(Date.parse(prior.reset), Date.parse(start))).toISOString();
-        prior.endDrop = drop;
-        prior.cycle_end_basis = drop || !confirmedReset ? "uncertain" : "reset";
-      }
-      out.push({ id: JSON.stringify([account, counter, start]), account, counter, start,
-        end: point.resets_at, reset: point.resets_at, cycle_end_basis: "scheduled", window_minutes: point.window_minutes,
-        readings: [], startDrop: drop, endDrop: null, seenReset: resetChanged, lastInput: point });
-      if (resetChanged) seenResets.push(resetMs);
-    }
-    const open = out.at(-1)!;
-    open.readings.push({ ts: point.ts, percent: point.used_percent, source: point.source ?? "probe",
-      ...(point.plan ? { plan: point.plan } : {}),
-      ...(point.limit_hit ? { limit_hit: point.limit_hit } : {}) });
-    open.lastInput = point;
-    last = point;
-  }
-  state.last = last;
-  return out;
-}
-
-const claudeMeterPlan = (plan: string | null | undefined): string | null => {
-  const canonical = canonicalPeriodPlan(plan?.trim().toLowerCase() ?? "");
-  return /^(pro|max-5x|max-20x)$/.test(canonical) ? canonical : null;
-};
-
-/** A plan switch can select another meter with the very same reset, then resume the first. */
-export function segmentClaudeReadings(account: string, counter: string, meter: readonly SegmentInput[],
-  periods: readonly DatedPeriod[], state?: SegmenterState): RawSegment[] {
-  const index = planPeriodIndex(periods);
-  const own = effectiveDatedPeriods(periods).filter(p => p.provider === "claude" && p.subject.toLowerCase() === account.toLowerCase());
-  const observedPlans = periods.filter(p => p.provider === "claude" && p.subject.toLowerCase() === account.toLowerCase()
-    && p.origin === "observed" && claudeMeterPlan(p.value)).sort((a, b) => Date.parse(a.from) - Date.parse(b.from));
-  const readingKey = (ts: string, percent: number) => `${ts}|${percent}`;
-  const rawPlans = new Map(meter.map(row => [readingKey(row.ts, row.used_percent), claudeMeterPlan(row.plan)]));
-  const switchAt = (plan: string, previous: string, next: string): string => {
-    const bounds = (p: DatedPeriod) => Date.parse(p.from) > Date.parse(previous) && Date.parse(p.from) <= Date.parse(next);
-    return own.find(p => p.origin === "declared" && claudeMeterPlan(p.value) === plan && bounds(p))?.from
-      ?? observedPlans.find(p => claudeMeterPlan(p.value) === plan && bounds(p))?.from ?? next;
-  };
-  const withoutUnpaidGaps = (initial: WindowActivity["spans"]): WindowActivity["spans"] => {
-    let spans = initial;
-    for (const gap of own.filter(p => p.value === "none")) {
-      const from = Date.parse(gap.from), until = gap.until ? Date.parse(gap.until) : Infinity;
-      spans = spans.flatMap(span => {
-        const start = Date.parse(span.start), end = Date.parse(span.end);
-        if (end <= from || start >= until) return [span];
-        return [...(start < from ? [{ start: span.start, end: new Date(from).toISOString() }] : []),
-          ...(end > until ? [{ start: new Date(until).toISOString(), end: span.end }] : [])];
-      });
-    }
-    return spans;
-  };
-  const rows: SegmentInput[] = [];
-  for (const row of meter) {
-    const previous = rows.findLast(prior => sameReset(prior.resets_at, row.resets_at));
-    const declaredSwitch = previous && own.some(p => p.origin === "declared" && p.value !== "none"
-      && Date.parse(p.from) > Date.parse(previous.ts) && Date.parse(p.from) <= Date.parse(row.ts));
-    const plan = claudeMeterPlan(row.plan) ?? (!declaredSwitch ? previous?.plan : null)
-      ?? claudeMeterPlan(index?.resolve("claude", account, row.ts).value);
-    rows.push({ ...row, plan });
-  }
-  const resolvedPlans = new Map(rows.map(row => [readingKey(row.ts, row.used_percent), row.plan]));
-  let result = segmentReadings(account, counter, meter, state);
-  const key = (ts: string, percent: number, source: string) => JSON.stringify([ts, percent, source]);
-  const accepted = new Set(result.flatMap(window => window.readings.map(row => key(row.ts, row.percent, row.source))));
-  const resets: SegmentInput[][] = [];
-  for (const row of rows.filter(row => accepted.has(key(row.ts, row.used_percent, row.source ?? "probe")))) {
-    const group = resets.find(group => sameReset(group[0]!.resets_at, row.resets_at));
-    if (group) group.push(row); else resets.push([row]);
-  }
-  for (const group of resets) {
-    const plans = [...new Set(group.flatMap(row => row.plan ? [row.plan] : []))];
-    if (plans.length < 2) continue;
-    const directPlans = new Set(group.flatMap(row => {
-      const plan = rawPlans.get(readingKey(row.ts, row.used_percent));
-      return plan ? [plan] : [];
-    }));
-    if (directPlans.size < 2) continue;
-    // Unknown readings do not establish a switch. They remain with the last known meter.
-    let lastPlan: string | null = null;
-    const assigned = group.map(row => { lastPlan = row.plan ?? lastPlan; return { ...row, plan: lastPlan }; });
-    const runs: Array<{ plan: string; start: string; end: string }> = [];
-    for (let i = 0; i < assigned.length; i++) {
-      const row = assigned[i]!;
-      if (!row.plan || runs.at(-1)?.plan === row.plan) continue;
-      const previous = assigned[i - 1];
-      const start = previous ? switchAt(row.plan, previous.ts, row.ts) : subtractMinutes(row.resets_at, row.window_minutes);
-      if (runs.length) runs.at(-1)!.end = canonicalTime(start);
-      runs.push({ plan: row.plan, start: canonicalTime(start), end: canonicalTime(row.resets_at) });
-    }
-    const original = result.filter(window => sameReset(window.reset, group[0]!.resets_at));
-    result = result.filter(window => !sameReset(window.reset, group[0]!.resets_at));
-    for (const plan of plans) {
-      const selected = assigned.filter(row => row.plan === plan);
-      const segments = segmentReadings(account, counter, selected);
-      for (const segment of segments) {
-        if (segment === segments[0] && plan === assigned.find(row => row.plan)?.plan && original[0]) {
-          segment.start = original[0].start;
-          segment.startDrop = original[0].startDrop;
-        }
-        let spans = runs.filter(run => run.plan === plan).map(run => ({
-          start: new Date(Math.max(Date.parse(run.start), Date.parse(segment.start))).toISOString(),
-          end: new Date(Math.min(Date.parse(run.end), Date.parse(segment.end))).toISOString(),
-        })).filter(span => span.start < span.end);
-        // A declared unpaid gap is not traffic of either paid meter.
-        spans = withoutUnpaidGaps(spans);
-        if (!spans.length) continue;
-        segment.start = spans[0]!.start;
-        segment.id = JSON.stringify([account, counter, segment.start]);
-        segment.activity = { plan, spans };
-        result.push(segment);
-      }
-    }
-  }
-  for (const window of result) {
-    if (window.activity) continue;
-    const plans = [...new Set(window.readings.flatMap(row => {
-      const plan = claudeMeterPlan(row.plan) ?? resolvedPlans.get(readingKey(row.ts, row.percent));
-      return plan ? [plan] : [];
-    }))];
-    if (plans.length !== 1) continue;
-    const initial = [{ start: window.start, end: window.end }];
-    // Direct meter readings can supersede a lagging account-plan projection.
-    const changes = observedPlans.map((period, i) => ({ plan: claudeMeterPlan(period.value)!, priority: 0,
-      at: Date.parse(switchAt(claudeMeterPlan(period.value)!, observedPlans[i - 1]?.lastSeen ?? observedPlans[i - 1]?.from ?? window.start, period.from)) }));
-    changes.push(...window.readings.flatMap(row => claudeMeterPlan(row.plan)
-      ? [{ plan: claudeMeterPlan(row.plan)!, priority: 1, at: Date.parse(row.ts) }] : []));
-    changes.sort((a, b) => a.at - b.at || a.priority - b.priority);
-    let selected = plans[0]!, cursor = Date.parse(window.start);
-    const end = Date.parse(window.end), selectedSpans: WindowActivity["spans"] = [];
-    for (const change of changes) {
-      if (change.at >= end) break;
-      if (change.at <= cursor) { selected = change.plan; continue; }
-      if (change.plan === selected) continue;
-      if (selected === plans[0]) selectedSpans.push({ start: new Date(cursor).toISOString(), end: new Date(change.at).toISOString() });
-      cursor = change.at; selected = change.plan;
-    }
-    if (selected === plans[0]) selectedSpans.push({ start: new Date(cursor).toISOString(), end: window.end });
-    const spans = withoutUnpaidGaps(selectedSpans);
-    const witnessed = observedPlans.some(period => claudeMeterPlan(period.value) === plans[0]
-      && Date.parse(period.from) <= Date.parse(window.lastInput.ts)
-      && (!period.until || Date.parse(period.until) > Date.parse(window.lastInput.ts)));
-    const dated = probeWindowPlan(index, own, "claude", account, window.start, window.end).plan;
-    if (JSON.stringify(spans) !== JSON.stringify(initial) || witnessed && dated !== plans[0])
-      window.activity = { plan: plans[0]!, spans };
-  }
-  return result.sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id));
-}
-
 /** Plan periods and manual measurements that resolve a register's segments into windows. */
 export interface WindowResolution {
   provider: string; account: string; counter: string;
@@ -456,7 +194,7 @@ export function resolveSegment(segment: SegmentShape, resolution: WindowResoluti
   // resolve this register from the plans its accepted readings actually report.
   const meterPlans = provider === "codex" ? [...new Set(segment.readings.flatMap(reading =>
     reading.plan?.trim() ? [reading.plan.trim().toLowerCase()] : []))] : [];
-  const plan = segment.activity ? { plan: segment.activity.plan, plan_detail: null, declared_plan_meter_mismatch: false }
+  const plan = segment.activity?.plan != null ? { plan: segment.activity.plan, plan_detail: null, declared_plan_meter_mismatch: false }
     : meterPlans.length ? { plan: meterPlans.length === 1 ? meterPlans[0]! : null,
     plan_detail: meterPlans.length > 1 ? { label: meterPlans.join(" → "), multiplier: null, status: "mixed" as const } : null,
     declared_plan_meter_mismatch: meterPlans.length > 1 }
@@ -481,7 +219,6 @@ export function buildProbeLimitWindows(input: {
 }): ProbeLimitWindow[] {
   const resolution = windowResolution(input.provider, input.account, input.counter, input.periods, input.measurements);
   const meter = segmentationInputs(input.readings);
-  return (input.provider === "claude" ? segmentClaudeReadings(input.account, input.counter, meter, input.periods)
-    : segmentReadings(input.account, input.counter, meter))
+  return segmentLimitReadings(input.provider, input.account, input.counter, meter, input.periods)
     .map(({ seenReset: _seen, lastInput: _last, ...segment }) => resolveSegment(segment, resolution));
 }

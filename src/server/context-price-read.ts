@@ -7,7 +7,7 @@ import type { ProbeLimitWindow } from "./probe-limit-windows";
 
 interface ContextRow {
   start_ts: string; end_ts: string; reset_ts: string; cycle: string | null; readings: string | null;
-  meter: string; start_drop: string | null;
+  meter: string; start_drop: string | null; activity?: string | null; window_minutes?: number;
 }
 
 type ContextUsage = Parameters<typeof storedContextPrice>[0];
@@ -31,7 +31,7 @@ function subtractUsage(high: ContextUsage, low: ContextUsage): ContextUsage | un
 /** Only stored window rows, scoped by account/counter and time; no ledger or event access. */
 export function readContextRows(db: Database, account: string, counter: string | null, from: string, until: string): ContextRow[] {
   if (!db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='window_usage'").get()) return [];
-  return db.query(`SELECT w.start_ts,w.end_ts,w.reset_ts,u.cycle,u.readings,w.readings meter,w.start_drop
+  return db.query(`SELECT w.start_ts,w.end_ts,w.reset_ts,u.cycle,u.readings,w.readings meter,w.start_drop,w.activity,w.window_minutes
     FROM limit_windows w LEFT JOIN window_usage u ON u.provider=w.provider AND u.account=w.account
       AND u.counter=w.counter AND u.window_id=w.window_id
     WHERE w.provider='codex' AND w.account=? AND (? IS NULL OR w.counter=?) AND w.start_ts<? AND w.end_ts>?
@@ -72,7 +72,8 @@ export function billingContextPrice(rows: readonly ContextRow[], from: string, u
     if (first >= start && last <= end) { parts.push(whole); continue; }
     const meter = (JSON.parse(row.meter) as ProbeLimitWindow["readings"]).sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
     const pairing = meter.length ? pairingBounds({ start: row.start_ts, readings: meter,
-      startDrop: row.start_drop ? { before: 0, after: 0 } : null }) : null;
+      startDrop: row.start_drop ? { before: 0, after: 0 } : null, reset: row.reset_ts, window_minutes: row.window_minutes,
+      ...(row.activity ? { activity: JSON.parse(row.activity) as ProbeLimitWindow["activity"] } : {}) }) : null;
     const bounds = pairing ? { fromReset: pairing.fromReset, start: Date.parse(pairing.start), end: Date.parse(pairing.last.ts) }
       : { fromReset: true, start: first, end: Infinity };
     const readings = (row.readings ? JSON.parse(row.readings) as WindowReadingSums[] : [])

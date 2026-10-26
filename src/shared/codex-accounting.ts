@@ -62,7 +62,7 @@ export interface CodexComparisonWindow {
   first_probe?: { ts: string; percent: number };
   cycle_start?: string | null;
   cycle_end?: string;
-  cycle_end_basis?: "scheduled" | "reset" | "uncertain";
+  cycle_end_basis?: "scheduled" | "reset" | "uncertain" | "plan_change" | "capacity_change";
   cycle_usage?: WindowUsage;
   unpaired_events?: number;
   meter_sources?: Array<"session" | "probe" | "manual" | "limit_hit">;

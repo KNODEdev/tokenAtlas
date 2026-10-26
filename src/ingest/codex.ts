@@ -106,7 +106,7 @@ export function ensureCodexSchema(db: Database): void {
     db.exec(CODEX_SOURCE_LOCATOR_INDEX_SQL);
     ensureCodexFileModelsIndex(db);
     const evidence = tableColumns(db, "codex_file_evidence");
-    for (const name of ["provider_thread_id", "provider_session_id", "provider_forked_from_id"]) {
+    for (const name of ["provider_thread_id", "provider_session_id", "provider_forked_from_id", "first_token_json"]) {
       if (!evidence.has(name)) db.exec(`ALTER TABLE codex_file_evidence ADD COLUMN ${name} TEXT`);
     }
     db.exec(CODEX_FORKED_FROM_INDEX_SQL);
@@ -226,6 +226,7 @@ async function backfillUnattributedModels(db: Database, pool: ParsePool, prepare
 }
 
 export interface CodexSyncOptions {
+  pool?: ParsePool;
   onTimings?:IngestTimingHandler;
   homes: string[];
   force?: boolean;
@@ -338,7 +339,7 @@ async function writeCodex(db: Database, options: CodexSyncOptions, empty: Set<st
   const insertRates = rowWriter(db, "ratelimit", "home,path,ts,window_minutes,used_percent,resets_at,plan_type,limit_id,limit_name,source_offset,source_slot".split(","));
   const insertFileEvidence = db.query(`INSERT INTO codex_file_evidence
     (home,path,source_sha256,source_byte_length,parser_version,evidence_version,session_headers_json,provider_thread_id,provider_session_id,
-     provider_forked_from_id) VALUES (?,?,?,?,?,1,?,?,?,?)`);
+     provider_forked_from_id,first_token_json) VALUES (?,?,?,?,?,1,?,?,?,?,?)`);
   const unavailable: CodexSyncResult["unavailable_inputs"] = [];
   let dirtyFrom: string | null = null, dirtyTo: string | null = null;
   const logical = (file: string) => toArchiveLogicalPath(rolloutIdentity(file));
@@ -398,7 +399,7 @@ async function writeCodex(db: Database, options: CodexSyncOptions, empty: Set<st
     if (dirtyTo === null || ts > dirtyTo) dirtyTo = ts;
   };
 
-  let pool: ParsePool | undefined;
+  let pool: ParsePool | undefined = options.pool;
   try {
     for (const home of homes) {
       const bookmarksEnd=timer.begin("bookmarksMs");
@@ -522,7 +523,8 @@ async function writeCodex(db: Database, options: CodexSyncOptions, empty: Set<st
           insertFileEvidence.run(hkey, stored, parse.evidence.source.sha256, BigInt(parse.evidence.source.byteLength),
             CODEX_PARSER_VERSION, JSON.stringify(parse.evidence.sessionHeaders), ids.thread, ids.session,
             // The file's own header comes first; a replayed parent header later in the file is not its parent.
-            parse.evidence.sessionHeaders[0]?.providerForkedFromId ?? null);
+            parse.evidence.sessionHeaders[0]?.providerForkedFromId ?? null,
+            parse.firstToken ? JSON.stringify({ ...parse.firstToken, bookmark: { size: stat.size, mtime: stat.mtime } }) : null);
           // Detail spans are nested in stageWriteMs, not added to its wall-time partition.
           const fileStarted=performance.now();
           replaceFile.run(hkey, stored, stat.size, stat.mtime, parse.events.length, parse.consumed, CODEX_PARSER_VERSION, pyDumps(parse.state));
@@ -544,7 +546,7 @@ async function writeCodex(db: Database, options: CodexSyncOptions, empty: Set<st
       preparation.peakPendingFiles = Math.max(preparation.peakPendingFiles, Math.min(pending.length, prefetchWindow));
     }
     if(pool?.size){const end=timer.begin("parserProfileMs");try{timer.workerProfile(await pool.profileSnapshot());}catch{/* Optional backend metrics cannot reject facts. */}finally{end();}}
-  } finally { const closeEnd=timer.begin("poolCloseMs");try{await pool?.close();}finally{closeEnd();timer.emit(true);} }
+  } finally { const closeEnd=timer.begin("poolCloseMs");try{if (!options.pool) await pool?.close();}finally{closeEnd();timer.emit(true);} }
 
   let recovered = 0;
   const recoveredDates: string[] = [];
@@ -553,11 +555,11 @@ async function writeCodex(db: Database, options: CodexSyncOptions, empty: Set<st
   try {
     // Current files were already parsed whole; only retained legacy events can gain model evidence.
     if (selected === null && !freshStage && db.query("SELECT 1 FROM events WHERE model='?' LIMIT 1").get()) {
-      const recoveryPool = new ParsePool(parseWorkerCount());
+      const recoveryPool = options.pool ?? new ParsePool(parseWorkerCount());
       try {
         const models = await backfillUnattributedModels(db, recoveryPool, writtenFiles);
         recovered += models.updated; recoveredDates.push(...models.dates);
-      } finally { await recoveryPool.close(); }
+      } finally { if (!options.pool) await recoveryPool.close(); }
     }
     db.exec("COMMIT");
   } catch (error) { if (db.inTransaction) db.exec("ROLLBACK"); throw error; }

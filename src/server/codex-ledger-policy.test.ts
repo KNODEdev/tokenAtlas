@@ -105,12 +105,12 @@ test("Fast-only or interrupted Standard coverage fails without losing periods", 
     legacyRule("b2", { valid_from: "2026-03-01" }), fast))).toThrow("Standard base");
 });
 
-test("raw mapping is dated, open to ultrafast, and never infers a NULL tier", () => {
+test("an omitted tier means Standard; recorded mappings remain dated and open to ultrafast", () => {
   const input = policy(); input.tiers.push("ultrafast");
   input.mappings.push({ id: "raw:ultra", raw_value: "turbo", tier: "ultrafast", valid_from: "2026-02-01", valid_until: "2026-03-01" });
   input.tier_rules.push({ ...input.tier_rules[1]!, id: "ultra", tier: "ultrafast", multiplier: "3.000000000000000000000000001" });
   const compiled = compileCodexLedgerPolicy(input);
-  expect(compiled.classify(null, "2026-02-01")).toBeNull();
+  expect(compiled.classify(null, "2026-02-01")).toBe("standard");
   expect(compiled.classify("standard", "2026-02-01")).toBeNull();
   expect(compiled.classify("default", "2026-02-01")).toBe("standard");
   expect(compiled.classify("priority", "2026-02-01")).toBe("fast");
@@ -124,6 +124,7 @@ test("raw mapping is dated, open to ultrafast, and never infers a NULL tier", ()
   expect(compiled.resolveBaseRule(null, "api_equivalent_usd", "2026-02-01")).toBeNull();
   expect(compiled.resolveBaseRule("m", "api_equivalent_usd", "2026-02-30")).toBeNull();
   expect(compiled.classify("default", "invalid")).toBeNull();
+  expect(compiled.classify(null, "invalid")).toBeNull();
 });
 
 test("tier-only high precision edits preserve stored base coefficients and compilation snapshots", () => {

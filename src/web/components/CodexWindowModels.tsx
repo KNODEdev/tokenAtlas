@@ -6,6 +6,8 @@ import type { CodexWindowModelRow, WindowPriceParts } from "../../shared/codex-w
 import { AccountPeriodDrawer } from "./AccountPeriodDrawer";
 import { ModelCacheHistory } from "./ModelCacheHistory";
 import { TableRow, Card, EmptyState, ErrorState, Fact, FactNote, Facts, HelpBlock, HelpDot, LoadingCard, Table, Tabs, Td, Th } from "./ui";
+import { WindowModelTable } from "./WindowModelTable";
+import { freshWindowInput, windowTokenDefinitions, windowTokenLabels } from "../lib/window-tokens";
 import "./CodexWindowModels.css";
 
 export interface CodexWindowModelsProps {
@@ -23,6 +25,7 @@ interface ModelSummary {
   input: number;
   cached: number;
   cacheWrite: number;
+  cache_write_complete: boolean;
   output: number;
   reasoning: number;
   total: number;
@@ -35,7 +38,7 @@ interface PriceSummary {
 
 const finite = (value: number): number => Number.isFinite(value) ? value : 0;
 const tokens = (row: CodexWindowModelRow): number => finite(row.input) + finite(row.output);
-const fresh = (row: CodexWindowModelRow): number => Math.max(0, finite(row.input) - finite(row.cached) - finite(row.cache_write));
+const fresh = freshWindowInput;
 const number = (value: number | null | undefined): string => value == null || !Number.isFinite(value) ? "—" : full(value);
 const decimal = (value: number | null | undefined): string => value == null || !Number.isFinite(value) ? "—" : value.toLocaleString(getLocale(), { maximumFractionDigits: 2 });
 const money = (value: number | null | undefined, prefix = ""): string => value == null || !Number.isFinite(value) ? "—" : prefix + usd(value);
@@ -61,6 +64,7 @@ function summaryRows(rows: CodexWindowModelRow[]): ModelSummary[] {
       input: 0,
       cached: 0,
       cacheWrite: 0,
+      cache_write_complete: true,
       output: 0,
       reasoning: 0,
       total: 0,
@@ -70,6 +74,8 @@ function summaryRows(rows: CodexWindowModelRow[]): ModelSummary[] {
     current.input += finite(row.input);
     current.cached += finite(row.cached);
     current.cacheWrite += finite(row.cache_write);
+    // Older stored answers lack completeness evidence too.
+    current.cache_write_complete &&= row.cache_write_complete === true;
     current.output += finite(row.output);
     current.reasoning += finite(row.reasoning);
     current.total += tokens(row);
@@ -181,9 +187,10 @@ function DetailedRateTable({ row }: { row: CodexWindowModelRow }) {
         <Th columnId="c4" align="right">{t("Credits/M", "Kredyty/M")}</Th><Th columnId="c5" align="right">{t("Credits", "Kredyty")}</Th>
       </TableRow></thead>
       <tbody>
-        {/* A piece with no tokens in this rate row is only noise ("0 — — —"). */}
-        {pieces.filter(piece => piece.quantity > 0).map(piece => <TableRow key={piece.key}>
-          <Td>{piece.label}</Td><Td align="right" mono>{number(piece.quantity)}</Td>
+        {/* Missing write evidence is distinct from a reported zero. */}
+        {pieces.filter(piece => piece.quantity > 0 || piece.key === "write" && row.cache_write_complete !== true).map(piece => <TableRow key={piece.key}>
+          <Td>{piece.label}</Td><Td align="right" mono>{piece.key === "write" && row.cache_write_complete !== true
+            ? piece.quantity > 0 ? `≥ ${number(piece.quantity)}` : "—" : number(piece.quantity)}</Td>
           <Td align="right" mono>{rate(piece.apiRate)}</Td><Td align="right" mono>{piece.apiCost}</Td>
           <Td align="right" mono>{rate(piece.creditRate)}</Td><Td align="right" mono>{piece.creditCost}</Td>
         </TableRow>)}
@@ -259,32 +266,6 @@ function perMillion(rows: CodexWindowModelRow[]): string {
   return priced.pricedTokens > 0 ? money(priced.total * 1_000_000 / priced.pricedTokens) : "—";
 }
 
-function SummaryCells({ summary, whole, bold }: { summary: ModelSummary; whole: number; bold?: boolean }) {
-  const { t } = useI18n();
-  const cell = (value: string) => bold ? <strong>{value}</strong> : value;
-  const unpriced = pricedSummary(summary.rows, "api").pricedTokens <= 0;
-  return <>
-    <Td align="right" mono>{cell(number(summary.calls))}</Td>
-    <Td mono>
-      <span className="codex-models-share">
-        {!bold && <span className="codex-models-share-track" title={percent(summary.total, whole)}>
-          <span style={{ width: `${whole > 0 ? 100 * summary.total / whole : 0}%` }} />
-        </span>}
-        {cell(number(summary.total))}
-      </span>
-    </Td>
-    <Td align="right" mono title={`${t("cache read", "odczyt z cache")} ${number(summary.cached)} / ${t("input", "input")} ${number(summary.input)}`}>
-      {cell(percent(summary.cached, summary.input))}
-    </Td>
-    <Td align="right" mono>{cell(number(summary.output))}</Td>
-    {unpriced
-      ? <Td align="right" style={{ color: "var(--faint)" }}>{t("no rate", "brak stawki")}</Td>
-      : <Td align="right" mono>{cell(partialAmount(summary.rows, "api", summary.total, money))}</Td>}
-    <Td align="right" mono>{cell(perMillion(summary.rows))}</Td>
-    <Td align="right" mono>{cell(partialAmount(summary.rows, "credits", summary.total, credits))}</Td>
-  </>;
-}
-
 /** Where the model's API Standard went, by priced piece, in the token composition card's colours. */
 export function CostSplit({ rows }: { rows: CodexWindowModelRow[] }) {
   const { t } = useI18n();
@@ -351,48 +332,21 @@ export function CodexWindowModels({ data, loading, error, cycleLabel, account }:
   const total = summaries.reduce<ModelSummary>((result, row) => ({
     model: t("Total", "Razem"), rows: [...result.rows, ...row.rows], calls: result.calls + row.calls,
     input: result.input + row.input, cached: result.cached + row.cached, cacheWrite: result.cacheWrite + row.cacheWrite,
+    cache_write_complete: result.cache_write_complete && row.cache_write_complete,
     output: result.output + row.output, reasoning: result.reasoning + row.reasoning, total: result.total + row.total,
-  }), { model: t("Total", "Razem"), rows: [], calls: 0, input: 0, cached: 0, cacheWrite: 0, output: 0, reasoning: 0, total: 0 });
+  }), { model: t("Total", "Razem"), rows: [], calls: 0, input: 0, cached: 0, cacheWrite: 0, cache_write_complete: true, output: 0, reasoning: 0, total: 0 });
   const shown = open ? summaries.find(summary => summary.model === open.model) ?? null : null;
+  const labels = windowTokenLabels(t), definitions = windowTokenDefinitions(t);
   return (
-    <Card pad="14px 16px 10px">
+    <Card>
       {(detail.excluded_mirror_events > 0 || detail.excluded_counter_events > 0 || detail.invalid_token_events > 0) && <div className="mono" style={{ margin: "0 0 var(--s-3)", color: "var(--faint)", fontSize: "var(--fs-3)" }}>
         {(detail.excluded_mirror_events > 0 || detail.excluded_counter_events > 0) && <>{t("Excluded", "Pominięto")}: {number(detail.excluded_mirror_events)} {t("mirror events", "kopii")}, {number(detail.excluded_counter_events)} {t("counter events", "zdarzeń licznika")}.</>}
         {detail.invalid_token_events > 0 && <span style={{ color: "var(--warn)" }}> {t("Invalid token events", "Nieprawidłowe zdarzenia tokenów")}: {number(detail.invalid_token_events)}.</span>}
       </div>}
-      <div className="codex-models-table">
-        <Table tableId="CodexWindowModels:1">
-          <thead><TableRow header>
-            <Th columnId="c0">{t("Model", "Model")}</Th>
-            <Th columnId="c1" align="right">{t("Calls", "Wywołania")}</Th>
-            <Th columnId="c2">{t("Tokens · share", "Tokeny · udział")}</Th>
-            <Th columnId="c3" align="right" title={t("Cache read as a share of input", "Odczyt z cache jako udział inputu")}>{t("Cache", "Cache")}</Th>
-            <Th columnId="c4" align="right" title={t("Output including reasoning", "Output z reasoning")}>{t("Output", "Output")}</Th>
-            <Th columnId="c5" align="right">{t("API Standard", "API Standard")}</Th>
-            <Th columnId="c6" align="right" title={t("API Standard per million priced tokens", "API Standard na milion wycenionych tokenów")}>{t("$/M tok.", "$/M tok.")}</Th>
-            <Th columnId="c7" align="right">{t("Credits Standard", "Kredyty Standard")}</Th>
-          </TableRow></thead>
-          <tbody>
-            {summaries.map(summary => {
-              const choose = (opener: HTMLElement | null) => { setTab("costs"); setOpen({ model: summary.model, opener }); };
-              return <TableRow key={summary.model} className={`ui-open-row${open?.model === summary.model ? " is-selected" : ""}`}
-                onClick={(event) => choose(event.currentTarget.querySelector("button"))}>
-                <Td title={summary.model}>
-                  <button type="button" className="ui-open-row-button" aria-haspopup="dialog"
-                    onClick={(event) => { event.stopPropagation(); choose(event.currentTarget); }}>
-                    {usageModelLabel(summary.model)} <span aria-hidden="true">›</span>
-                  </button>
-                </Td>
-                <SummaryCells summary={summary} whole={total.total} />
-              </TableRow>;
-            })}
-            <TableRow>
-              <Td><strong>{t("Total", "Razem")}</strong></Td>
-              <SummaryCells summary={total} whole={total.total} bold />
-            </TableRow>
-          </tbody>
-        </Table>
-      </div>
+      <WindowModelTable tableId="CodexWindowModels:1" selectedModel={open?.model} rows={summaries.map(summary => ({
+        ...summary, cache_write: summary.cacheWrite,
+        api: pricedSummary(summary.rows, "api"), credits: pricedSummary(summary.rows, "credits"),
+      }))} onOpen={(model, opener) => { setTab("costs"); setOpen({ model, opener }); }} />
       <CoverageLine summaries={summaries} total={total} />
       {shown && open && <AccountPeriodDrawer busy={false} returnFocus={open.opener} onClose={() => setOpen(null)}
         className="ui-detail-drawer" title={usageModelLabel(shown.model)} subtitle={cycleLabel}
@@ -404,12 +358,14 @@ export function CodexWindowModels({ data, loading, error, cycleLabel, account }:
           <Fact label={t("Credits Standard", "Kredyty Standard")} value={partialAmount(shown.rows, "credits", shown.total, credits)} notes={<CoverageNote rows={shown.rows} basis="credits" totalTokens={shown.total} />} />
         </Facts>
         <Facts>
-          {/* The cost split below already names fresh and cache-read input; the exact pieces stay in the tooltip. */}
-          <Fact label={t("Input", "Input")}
-            value={<span title={`${t("fresh", "świeży")} ${number(shown.input - shown.cached - shown.cacheWrite)} · ${t("cache read", "odczyt z cache")} ${number(shown.cached)} · ${t("cache write", "zapis do cache")} ${number(shown.cacheWrite)}`}>{number(shown.input)}</span>} />
-          <Fact label={t("Output", "Output")} value={number(shown.output)}
+          <Fact label={<span title={definitions.input}>{labels.input}</span>}
+            value={number(shown.input)} />
+          <Fact label={<span title={definitions.fresh}>{labels.fresh}</span>} value={shown.cache_write_complete ? number(shown.input - shown.cached - shown.cacheWrite) : "—"} />
+          <Fact label={<span title={definitions.cached}>{labels.cached}</span>} value={number(shown.cached)} />
+          <Fact label={<span title={definitions.cache_write}>{labels.cache_write}</span>} value={shown.cache_write_complete ? number(shown.cacheWrite) : shown.cacheWrite > 0 ? `≥ ${number(shown.cacheWrite)}` : "—"} />
+          <Fact label={<span title={definitions.output}>{labels.output}</span>} value={number(shown.output)}
             notes={shown.reasoning > 0 ? <FactNote>{t("reasoning", "reasoning")} {number(shown.reasoning)}</FactNote> : undefined} />
-          <Fact label={<span title={t("Cache read as a share of input", "Odczyt z cache jako udział inputu")}>{t("Cache", "Cache")}</span>} value={percent(shown.cached, shown.input)} />
+          <Fact label={<span title={definitions.cache_share}>{labels.cache_share}</span>} value={percent(shown.cached, shown.input)} />
           <Fact label={<span title={t("API Standard per million priced tokens", "API Standard na milion wycenionych tokenów")}>{t("$/M tokens", "$/M tokenów")}</span>} value={perMillion(shown.rows)} />
         </Facts>
         <Tabs value={tab} onChange={setTab} options={[

@@ -1,4 +1,5 @@
 import type { WindowUsage, CONTEXT_USAGE_KEYS } from "../shared/codex-accounting";
+import type { WindowModelUsage } from "../shared/window-model-usage";
 import type { ModelCapacityWindow } from "../shared/model-capacity";
 import type { WindowEvidence } from "../shared/subscription-quality";
 import type { MeterExclusion, MeterEvent, WindowAccountingAdapter } from "./subscription-window-comparison";
@@ -61,11 +62,8 @@ export interface WindowCycleSums {
 }
 
 /** The cycle's traffic of one model: counted (`excluded` null) or left out with its reason. */
-export interface WindowModelTraffic {
-  model: string | null; excluded: MeterExclusion | null; calls: number;
-  input: number; cached: number; cache_write: number; output: number; reasoning: number;
-  /** API Standard value of the priced calls; the unpriced calls' tokens beside it. */
-  api_standard: number; unpriced_tokens: number;
+export interface WindowModelTraffic extends WindowModelUsage {
+  excluded: MeterExclusion | null;
   /** Grok and GLM: the vendor-recorded money of the calls and how many recorded none. */
   reported_usd?: number; reported_missing?: number;
 }

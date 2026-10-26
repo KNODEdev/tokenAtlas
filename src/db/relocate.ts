@@ -3,8 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { ARCHIVE_ROOT } from "../config/paths";
-import { atomicArchiveWrite } from "../sync/archive-publication";
-import { databaseEnvironmentContents, databaseEnvFile } from "./location";
+import { databaseEnvFile, databaseLocalStateRoot, saveDatabaseSelection, selectedDatabasePath } from "./location";
+import { copyLocalState } from "../config/local-settings";
+import { resolveLocalStateRootBase } from "../config/archive-locator";
 import { temporaryDirectory, createTemporaryWorkspace } from "../config/temporary-storage";
 
 function physicalPath(value: string): string {
@@ -37,11 +38,11 @@ export function validateDatabaseDestination(source: string, input: string, env =
 export function relocateDatabase(source: string, requested: string, envFile = databaseEnvFile, env = process.env): string {
   if (process.env.NODE_ENV === "test" && path.resolve(envFile) === databaseEnvFile) throw new Error("Tests must supply a fixture envFile.");
   const destination = validateDatabaseDestination(source, requested, env);
-  const previousEnv = fs.existsSync(envFile) ? fs.readFileSync(envFile, "utf8") : "";
   const admission = new Database(source, { readwrite: true });
   let workspace: ReturnType<typeof createTemporaryWorkspace> | undefined;
   let reader: Database | undefined;
   let published = false;
+  let copiedState = false;
   try {
     admission.exec("BEGIN IMMEDIATE;");
     // Refuse another process's unfinished import rather than copying its partial publication.
@@ -64,10 +65,12 @@ export function relocateDatabase(source: string, requested: string, envFile = da
     published = true;
     const destinationFd = fs.openSync(destination, "r+");
     try { fs.fsyncSync(destinationFd); } finally { fs.closeSync(destinationFd); }
-    atomicArchiveWrite(envFile, databaseEnvironmentContents(previousEnv, destination));
+    copiedState = copyLocalState(resolveLocalStateRootBase(env, selectedDatabasePath(envFile) ?? null), databaseLocalStateRoot(destination));
+    saveDatabaseSelection(destination, envFile);
     return destination;
   } catch (error) {
     if (published) fs.rmSync(destination, { force: true });
+    if (copiedState) fs.rmSync(databaseLocalStateRoot(destination), { recursive: true, force: true });
     throw error;
   } finally {
     reader?.close();

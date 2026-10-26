@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { expiryNotices, grantOutlook, poolChangeNotices, type NoticePool, type NoticePoolItem, type StoredPool } from "./credit-notices";
+import { creditNoticeOccurredAt, expiryNotices, grantOutlook, poolChangeNotices, type NoticePool, type NoticePoolItem, type StoredPool } from "./credit-notices";
 
 const DAY = 86_400_000;
 const at = (day: number) => new Date(Date.UTC(2026, 9, 1) + day * DAY).toISOString();
@@ -15,6 +15,17 @@ const resets = (...items: NoticePoolItem[]): NoticePool => ({ key: "codex:resets
   granted: null, used: null, remaining: items.length, remaining_text: null, unlimited: false, granted_at: null,
   expires_at: items.map(item => item.expires_at!).sort()[0] ?? null, items });
 const kinds = (drafts: ReturnType<typeof poolChangeNotices>) => drafts.map(draft => `${draft.kind}:${draft.notice}:${draft.amount_text ?? draft.amount}`);
+
+test("notice chronology uses grant and expiry facts, warning creation, and observation when no event date is known", () => {
+  const base = { observed_at: at(25), expires_at: at(22), detail: { granted_at: "2026-09-29T20:39:37+02:00" } };
+  expect(creditNoticeOccurredAt({ ...base, kind: "received" })).toBe("2026-09-29T18:39:37.000Z");
+  expect(creditNoticeOccurredAt({ ...base, kind: "expired_unused" })).toBe(at(22));
+  expect(creditNoticeOccurredAt({ ...base, kind: "expiring", created_at: at(26) })).toBe(at(26));
+  for (const kind of ["used", "spent", "topped_up"] as const)
+    expect(creditNoticeOccurredAt({ ...base, kind })).toBe(at(25));
+  expect(creditNoticeOccurredAt({ ...base, kind: "received", detail: { granted_at: "invalid" } })).toBe(at(25));
+  expect(creditNoticeOccurredAt({ ...base, kind: "expired_unused", expires_at: null })).toBe(at(25));
+});
 
 describe("pool change notices", () => {
   test("a first reading is the baseline except free resets granted within a week", () => {

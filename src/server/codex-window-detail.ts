@@ -280,6 +280,8 @@ function buildWindowDetail(sqlite: Database, card: RateCard, options: WindowOpti
     if (!entry) {
       const exact = (band: PublishedCodexLedgerBand | undefined): ExactParts => ({ ...partsHead(band!), input: zero, cached: zero, cache_write: zero, output: zero, total: zero });
       entry = { row: { model: model ?? "?", speed, first: stored.first_ts, last: stored.last_ts, calls: 0, input: 0, cached: 0, cache_write: 0, output: 0,
+        // Stored cohorts retain write quantities, but not source-counter completeness.
+        cache_write_complete: false,
         reasoning: 0, tokens: 0, long_context: apiBand?.band === "long", api: null, credits: null, actual_api: null, actual_credits: null,
         unpriced_reason: apiReason ?? creditReason }, firstMs, lastMs, order,
         api: apiParts && exact(apiBand), credits: creditParts && exact(creditBand), actualApi: zero, actualCredits: zero };

@@ -659,6 +659,20 @@
       "when": 1789776000061,
       "tag": "0093_window_activity",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "6",
+      "when": 1789776000062,
+      "tag": "0094_window_meter_evidence",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "6",
+      "when": 1789776000063,
+      "tag": "0095_first_token",
+      "breakpoints": true
     }
   ]
 }

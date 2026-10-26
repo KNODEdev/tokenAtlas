@@ -4,6 +4,9 @@ import { BacklogProgress, ProgressRegistry } from "../sync/progress";
 import { createClaudeCodeAcceptanceFixture } from "./claude-code-capacity.fixture";
 import { runBackgroundTurn, type BackgroundTurn } from "./background-jobs";
 import { analysisRebuildStatus, queueAnalysisRebuild } from "./analysis-rebuild";
+import { installFirstTokenTracking } from "../db/first-token";
+import { codexFirstTokenAdapter } from "../providers/first-token/codex";
+import { writeRebuildStatusJson } from "../db/rebuild-status";
 
 const turnOf = (fixture: ReturnType<typeof createClaudeCodeAcceptanceFixture>, canWrite: () => boolean = () => true): BackgroundTurn => {
   const progress = new ProgressRegistry(null);
@@ -42,6 +45,36 @@ test("a writer that must yield writes nothing", () => {
     const result = runBackgroundTurn(turnOf(fixture, () => false));
     expect(result).toMatchObject({ catchUpNeeded: false, errors: {} });
     expect(changes()).toEqual(before);
+  } finally { fixture.teardown(); }
+}, 30000);
+
+test("a native completion publishes only TTFT and respects a source rebuild and the writer gate", () => {
+  const fixture = withEmptyCodexSource(createClaudeCodeAcceptanceFixture());
+  try {
+    const { db } = fixture;
+    db.exec("CREATE TABLE IF NOT EXISTS files(home TEXT,path TEXT,size INTEGER,mtime REAL,PRIMARY KEY(home,path))");
+    installFirstTokenTracking(db, codexFirstTokenAdapter);
+    db.exec("ALTER TABLE codex_file_evidence ADD COLUMN first_token_json TEXT");
+    db.query("INSERT INTO files VALUES('h','/archive/codex/pc/f',1,1)").run();
+    db.query(`INSERT INTO codex_file_evidence(home,path,source_sha256,source_byte_length,parser_version,evidence_version,session_headers_json,first_token_json)
+      VALUES('h','/archive/codex/pc/f','fixture',1,8,1,'[]',?)`)
+      .run(JSON.stringify({ version: 1, turns: [], bookmark: { size: 1, mtime: 1 } }));
+    const turn = { ...turnOf(fixture), firstTokenOnly: true };
+    const unrelated = rows(fixture, "current_projection_dirty");
+    const changes = db.query("SELECT total_changes() n").get();
+    runBackgroundTurn({ ...turn, canWrite: () => false });
+    expect(db.query("SELECT total_changes() n").get()).toEqual(changes);
+    queueAnalysisRebuild(db, { scope: "all" }, new Date("2026-09-20T12:00:00Z"));
+    writeRebuildStatusJson(db, JSON.stringify({ ...analysisRebuildStatus(db), phase: "sources" }));
+    runBackgroundTurn(turn);
+    expect(db.query("SELECT COUNT(*) n FROM response_time_queue").get()).toEqual({ n: 1 });
+    // Source ownership stays with the explicit rebuild until its source phase finishes.
+    writeRebuildStatusJson(db, JSON.stringify({ ...analysisRebuildStatus(db), phase: "reports" }));
+    const result = runBackgroundTurn(turn);
+    expect(result.errors).toEqual({});
+    expect(db.query("SELECT COUNT(*) n FROM response_time_queue").get()).toEqual({ n: 0 });
+    expect(rows(fixture, "current_projection_dirty")).toEqual(unrelated);
+    expect(turn.progress.entries()).toEqual([]);
   } finally { fixture.teardown(); }
 }, 30000);
 

@@ -3,6 +3,7 @@ import type { AppActivity as ActivitySnapshot } from "../../shared/app-activity"
 import type { AnalysisRebuildJob, SyncStatus } from "../lib/api";
 import { browserSafeDiagnostic } from "../lib/browserDiagnostic";
 import { getLocale, useI18n, type MessageTranslator } from "../lib/i18n";
+import { dayTime } from "../lib/format";
 import { useStaleReportTime } from "../lib/report-freshness";
 import { useAppActivity } from "../lib/useAppActivity";
 import { backgroundTasks, isSyncScope, overallFraction, vendorName, type BackgroundTask } from "../lib/progress";
@@ -11,7 +12,7 @@ import { probeNoticeLines, useProbeNotices } from "../lib/probe-notices";
 import type { ProbeNotice } from "../../shared/probe-error";
 import { requestSettingsTab } from "../lib/settings-link";
 import type { MissingRateSummary } from "../../shared/missing-rate";
-import type { CreditNoticeView } from "../../shared/credit-notices";
+import { isOpenCreditNotice, type CreditNoticeView } from "../../shared/credit-notices";
 import { api } from "../lib/api";
 import { creditNoticeAlert, creditNoticeLine, creditNoticeSuffix, useCreditNotices } from "../lib/credit-notices";
 import { AppActivityDetails, viewName } from "./AppActivity";
@@ -145,23 +146,27 @@ export function statusLine({ sync, syncUnavailable, rebuild, waitingForSubscript
   return { tone: "ok", title: t("Data up to date", "Dane aktualne"), detail: arrivals ? `${synchronized} · ${arrivals}` : synchronized, progress: null };
 }
 
-/** The details panel's package notices (docs/credit-notices-2026-10-09.md §6). */
+/** Stored package history; acknowledgement clears alerts without removing rows. */
 export function CreditNotices({ notices, now, onOpenAccount, onRead }: { notices: readonly CreditNoticeView[]; now: number;
   onOpenAccount?: (account: string) => void; onRead: (ids: number[]) => void }) {
   const { t } = useI18n();
   // Opening a subscription closes the panel so it does not cover the selected account.
   const ref = useRef<HTMLDivElement>(null);
+  const unread = notices.filter(notice => notice.acknowledged_at == null).map(notice => notice.id);
   return (
     <div ref={ref} data-credit-notices className="status-event">
       <div className="status-event-head">
         <strong>{t("Packages", "Pakiety")}<span className="status-event-count mono">{notices.length}</span></strong>
         <div className="status-event-actions">
-          <GhostButton onClick={() => onRead(notices.map(notice => notice.id))}>{t("Mark as read", "Oznacz jako przeczytane")}</GhostButton>
+          <GhostButton disabled={!unread.length} onClick={() => onRead(unread)}>{t("Mark as read", "Oznacz jako przeczytane")}</GhostButton>
         </div>
       </div>
       {notices.map(notice => {
         const line = creditNoticeLine(notice, now);
-        return <div key={notice.id} className="status-event-item">
+        const tooltip = [notice.occurred_at,
+          notice.acknowledged_at && `${t("Read", "Przeczytane")}: ${dayTime(notice.acknowledged_at)}`,
+          notice.resolved_at && `${t("Resolved", "Nieaktualne")}: ${dayTime(notice.resolved_at)}`].filter(Boolean).join(" · ");
+        return <div key={notice.id} className="status-event-item" title={tooltip}>
           <div className="status-event-item-head">
             <strong className={line.tone === "warn" ? "is-warn" : line.tone === "ok" ? "is-ok" : undefined}>{line.title}</strong>
             {line.when && <span className="status-event-meta mono">{line.when}</span>}
@@ -169,7 +174,7 @@ export function CreditNotices({ notices, now, onOpenAccount, onRead }: { notices
           <span className="status-event-meta mono">
             <span aria-hidden="true" className="status-event-dot" style={{ background: `var(--${notice.provider}, var(--faint))` }} />
             {notice.label} · {line.facts}</span>
-          {line.tone === "warn" && onOpenAccount && <div className="status-event-actions">
+          {line.tone === "warn" && isOpenCreditNotice(notice) && onOpenAccount && <div className="status-event-actions">
             <GhostButton onClick={() => { ref.current?.closest("details")?.removeAttribute("open"); onOpenAccount(notice.account); }}>
               {t("Open subscription", "Otwórz subskrypcję")}</GhostButton></div>}
         </div>;

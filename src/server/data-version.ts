@@ -18,7 +18,7 @@ function rows(db: Database, table: string, sql: string): unknown {
   return exists(db, table) ? db.query(sql).all() : null;
 }
 
-export function dataVersion(db: Database, scope: { windowSums?: boolean; capacityCycles?: boolean; contextPrices?: boolean | string } = {}): string {
+export function dataVersion(db: Database, scope: { windowSums?: boolean; capacityCycles?: boolean; contextPrices?: boolean | string; firstTokenTimes?: boolean } = {}): string {
   const parts = [
     // The Codex price ledger's state is the `codex` row.
     rows(db, "usage_ledger_state", "SELECT provider,version,status,covered,rules_digest,revision FROM usage_ledger_state ORDER BY provider"),
@@ -32,6 +32,7 @@ export function dataVersion(db: Database, scope: { windowSums?: boolean; capacit
     rows(db, "subscription_capacity_state", "SELECT value FROM subscription_capacity_state WHERE key='revision'"),
     rows(db, "subscription_hours_state", "SELECT value FROM subscription_hours_state WHERE key='revision'"),
     rows(db, "project_plan_state", "SELECT value FROM project_plan_state WHERE key='revision'"),
+    scope.firstTokenTimes ? rows(db, "response_time_state", "SELECT provider,version,revision FROM response_time_state ORDER BY provider") : null,
     scope.capacityCycles === false ? null
       : rows(db, "analysis_source_revisions", "SELECT revision FROM analysis_source_revisions WHERE source='capacity_cycle_results' AND bucket='*'"),
   ];

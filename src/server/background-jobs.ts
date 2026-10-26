@@ -38,6 +38,7 @@ import { advanceClaudeCardMetadata } from "./claude-card-metadata";
 import { ledgerProviderOf } from "./subscription-accounting-adapters";
 import { advanceCodexContextPrices } from "./codex-context-producer";
 import { advanceCodexContextDetails } from "./codex-context-model-producer";
+import { advanceFirstTokenTimes, type FirstTokenReader } from "./first-token-producer";
 
 /**
  * The background writer's job queue (U2.1). Outside a sync run, every multi-row write to the
@@ -52,6 +53,9 @@ import { advanceCodexContextDetails } from "./codex-context-model-producer";
  * turn resumes it. Each job reports its backlog to the progress register under its own scope.
  */
 export interface BackgroundTurn {
+  firstTokenReader?: FirstTokenReader;
+  /** A native completion wakes only its producer; ordinary turns still run every job. */
+  firstTokenOnly?: boolean;
   db: Database;
   config: CurrentConfig;
   rates: RateCard | null;
@@ -137,6 +141,12 @@ const JOBS: readonly BackgroundJob[] = [
     return advanceCreditNotices(turn.db, { decode: decodeNoticePools, canWrite: turn.canWrite }).pending;
   } },
   { scope: "analysis-rebuild", run(turn) { runAnalysisRebuild(turn.db, turn.config); return false; } },
+  { scope: "first-token-times", run(turn) {
+    const status = advanceFirstTokenTimes(turn.db, { reader: turn.firstTokenReader, canWrite: turn.canWrite, budgetMs: Math.min(250, turn.turnMs || 250) });
+    if (status.pending) turn.progress.report("first-token-times", "files", "preparing first-token times", "files", status.completed, status.total);
+    else turn.progress.end("first-token-times");
+    return status.processed > 0 && status.pending;
+  } },
   { scope: "usage-prices", run(turn) {
     if (!turn.rates) return false;
     // The same homes and source homes the report readers use; a different set changes the scope's source stamp.
@@ -329,16 +339,17 @@ export function deliverGaugeJournal(db: Database, target: JournalDeliveryTarget,
 export function runBackgroundTurn(turn: BackgroundTurn): BackgroundTurnResult {
   const result: BackgroundTurnResult = { catchUpNeeded: false, errors: {} };
   // A ledger change marks the stored window answers of the accounts that own it, not every account's.
-  setLedgerAnswerOwners(turn.db, ledgerOwnersOf(turn.db, turn.config.subscriptions));
+  if (!turn.firstTokenOnly) setLedgerAnswerOwners(turn.db, ledgerOwnersOf(turn.db, turn.config.subscriptions));
   const rebuild = analysisRebuildStatus(turn.db);
   const sourcesRebuilding = rebuild?.phase === "sources" && (rebuild.state === "queued" || rebuild.state === "running");
   for (const job of JOBS) {
+    if (turn.firstTokenOnly && job.scope !== "first-token-times") continue;
     if (sourcesRebuilding && !job.independentOfRebuild || !job.readOnly && !turn.canWrite()) continue;
     try { result.catchUpNeeded = job.run(turn, result) || result.catchUpNeeded; }
     catch (error) { result.errors[job.scope] = error instanceof Error ? error.message : String(error); }
   }
   // What the producers still have queued, for the progress register; never fails the turn.
-  try { reportBackgroundProgress(turn.db, turn.progress, turn.backlog); } catch { /* Progress is advisory. */ }
+  if (!turn.firstTokenOnly) try { reportBackgroundProgress(turn.db, turn.progress, turn.backlog); } catch { /* Progress is advisory. */ }
   result.catchUpNeeded &&= turn.canWrite();
   return result;
 }

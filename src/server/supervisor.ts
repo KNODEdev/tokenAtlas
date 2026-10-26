@@ -1,10 +1,12 @@
 import { relocateDatabase, validateDatabaseDestination } from "../db/relocate";
 import { activeDatabasePath } from "../db";
+import { prepareLocalSettings } from "../config/local-settings";
 
 export interface DatabaseRestartRequest { type: "relocate-database"; destination: string }
 
 /** Keep the launcher alive while replacing the entire server process. */
 export async function superviseServer(entrypoint: string, options: { envFile?: string; database?: string } = {}): Promise<number> {
+  prepareLocalSettings(options.envFile);
   let database = options.database ?? activeDatabasePath(options.envFile);
   let result: { destination: string; error: string | null } | null = null;
   let stopping = false;

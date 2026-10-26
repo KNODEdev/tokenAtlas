@@ -62,6 +62,7 @@ export const storedAnswerConfiguration = (ctx: AppContext, url?: URL, readLatest
   return JSON.stringify([STORED_ANSWER_VERSION,
     url && WINDOW_SCREENS[url.pathname]?.configuration?.(ctx, url, readLatest) || dataConfigurationStamp(ctx, false),
     ...(contextView ? ["stored-context-price-1"] : []),
+    ...(url && ["/api/claude-limit", "/api/claude-limit-card"].includes(url.pathname) ? ["window-model-usage-1"] : []),
     ...(url && contextRequested(url) ? [contextProjectionStamp(ctx.sqlite, url)] : []),
     ...(calibrationView ? [["claude-capacity", CLAUDE_CODE_CAPACITY_ALGORITHM]] : [])]);
 };
@@ -223,6 +224,7 @@ export function createDataRead(workerFactory = createDataReadWorker, options: { 
     const view = DATA_VIEWS[url.pathname], day = view?.clock && view.preparationClock === "day" && !url.searchParams.has("as_of")
       ? new Date(Date.now()).toISOString().slice(0, 10) : null;
     const rows = dataVersion(ctx.sqlite, { windowSums: readsWindowSums(url.pathname), capacityCycles: view?.sources.includes("capacity_cycle_results") ?? false,
+      firstTokenTimes: view?.sources.includes("response_time_hours") ?? false,
       contextPrices: contextRequested(url) ? url.pathname : false });
     return { rows, key: JSON.stringify([rows, dataConfigurationStamp(ctx, false), day]) };
   };

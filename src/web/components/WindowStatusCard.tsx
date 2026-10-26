@@ -16,7 +16,7 @@ import { PoolFacts } from "./PoolFacts";
 import { PoolUsageChart, PoolUsageLegend } from "./PoolUsageChart";
 import { observedPoolDays, windowPoolSeries } from "../lib/pool-series";
 import { activeCourses } from "../lib/window-activity";
-import { activityStartsAt } from "../../shared/window-activity";
+import { activityStartsAt, activityHasZeroStart } from "../../shared/window-activity";
 import { poolUsage } from "../../shared/pool-usage";
 
 export const ACCENT_SOFT = "color-mix(in srgb, var(--accent) 40%, var(--surface))";
@@ -149,7 +149,8 @@ export function WindowChart({ startMs, spanMs, endMs, active, insight, reading, 
 
   const band = percent ? typicalBand(insight?.comparableWindows.map((w) => w.shape) ?? []) : [];
   const startsAtReset = activityStartsAt(insight?.current.activity, startMs)
-    && (!insight?.current.activity || Math.abs(spanMs - (insight.current.windowHours ?? 0) * 3_600_000) < 120_000);
+    && (!insight?.current.activity || activityHasZeroStart(insight.current.activity)
+      || insight.current.activity.start_basis !== "partial" && Math.abs(spanMs - (insight.current.windowHours ?? 0) * 3_600_000) < 120_000);
   const meter: CoursePoint[] = [...(startsAtReset ? [{ t: 0, pct: 0 }] : []), ...(insight?.current.shape ?? [])
     .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.pct)).sort((a, b) => a.t - b.t)
     .map((p) => ({ t: p.t, pct: p.pct }))];

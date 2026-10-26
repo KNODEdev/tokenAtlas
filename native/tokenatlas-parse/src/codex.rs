@@ -19,12 +19,14 @@ const FIELDS: [&str; 6] = [
     "reasoning_output_tokens",
     "total_tokens",
 ];
-const TAGS: [&[u8]; 5] = [
+const TAGS: [&[u8]; 7] = [
     b"\"session_meta\"",
     b"\"turn_context\"",
     b"\"thread_settings_applied\"",
     b"\"token_count\"",
     b"\"token_usage_record\"",
+    b"\"task_started\"",
+    b"\"task_complete\"",
 ];
 /// Lines `TAG_SCAN` skips that the response-time rule reads (header fields only, `head_fields`).
 const HEAD_TAGS: [&[u8]; 6] = [
@@ -109,7 +111,7 @@ fn instant(value: &V) -> Option<i64> {
 }
 /// `type`, `timestamp` and the payload's `type` and `role` of a line, without building the rest (a
 /// response item can hold megabytes of encrypted reasoning or tool output). The last duplicate key wins.
-fn head_fields(bytes: &[u8]) -> Option<(Option<Mark>, Option<i64>)> {
+fn head_fields(bytes: &[u8]) -> Option<(Option<Mark>, Option<i64>, bool)> {
     use serde::de::{IgnoredAny, MapAccess, Visitor};
     use std::borrow::Cow;
     struct Payload(Option<String>, Option<String>);
@@ -198,6 +200,8 @@ fn head_fields(bytes: &[u8]) -> Option<(Option<Mark>, Option<i64>)> {
     Some((
         mark_of(kind.as_deref(), item.as_deref(), role.as_deref()),
         timestamp.as_deref().and_then(crate::js_date::precise),
+        kind.as_deref() == Some("turn_context") || kind.as_deref() == Some("event_msg")
+            && matches!(item.as_deref(), Some("task_started" | "task_complete" | "token_count")),
     ))
 }
 /// Input, output and barrier records of a file in order: (byte start, mark, timestamp).
@@ -355,7 +359,72 @@ struct Record {
     accounting: Option<usize>,
     duplicates: Vec<V>,
 }
-fn reconcile(bytes: &[u8]) -> Result<(Vec<Record>, bool, Marks), String> {
+#[derive(Default)]
+struct FirstTokenCollector {
+    contexts: HashMap<String, V>,
+    starts: HashMap<String, (i64, V)>,
+    turns: std::collections::BTreeMap<String, V>,
+    active: Option<String>,
+}
+impl FirstTokenCollector {
+    fn observe(&mut self, value: &V) {
+        let payload = value.get("payload");
+        let Some(id) = payload.get("turn_id").text().filter(|s| !s.trim().is_empty()) else {
+            self.pool(value);
+            return;
+        };
+        if value.get("type").is("turn_context") {
+            self.contexts.insert(id, payload.get("model").text().filter(|s| !s.trim().is_empty()).map_or(V::Null, V::from));
+            return;
+        }
+        if !value.get("type").is("event_msg") { return; }
+        if payload.get("type").is("task_started") {
+            self.active = Some(id.clone());
+            if let Some(at) = Self::instant(value.get("timestamp")) {
+                self.starts.insert(id.clone(), (at, V::from("unknown")));
+            }
+        }
+        self.pool(value);
+        if !payload.get("type").is("task_complete") { return; }
+        let (Some((start, billing)), Some(end)) = (self.starts.get(&id), Self::instant(value.get("timestamp"))) else { return; };
+        if end < *start { return; }
+        let ms = payload.get("time_to_first_token_ms");
+        let duration = payload.get("duration_ms");
+        let valid = ms.valid_counter() && duration.valid_counter()
+            && duration.number().unwrap() >= ms.number().unwrap()
+            && ms.number().unwrap() <= (end - start + 1000) as f64;
+        let ts = chrono::DateTime::from_timestamp_millis(*start).unwrap().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let mut turn = obj([
+            ("id", V::from(id.as_str())), ("model", self.contexts.get(&id).cloned().unwrap_or(V::Null)),
+            ("ts", V::from(ts)), ("ms", if valid { ms.clone() } else { V::Null }), ("billing", billing.clone()),
+            ("reason", if valid { V::Null } else if matches!(ms, V::Null) { V::from("not_recorded") } else { V::from("invalid") }),
+        ]);
+        if let Some(previous) = self.turns.get(&id) && previous != &turn {
+            turn = previous.clone(); turn.set("ms", V::Null); turn.set("reason", V::from("conflicting_completion"));
+        }
+        self.turns.insert(id.clone(), turn);
+        if self.active.as_ref() == Some(&id) { self.active = None; }
+    }
+    fn instant(value: &V) -> Option<i64> {
+        static ISO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\d{4}-\d\d-\d\dT.*(?:Z|[+-]\d\d:\d\d)$").unwrap());
+        let text = value.text()?;
+        ISO.is_match(&text).then(|| crate::js_date::precise(&text)).flatten()
+    }
+    fn pool(&mut self, value: &V) {
+        let payload = value.get("payload");
+        if !value.get("type").is("event_msg") || !payload.get("type").is("token_count") { return; }
+        if let Some(id) = &self.active && let Some((_, billing)) = self.starts.get_mut(id) {
+            let plan = payload.get("rate_limits").get("plan_type");
+            if billing.is("unknown") && plan.truthy() {
+                *billing = V::from(if plan.is("self_serve_business_usage_based") { "business_credits" } else { "allowance" });
+            }
+        }
+    }
+    fn result(self) -> V {
+        obj([("version", n(1)), ("turns", V::Arr(self.turns.into_values().collect()))])
+    }
+}
+fn reconcile(bytes: &[u8], first_token_only: bool) -> Result<(Vec<Record>, bool, Marks, V), String> {
     let mut records: Vec<Record> = vec![];
     let mut marks: Marks = vec![];
     let mut rich = vec![];
@@ -364,6 +433,7 @@ fn reconcile(bytes: &[u8]) -> Result<(Vec<Record>, bool, Marks), String> {
     let mut seen: HashMap<String, usize> = HashMap::new();
     let mut meter = None;
     let mut start = 0;
+    let mut first_token = FirstTokenCollector::default();
     for newline in memchr::memchr_iter(b'\n', bytes) {
         let end = newline + 1;
         let raw = &bytes[start..end];
@@ -374,10 +444,16 @@ fn reconcile(bytes: &[u8]) -> Result<(Vec<Record>, bool, Marks), String> {
         let selected = TAG_SCAN.is_match(raw);
         crate::trace::add(&crate::trace::SCAN, scan_start);
         if !selected {
+            // Unicode escapes can spell tags differently; inspect just headers before allocating a payload.
+            if raw.windows(2).any(|pair| pair == b"\\u")
+                && !matches!(head_fields(raw), Some((_, _, false)))
+                && let Ok(value) = parse(String::from_utf8_lossy(raw).trim_matches(js_space))
+            { first_token.observe(&value); }
+            if first_token_only { continue; }
             static HEAD_SCAN: LazyLock<AhoCorasick> =
                 LazyLock::new(|| AhoCorasick::new(HEAD_TAGS).unwrap());
             if HEAD_SCAN.is_match(raw)
-                && let Some((Some(mark), at)) = head_fields(raw)
+                && let Some((Some(mark), at, _)) = head_fields(raw)
             {
                 marks.push((byte_start, mark, at));
             }
@@ -391,8 +467,12 @@ fn reconcile(bytes: &[u8]) -> Result<(Vec<Record>, bool, Marks), String> {
         let parsed = parse(&line);
         crate::trace::add(&crate::trace::JSON, parse_start);
         let Ok(value) = parsed else {
+            // TTFT's reference trims JSONL boundaries; retain the usage parser's established BOM behavior.
+            if let Ok(value) = parse(line.trim_matches(js_space)) { first_token.observe(&value); }
             continue;
         };
+        first_token.observe(&value);
+        if first_token_only { continue; }
         if !value.dict() {
             return Err(format!(
                 "'{}' object has no attribute 'get'",
@@ -523,7 +603,7 @@ fn reconcile(bytes: &[u8]) -> Result<(Vec<Record>, bool, Marks), String> {
             records[current].skip = true;
         }
     }
-    Ok((records, !rich.is_empty(), marks))
+    Ok((records, !rich.is_empty(), marks, first_token.result()))
 }
 fn canonical_ts(value: &V) -> V {
     // A 24-unit UTC millisecond timestamp is already the canonical spelling.
@@ -809,12 +889,20 @@ impl State<'_> {
     }
 }
 pub fn prepare(file: &str, size: u64, validate: bool) -> Result<V, String> {
+    prepare_mode(file, size, validate, false)
+}
+pub fn prepare_first_token(file: &str) -> Result<V, String> {
+    let selected = crate::rollout_codec::select_jsonl_source(file).map_err(|e| e.to_string())?;
+    let size = std::fs::metadata(&selected).map_err(|e| e.to_string())?.len();
+    prepare_mode(&selected, size, false, true)
+}
+fn prepare_mode(file: &str, size: u64, validate: bool, first_token_only: bool) -> Result<V, String> {
     thread_local! {
         static READ_BUFFER: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
     }
     READ_BUFFER.with(|buffer| {
         let mut buffer = buffer.borrow_mut();
-        let result = prepare_buffered(file, size, validate, &mut buffer);
+        let result = prepare_buffered(file, size, validate, first_token_only, &mut buffer);
         // Keep common files allocation-free without retaining an oversized file per lane.
         if buffer.capacity() > 64 << 20 {
             *buffer = Vec::new();
@@ -822,7 +910,7 @@ pub fn prepare(file: &str, size: u64, validate: bool) -> Result<V, String> {
         result
     })
 }
-fn prepare_buffered(file: &str, size: u64, validate: bool, buffer: &mut Vec<u8>) -> Result<V, String> {
+fn prepare_buffered(file: &str, size: u64, validate: bool, first_token_only: bool, buffer: &mut Vec<u8>) -> Result<V, String> {
     let mut read = || -> std::io::Result<(usize, V)> {
         let open_start = std::time::Instant::now();
         let mut options = OpenOptions::new();
@@ -909,7 +997,7 @@ fn prepare_buffered(file: &str, size: u64, validate: bool, buffer: &mut Vec<u8>)
     };
     let bytes = &buffer[..used];
     // A queued file is validated in this read instead of a separate pass over the whole file.
-    if validate || crate::rollout_codec::compressed(file) {
+    if !first_token_only && (validate || crate::rollout_codec::compressed(file)) {
         if let Some(message) = crate::jsonl::invalid(file, bytes) {
             return Ok(obj([
                 ("kind", V::from("read_error")),
@@ -919,8 +1007,17 @@ fn prepare_buffered(file: &str, size: u64, validate: bool, buffer: &mut Vec<u8>)
             ]));
         }
     }
+    let complete = &bytes[..bytes.iter().rposition(|b| *b == b'\n').map_or(0, |i| i + 1)];
+    let first_token_valid = if !first_token_only && (validate || crate::rollout_codec::compressed(file)) {
+        None
+    } else { crate::jsonl::invalid(file, complete) };
+    if first_token_only && let Some(message) = &first_token_valid { return Err(message.clone()); }
     let reconcile_start = std::time::Instant::now();
-    let (records, has_rich, marks) = reconcile(bytes)?;
+    let (records, has_rich, marks, first_token) = reconcile(bytes, first_token_only)?;
+    let first_token = if first_token_valid.is_none() { first_token } else { V::Null };
+    if first_token_only {
+        return Ok(obj([("kind", V::from("ok")), ("parse", obj([("firstToken", first_token)]))]));
+    }
     crate::trace::add(&crate::trace::RECONCILE, reconcile_start);
     let build_start = std::time::Instant::now();
     let mut state = State {
@@ -1298,6 +1395,7 @@ fn prepare_buffered(file: &str, size: u64, validate: bool, buffer: &mut Vec<u8>)
                 ("consumed", n(state.consumed)),
                 ("state", checkpoint),
                 ("evidence", evidence),
+                ("firstToken", first_token),
             ]),
         ),
     ]);

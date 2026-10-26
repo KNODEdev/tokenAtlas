@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
-import { acknowledgeCreditNotices, hasCreditNoticeSchema, readOpenCreditNotices } from "../db/credit-notices";
-import type { CreditNoticeView } from "../shared/credit-notices";
+import { acknowledgeCreditNotices, hasCreditNoticeSchema, readCreditNotices } from "../db/credit-notices";
+import { creditNoticeOccurredAt, type CreditNoticeView } from "../shared/credit-notices";
 
 /** Subscription names as the current projection publishes them; an account without one shows its id. */
 function labels(db: Database): Map<string, string> {
@@ -9,15 +9,16 @@ function labels(db: Database): Map<string, string> {
     Array<{ id: string; label: string | null }>).map(row => [row.id, row.label ?? row.id]));
 }
 
-export function readCreditNoticeViews(db: Database, now = Date.now()): CreditNoticeView[] {
+export function readCreditNoticeViews(db: Database): CreditNoticeView[] {
   const names = labels(db);
-  return readOpenCreditNotices(db, now).map(row => ({ id: row.id, provider: row.provider, account: row.account,
+  return readCreditNotices(db).map(row => ({ id: row.id, provider: row.provider, account: row.account,
     label: names.get(row.account) ?? row.account, pool: row.pool, kind: row.kind, unit: row.unit, amount: row.amount,
-    amount_text: row.amount_text, expires_at: row.expires_at, observed_at: row.observed_at, detail: row.detail }));
+    amount_text: row.amount_text, expires_at: row.expires_at, observed_at: row.observed_at,
+    occurred_at: creditNoticeOccurredAt(row), acknowledged_at: row.acknowledged_at, resolved_at: row.resolved_at, detail: row.detail }));
 }
 
 /**
- * `/api/credit-notices`: GET lists the open notices (stored rows, no preparation); POST `{ ids }` marks them
+ * `/api/credit-notices`: GET lists stored history (no preparation); POST `{ ids }` marks notices
  * read, one short write of the user's own action.
  */
 export async function handleCreditNotices(db: Database, req: Request): Promise<Response> {

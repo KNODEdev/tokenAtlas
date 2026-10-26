@@ -61,7 +61,7 @@ test("simultaneous 5h and weekly counters stay separate, and event weekly anchor
   expect(short[0]!.usage.api_standard).toBeCloseTo(0.78);
 });
 
-test("combines both PCs in one account; preserves known Fast and bounds unknown mode", () => {
+test("combines both PCs in one account; preserves Fast and treats omitted mode as Standard", () => {
   const [w] = compareCodexWindows(config, [event(), event({ home: "LAPTOP", speed: "fast" }), event({ speed: "unknown" }),
     event({ account: "other" }), event({ model: "gpt-5.3-codex-spark" })], endpoints);
   expect(w!.observed_pp).toBe(100);
@@ -73,7 +73,7 @@ test("combines both PCs in one account; preserves known Fast and bounds unknown 
   expect(w!.models.reduce((n, m) => n + (m.api_normalized ?? 0), 0)).toBeCloseTo(3.51);
   expect(w!.sources.reduce((n, s) => n + (s.api_normalized ?? 0), 0)).toBeCloseTo(3.51);
   expect(w!.usage.credits_low).toBeCloseTo(19.5 * 4.5);
-  expect(w!.usage.credits_high).toBeCloseTo(19.5 * 6);
+  expect(w!.usage.credits_high).toBeCloseTo(19.5 * 4.5);
   expect(w!.sources).toHaveLength(2);
   expect(w!.sources.reduce((n, s) => n + s.credits_low, 0)).toBeCloseTo(w!.usage.credits_low);
 });

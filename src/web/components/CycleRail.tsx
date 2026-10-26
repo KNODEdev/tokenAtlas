@@ -12,7 +12,7 @@ import { accountCreditsOfCycles, creditTag, railCreditsView } from "../lib/credi
 import { pointBasisOfCycles, pointBasisTitle, type CurrentPointBasis } from "../lib/current-point-basis";
 import { activeCourses } from "../lib/window-activity";
 import { subscriptionPlan } from "../lib/subscription-plan";
-import { activityStartsAt } from "../../shared/window-activity";
+import { activityStartsAt, activityHasZeroStart } from "../../shared/window-activity";
 import "./Rail.css";
 const MIN_SHAPE_POINTS = MIN_RAIL_SHAPE_POINTS;
 const TREND_WINDOWS = 12;
@@ -379,8 +379,8 @@ function anchoredShape(window: RailWindow): RailWindow["shape"] {
   const first = shape[0]!;
   if (first.t <= 0) return shape;
   if (!activityStartsAt(window.activity, Date.parse(window.startIso))) return shape;
-  if (window.activity && Math.abs(Date.parse(window.resetIso ?? "") - Date.parse(window.startIso)
-    - (window.windowHours ?? 0) * 3_600_000) > 120_000) return shape;
+  if (window.activity && !activityHasZeroStart(window.activity) && (window.activity.start_basis === "partial"
+    || Math.abs(Date.parse(window.resetIso ?? "") - Date.parse(window.startIso) - (window.windowHours ?? 0) * 3_600_000) > 120_000)) return shape;
   return [{ t: 0, pct: window.counterSegment?.startDrop?.after ?? 0 }, ...shape];
 }
 function ProbeShape({ window, color, active }: { window: RailWindow; color: string; active: boolean }) {

@@ -107,7 +107,7 @@ test("provider dropdown groups interleaved accounts and keeps all same-provider 
     { value: "c1", vendor: "codex", label: "A" }, { value: "a1", vendor: "claude", label: "Claude" },
   ]).map(group => group.options.map(option => option.value))).toEqual([["c1", "c2"], ["a1"], ["g1"]]);
   const config: SourceProfileConfiguration = { revision: "v1", machine: "LAPTOP", login: "user", declarations: [], resolved: [], detected_profiles: [
-    { vendor: "gemini", home: "pool:agy1", name: "agy1", kind: "managed", account: "agy@example.test", error: null },
+    { vendor: "gemini", home: "pool:agy1", name: "agy1", kind: "managed", account: "account_0000@example.test", error: null },
     { vendor: "claude", home: "C:/.claude", name: ".claude", kind: "folder", account: null, error: null },
     ...[".codex", ".codex-mr", ".codex-other"].map(name => ({ vendor: "codex", home: `C:/${name}`, name, kind: "folder" as const, account: `${name}@example.test`, error: null })),
   ] };

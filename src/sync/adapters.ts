@@ -130,6 +130,7 @@ async function runCodex(context: AdapterContext): Promise<NormalizedAdapterResul
     setupEnd();setupTimer.stop();
     const setupTimings=setupTimer.snapshot();
     result = await syncCodex(stage, {
+      pool: context.parsePool,
       homes: scanned,
       files,
       force: context.reparse === true || context.changedFiles !== undefined,

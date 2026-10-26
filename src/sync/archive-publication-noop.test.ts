@@ -3,9 +3,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import * as childProcess from "node:child_process";
 import { removeTestFixture } from "../test-cleanup";
 import { ensureArchiveIdentity } from "./archive-inventory";
-import { publishArchiveFile } from "./archive-publication";
+import { archivePublicationPaths, publishArchiveFile } from "./archive-publication";
 import { readOriginalRecord } from "./archive-originals";
 import { acquireArchiveWriterFence, ArchiveWritesPausedError, withArchiveWriter } from "./archive-writers";
 
@@ -57,6 +58,56 @@ test("a plain original against a checkpointed compressed archive also needs no d
   expect(fs.existsSync(f.destination)).toBe(false);
   expect(Bun.zstdDecompressSync(fs.readFileSync(`${f.destination}.zst`)).toString()).toBe(body);
   expect(() => publishArchiveFile(f.source, `${f.destination}.zst`, f.options)).toThrow("keep the source codec");
+});
+
+test("cold checkpoints for identical compacted history validate one transcript and survive restart", () => {
+  const f = fixture(), content = body + Array.from({ length: 200 }, (_, i) => JSON.stringify({ i, payload: "x".repeat(1000) }) + "\n").join("");
+  fs.writeFileSync(f.source, content);
+  fs.writeFileSync(`${f.destination}.zst`, Bun.zstdCompressSync(content)); fs.unlinkSync(f.destination);
+  const checkpoint = archivePublicationPaths(f.options.archiveRoot, f.destination, f.options).state;
+  fs.unlinkSync(checkpoint);
+  const compressed = fs.readFileSync(`${f.destination}.zst`), at = fs.statSync(`${f.destination}.zst`).mtimeMs;
+  const parse = JSON.parse;
+  let parsedRecords = 0;
+  const spy = spyOn(JSON, "parse").mockImplementation((text, ...args) => {
+    if (typeof text === "string" && text.includes('"payload":')) parsedRecords++;
+    return Reflect.apply(parse, JSON, [text, ...args]);
+  });
+  try { expect(f.publish()).toBe("unchanged"); } finally { spy.mockRestore(); }
+  expect(parsedRecords).toBe(200);
+  expect(fs.readFileSync(`${f.destination}.zst`)).toEqual(compressed);
+  expect(fs.statSync(`${f.destination}.zst`).mtimeMs).toBe(at);
+  expect(fs.existsSync(f.destination)).toBe(false);
+  expect(JSON.parse(fs.readFileSync(checkpoint, "utf8")).logicalBytes).toBe(Buffer.byteLength(content));
+  expect(observe(f, () => expect(f.publish()).toBe("unchanged"))).toEqual({ payloadReads: 0, syncs: 0 });
+  fs.appendFileSync(f.source, '{"appended":1}\n');
+  expect(f.publish()).toBe("copied");
+  expect(fs.readFileSync(f.destination, "utf8")).toBe(content + '{"appended":1}\n');
+});
+
+test("identical malformed compacted history cannot acquire a trusted cold checkpoint", () => {
+  const f = fixture(), malformed = '{"ok":1}\n{broken}\n';
+  fs.writeFileSync(f.source, malformed);
+  fs.writeFileSync(`${f.destination}.zst`, Bun.zstdCompressSync(malformed)); fs.unlinkSync(f.destination);
+  const checkpoint = archivePublicationPaths(f.archiveRoot, f.destination, f.options).state;
+  fs.unlinkSync(checkpoint);
+  expect(f.publish).toThrow("Invalid JSONL record");
+  expect(fs.existsSync(checkpoint)).toBe(false);
+  expect(Bun.zstdDecompressSync(fs.readFileSync(`${f.destination}.zst`)).toString()).toBe(malformed);
+});
+
+test("identical compressed source and archive decode once when recovering a cold checkpoint", () => {
+  const f = fixture(true), checkpoint = archivePublicationPaths(f.archiveRoot, f.destination, f.options).state;
+  fs.unlinkSync(checkpoint);
+  const spawn = childProcess.spawnSync;
+  let decodes = 0;
+  const spy = spyOn(childProcess, "spawnSync").mockImplementation(((...args: Parameters<typeof spawn>) => {
+    if ((args[1] as string[])?.[0] === "--decode-rollout") decodes++;
+    return Reflect.apply(spawn, childProcess, args);
+  }) as typeof spawn);
+  try { expect(f.publish()).toBe("unchanged"); } finally { spy.mockRestore(); }
+  expect(decodes).toBe(1);
+  expect(observe(f, () => expect(f.publish()).toBe("unchanged"))).toEqual({ payloadReads: 0, syncs: 0 });
 });
 
 test("an explicit archive-source fence is checked even for otherwise unchanged bytes", () => {

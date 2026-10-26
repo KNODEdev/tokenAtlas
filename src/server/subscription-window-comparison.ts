@@ -3,7 +3,7 @@ import type { CapacityCycleModel, CapacityCycleSource, CapacityUsagePoint } from
 import { emptyWindowEvidence } from "./subscription-evidence";
 import type { ManualCapacityMeasurement } from "../shared/manual-capacity";
 import type { ProbeLimitWindow } from "./probe-limit-windows";
-import { activityStartsAt } from "../shared/window-activity";
+import { activityStartsAt, activityHasZeroStart } from "../shared/window-activity";
 
 export const emptyWindowUsage = (): WindowUsage => ({ events: 0, tokens: 0, input: 0, cached: 0, output: 0, fast_tokens: 0, unknown_tokens: 0,
   priced_tokens: 0, unpriced_events: 0, api_standard: 0, credits_low: 0, credits_high: 0 });
@@ -71,7 +71,8 @@ export function pairingBounds(window: Pick<ProbeLimitWindow, "start" | "readings
   const last = manual.at(-1) ?? firstSaturatedReading(readings, reading => reading.percent) ?? readings.at(-1)!;
   const fromReset = manual.length === 0 && !window.startDrop && Date.parse(window.start) < Date.parse(first.ts)
     && activityStartsAt(window.activity, Date.parse(window.start))
-    && (!window.activity || Math.abs(Date.parse(window.start) - (Date.parse(window.reset!) - window.window_minutes! * 60_000)) < 120_000);
+    && (!window.activity || activityHasZeroStart(window.activity)
+      || window.activity.start_basis !== "partial" && Math.abs(Date.parse(window.start) - (Date.parse(window.reset!) - window.window_minutes! * 60_000)) < 120_000);
   return { manual, first, last, fromReset, start: fromReset ? window.start : first.ts, startPercent: fromReset ? 0 : first.percent };
 }
 

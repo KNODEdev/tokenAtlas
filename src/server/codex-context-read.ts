@@ -183,7 +183,7 @@ const apiVariants = new Set<LedgerVariant>(["api_standard", "api_standard_credit
 function factorFor(variant: LedgerVariant, group: LedgerReadGroup<readonly LedgerVariant[]>, policy: LedgerTierPolicy): Rational | null {
   const row = group.stored;
   if (variant === "api_actual") {
-    const tier = group.tier ?? (row.service_tier == null ? "standard" : null);
+    const tier = group.tier;
     return tier === "standard" ? rational(1n) : tier ? policy.multiplier(row.model, "api_equivalent_usd", tier, row.day) : null;
   }
   if (variant === "normalized_usd" || variant === "window_normalized" && row.day >= "2026-04-02") {

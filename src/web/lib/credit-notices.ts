@@ -1,4 +1,4 @@
-import type { CreditNoticeView } from "../../shared/credit-notices";
+import { isOpenCreditNotice, type CreditNoticeView } from "../../shared/credit-notices";
 import { api } from "./api";
 import { dayMonth, dayTime } from "./format";
 import { getLocale, translate as t } from "./i18n";
@@ -11,7 +11,7 @@ export interface NoticeLine { tone: NoticeTone; title: string; detail: string; f
 const DAY = 86_400_000;
 const WARN_KINDS = new Set(["expiring", "expired_unused"]);
 
-/** Open credit notices (`/api/credit-notices`), refreshed with the other live data; null until first read. */
+/** Credit notice history (`/api/credit-notices`), refreshed with the other live data; null until first read. */
 export function useCreditNotices(): { notices: CreditNoticeView[] | null; reload: () => void } {
   const state = useAsync(async () => api.creditNotices(), [], true);
   return { notices: state.data?.notices ?? null, reload: state.reload };
@@ -75,28 +75,29 @@ export function creditNoticeLine(notice: CreditNoticeView, now: number): NoticeL
         `${t("about", "ok.")} ${money(notice.amount)} ${t("lost on", "przepadnie")} ${dayMonth(notice.expires_at)}`].join(" · "));
     }
     case "expired_unused":
-      if (reset) return line(t("Reset expired unused", "Reset wygasł niewykorzystany"), resetTitle(notice), dayTime(notice.expires_at));
+      if (reset) return line(t("Reset expired unused", "Reset wygasł niewykorzystany"), resetTitle(notice), dayTime(notice.occurred_at));
       return line(t("Expired unused", "Wygasł niewykorzystany"), [`grant ${money(num(d.granted))}`,
-        `${t("lost", "przepadło")} ${d.upper_bound === true ? t("up to ", "do ") : ""}${money(notice.amount)}`].join(" · "), dayMonth(notice.expires_at));
+        `${t("lost", "przepadło")} ${d.upper_bound === true ? t("up to ", "do ") : ""}${money(notice.amount)}`].join(" · "), dayTime(notice.occurred_at));
     case "received": {
       if (reset) return line(t("New reset", "Nowy reset"), `${resetTitle(notice)}, ${t("valid until", "ważny do")} ${dayMonth(notice.expires_at)}`,
-        `${t("received", "otrzymany")} ${dayTime(str(d.granted_at) ?? notice.observed_at)}`);
+        `${t("received", "otrzymany")} ${dayTime(notice.occurred_at)}`);
       const what = notice.unit === "credits" ? credits(notice.amount, notice.amount_text)
         : notice.pool.startsWith("claude:spend") ? `${t("extra usage, limit", "dodatkowe użycie, limit")} ${money(notice.amount)}`
         : `grant ${money(notice.amount)}`;
       const until = notice.expires_at ? `, ${t("valid until", "ważny do")} ${dayMonth(notice.expires_at)}` : "";
-      return line(t("New package", "Nowy pakiet"), `${what}${until}`, `${t("received", "otrzymany")} ${dayMonth(notice.observed_at)}`);
+      return line(t("New package", "Nowy pakiet"), `${what}${until}`, `${t("received", "otrzymany")} ${dayTime(notice.occurred_at)}`);
     }
     case "topped_up":
-      return line(t("Top-up", "Doładowanie"), `+${amountOf(notice)}`, dayMonth(notice.observed_at));
+      return line(t("Top-up", "Doładowanie"), `+${amountOf(notice)}`, dayTime(notice.occurred_at));
     case "spent": {
       const balance = notice.unit === "credits";
       const left = balance ? credits(num(d.remaining), str(d.remaining_text)) : money(num(d.remaining));
       return line(balance ? t("Credits spent", "Zużyto kredyty") : t("Package used", "Zużyto z pakietu"),
-        `−${amountOf(notice)} ${t("since", "od")} ${dayMonth(str(d.since) ?? notice.observed_at)} · ${balance ? t("balance", "saldo") : t("left", "zostało")} ${left}`);
+        `−${amountOf(notice)} ${t("since", "od")} ${dayMonth(str(d.since) ?? notice.observed_at)} · ${balance ? t("balance", "saldo") : t("left", "zostało")} ${left}`,
+        dayTime(notice.occurred_at));
     }
     case "used":
-      return line(t("Reset used", "Reset wykorzystany"), resetTitle(notice), dayTime(notice.observed_at));
+      return line(t("Reset used", "Reset wykorzystany"), resetTitle(notice), dayTime(notice.occurred_at));
   }
 }
 
@@ -105,7 +106,7 @@ export function creditNoticeLine(notice: CreditNoticeView, now: number): NoticeL
  * warnings; arrivals never take the line (see `creditNoticeSuffix`).
  */
 export function creditNoticeAlert(notices: readonly CreditNoticeView[] | null | undefined, now: number): { title: string; detail: string } | null {
-  const warnings = (notices ?? []).filter(notice => WARN_KINDS.has(notice.kind));
+  const warnings = (notices ?? []).filter(notice => isOpenCreditNotice(notice) && WARN_KINDS.has(notice.kind));
   if (!warnings.length) return null;
   const expiring = warnings.filter(notice => notice.kind === "expiring")
     .sort((a, b) => (a.expires_at ?? "").localeCompare(b.expires_at ?? ""));
@@ -129,7 +130,7 @@ export function creditNoticeAlert(notices: readonly CreditNoticeView[] | null | 
 
 /** "nowe pakiety: 2 (Claude Max $250, Codex Pro 1 reset)" after "Data up to date"; null without arrivals. */
 export function creditNoticeSuffix(notices: readonly CreditNoticeView[] | null | undefined): string | null {
-  const arrivals = (notices ?? []).filter(notice => notice.kind === "received" || notice.kind === "topped_up");
+  const arrivals = (notices ?? []).filter(notice => isOpenCreditNotice(notice) && (notice.kind === "received" || notice.kind === "topped_up"));
   if (!arrivals.length) return null;
   const shown = arrivals.slice(0, 2).map(notice => `${notice.label} ${notice.kind === "topped_up" ? "+" : ""}${amountOf(notice)}`);
   const list = shown.join(", ") + (arrivals.length > shown.length ? ", …" : "");

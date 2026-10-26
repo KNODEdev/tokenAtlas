@@ -105,7 +105,9 @@ fn execute(request: Value, metrics: &Metrics, partials: &mut Vec<String>) -> Str
     };
     let started = Instant::now();
     let validate = request["input"]["validate"].as_bool() == Some(true);
-    let result = codex::prepare(file, size, validate);
+    let result = if request["input"]["firstTokenOnly"].as_bool() == Some(true) {
+        codex::prepare_first_token(file)
+    } else { codex::prepare(file, size, validate) };
     add(&metrics.parse, elapsed(started));
     let started = Instant::now();
     let response = match &result {

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { selectedDatabasePath, databaseLocalStateRoot } from "../db/location";
 
 export const LOCAL_ARCHIVE_LOCATOR_FILE="archive-location.sqlite";
 const STAGED_RELOCATION_FILE=".archive-relocation-owner.json";
@@ -17,10 +18,16 @@ export class LocalArchiveActivationDecisionError extends Error {
   }
 }
 
-export function resolveLocalStateRootBase(env:Environment=process.env):string {
-  return path.resolve(env.TOKENATLAS_LOCAL_STATE?.trim() || (process.platform==="win32"
+export function legacyLocalStateRoot(env:Environment=process.env):string {
+  return path.resolve(process.platform==="win32"
     ? path.join(env.LOCALAPPDATA?.trim() || os.homedir(),"tokenAtlas")
-    : path.join(os.homedir(),".local","state","tokenAtlas")));
+    : path.join(os.homedir(),".local","state","tokenAtlas"));
+}
+export function resolveLocalStateRootBase(env:Environment=process.env,
+  selected: string | null | undefined = env.NODE_ENV === "test" ? undefined : selectedDatabasePath()):string {
+  // Explicit overrides remain available for isolated test/embedded runtimes.
+  if (env.TOKENATLAS_LOCAL_STATE?.trim()) return path.resolve(env.TOKENATLAS_LOCAL_STATE.trim());
+  return selected ? databaseLocalStateRoot(selected) : legacyLocalStateRoot(env);
 }
 export function localArchiveLocatorPath(env:Environment=process.env):string {
   return path.join(resolveLocalStateRootBase(env),LOCAL_ARCHIVE_LOCATOR_FILE);

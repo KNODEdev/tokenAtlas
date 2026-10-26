@@ -14,8 +14,8 @@ import { codexLimitCounter, codexLimitReadings, loadCodexLimitProbes, type Codex
 import {
   acceptLimitHits, buildProbeLimitWindows, counterReadings, loadProbeLimitEvidence, ownedLimitHitRows, probeLimitCounter,
   probeLimitSamples, resolveSegment, segmentationInputs,
-  RESET_JOIN_MS, segmentReadings, segmentClaudeReadings, windowResolution, withLimitHits, type ProbeLimitReading, type ProbeLimitWindow, type RawSegment,
-  type SegmentInput, type SegmenterState, type WindowResolution,
+  RESET_JOIN_MS, segmentLimitReadings, windowResolution, withLimitHits, type ProbeLimitReading, type ProbeLimitWindow, type RawSegment,
+  type SegmentInput, type WindowResolution,
 } from "./probe-limit-windows";
 import { markWindowUsageDirty } from "../db/window-usage";
 import { markWindowAnswersDirty } from "../db/window-answers";
@@ -102,6 +102,7 @@ interface InputRow {
   resets_at: string; window_minutes: number; source: string; limit_hit: string | null; anchor: number;
   home: string | null; path: string | null;
   source_plan: string | null;
+  meter_evidence: string | null;
 }
 
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -136,7 +137,9 @@ function enqueueConfigChanges(db: Database, options: LimitWindowProducerOptions,
     ["limit_windows_resolver", resolverConfig, () => { for (const provider of usageProviderIds()) markLimitWindowsDirty(db, provider, ALL_ACCOUNTS, LIMIT_WINDOW_ALL); }],
     ["limit_windows_codex_sources", codexSources, () => markLimitWindowsDirty(db, "codex", ALL_ACCOUNTS, LIMIT_WINDOW_ALL)],
     ["limit_windows_codex_source_plan", "1", () => markLimitWindowsDirty(db, "codex", ALL_ACCOUNTS, LIMIT_WINDOW_ALL)],
-    ["limit_windows_claude_activity", "1", () => markLimitWindowsDirty(db, "claude", ALL_ACCOUNTS, LIMIT_WINDOW_ALL)],
+    ["limit_windows_claude_activity", "2", () => markLimitWindowsDirty(db, "claude", ALL_ACCOUNTS, LIMIT_WINDOW_ALL)],
+    ["limit_windows_lifecycle", "1", () => { for (const provider of usageProviderIds())
+      markLimitWindowsDirty(db, provider, ALL_ACCOUNTS, LIMIT_WINDOW_ALL); }],
     // Cadence declarations name counters of probe readings; Codex counters do not use them.
     ["limit_windows_cycles", digest(cycles.windows ?? []), () => { for (const provider of usageProviderIds())
       if (provider !== "codex") markLimitWindowsDirty(db, provider, ALL_ACCOUNTS, LIMIT_WINDOW_ALL); }],
@@ -297,7 +300,9 @@ function toRow(state: State, counter: string, input: SegmentInput, anchor: numbe
   return { provider: state.provider, account: state.account, scope: state.scope, counter, ts: input.ts, grp: input.grp ?? "", ord: input.ord,
     used_percent: input.used_percent, resets_at: input.resets_at, window_minutes: input.window_minutes,
     source: input.source ?? "probe", limit_hit: input.limit_hit ? JSON.stringify(input.limit_hit) : null, anchor, home, path,
-    source_plan: state.provider === "codex" || state.provider === "claude" ? input.plan ?? null : null };
+    source_plan: input.plan ?? null,
+    meter_evidence: input.allowance != null || input.used != null
+      ? JSON.stringify({ allowance: input.allowance ?? null, used: input.used ?? null }) : null };
 }
 
 function evidenceRegion(db: Database, state: State, resolver: AccountResolver, cycles: CyclesConfig,
@@ -335,7 +340,7 @@ function evidenceRegion(db: Database, state: State, resolver: AccountResolver, c
       const counter = probeLimitCounter(sample, state.account, cycles);
       const readings = byCounter.get(counter) ?? [];
       readings.push({ ts: sample.ts, used_percent: sample.used_percent, resets_at: sample.resets_at,
-        plan: sample.plan,
+        plan: sample.plan, allowance: sample.allowance, used: sample.used,
         window_minutes: JSON.parse(counter)[2] as number, source: sample.limitHit ? "limit_hit" : "probe",
         ...(sample.limitHit ? { limit_hit: { call_id: sample.limitHit.callId } } : {}) });
       byCounter.set(counter, readings);
@@ -406,7 +411,7 @@ function dataSpan(db: Database, state: State): { first: number; last: number } |
 }
 
 const inputKey = (row: Pick<InputRow, "counter" | "ts" | "grp" | "ord">) => `${row.counter}\u0000${row.ts}\u0000${row.grp}\u0000${row.ord}`;
-const inputValue = (row: InputRow) => JSON.stringify([row.used_percent, row.resets_at, row.window_minutes, row.source, row.limit_hit, row.anchor, row.source_plan]);
+const inputValue = (row: InputRow) => JSON.stringify([row.used_percent, row.resets_at, row.window_minutes, row.source, row.limit_hit, row.anchor, row.source_plan, row.meter_evidence]);
 
 /** One bounded slice of a scope's input recomputation. */
 function advanceInputs(db: Database, state: State, resolver: AccountResolver, cycles: CyclesConfig,
@@ -446,10 +451,10 @@ function advanceInputs(db: Database, state: State, resolver: AccountResolver, cy
   const operations: Array<() => void> = [];
   const remove = db.query("DELETE FROM limit_window_inputs WHERE provider=? AND account=? AND scope=? AND counter=? AND ts=? AND grp=? AND ord=?");
   const insert = db.query(`INSERT INTO limit_window_inputs(provider,account,scope,counter,ts,grp,ord,used_percent,resets_at,window_minutes,
-    source,limit_hit,anchor,home,path,source_plan) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    source,limit_hit,anchor,home,path,source_plan,meter_evidence) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   for (const row of removed) operations.push(() => remove.run(row.provider, row.account, row.scope, row.counter, row.ts, row.grp, row.ord));
   for (const row of added) operations.push(() => insert.run(row.provider, row.account, row.scope, row.counter, row.ts, row.grp, row.ord,
-    row.used_percent, row.resets_at, row.window_minutes, row.source, row.limit_hit, row.anchor, row.home, row.path, row.source_plan));
+    row.used_percent, row.resets_at, row.window_minutes, row.source, row.limit_hit, row.anchor, row.home, row.path, row.source_plan, row.meter_evidence));
   // Large slices are written in several short transactions. The change is recorded first, so an interrupted
   // slice is recomputed (the cursor has not moved) and still segments from its earliest change.
   const batches = Math.max(1, Math.ceil(operations.length / WRITE_BATCH));
@@ -473,6 +478,7 @@ function advanceInputs(db: Database, state: State, resolver: AccountResolver, cy
 function parseInput(row: InputRow): SegmentInput {
   return { ts: row.ts, grp: row.grp, ord: row.ord, used_percent: row.used_percent, resets_at: row.resets_at, window_minutes: row.window_minutes,
     source: row.source as SegmentInput["source"], ...(row.source_plan ? { plan: row.source_plan } : {}),
+    ...(row.meter_evidence ? JSON.parse(row.meter_evidence) as Pick<SegmentInput, "allowance" | "used"> : {}),
     ...(row.limit_hit ? { limit_hit: JSON.parse(row.limit_hit) as { call_id: string } } : {}) };
 }
 
@@ -484,7 +490,9 @@ function windowRow(provider: string, seq: number, segment: RawSegment, window: P
     window.startDrop ? JSON.stringify(window.startDrop) : null, window.endDrop ? JSON.stringify(window.endDrop) : null,
     segment.seenReset ? 1 : 0, JSON.stringify({ ts: segment.lastInput.ts, grp: segment.lastInput.grp ?? "", ord: segment.lastInput.ord,
       used_percent: segment.lastInput.used_percent, resets_at: segment.lastInput.resets_at,
-      window_minutes: segment.lastInput.window_minutes, source: segment.lastInput.source ?? "probe" }),
+      window_minutes: segment.lastInput.window_minutes, source: segment.lastInput.source ?? "probe",
+      ...(segment.lastInput.allowance != null ? { allowance: segment.lastInput.allowance } : {}),
+      ...(segment.lastInput.used != null ? { used: segment.lastInput.used } : {}) }),
     window.activity ? JSON.stringify(window.activity) : null];
 }
 const INSERT_WINDOW = `INSERT INTO limit_windows(provider,account,counter,seq,window_id,start_ts,end_ts,reset_ts,cycle_end_basis,
@@ -503,15 +511,6 @@ function pairingReadings(readings: string): string {
 }
 function usageShape(row: unknown[]): string {
   return JSON.stringify([row[5], row[6], row[7], row[9], pairingReadings(String(row[13])), row[14], row[19]]);
-}
-
-/** The segment a stored window was before a later segment closed it: the state to resume from. */
-function restoreSegment(row: LimitWindowRow): RawSegment {
-  return { id: row.window_id, account: row.account, counter: row.counter, start: row.start_ts, end: row.reset_ts,
-    reset: row.reset_ts, cycle_end_basis: "scheduled", window_minutes: row.window_minutes,
-    readings: (JSON.parse(row.readings) as ProbeLimitWindow["readings"]).filter(reading => reading.source !== "manual"),
-    startDrop: row.start_drop === null ? null : JSON.parse(row.start_drop) as RawSegment["startDrop"], endDrop: null,
-    seenReset: row.seen_reset === 1, lastInput: JSON.parse(row.last_input) as SegmentInput };
 }
 
 function nextCounter(db: Database, state: State, after: string): string | null {
@@ -534,37 +533,18 @@ function publishWindows(db: Database, state: State, periods: readonly DatedPerio
   for (let counter = nextCounter(db, state, ""); counter !== null; counter = nextCounter(db, state, counter)) {
     const windows = db.query("SELECT * FROM limit_windows WHERE provider=? AND account=? AND counter=? ORDER BY seq")
       .all(state.provider, state.account, counter) as LimitWindowRow[];
-    let resume: LimitWindowRow | null = null;
-    for (const row of windows) if (Date.parse((JSON.parse(row.last_input) as SegmentInput).ts) < changedFrom) resume = row;
-    const segState: SegmenterState = resume
-      ? { last: JSON.parse(resume.last_input) as SegmentInput,
-        seenResets: windows.filter(row => row.seq <= resume!.seq && row.seen_reset === 1).map(row => Date.parse(row.reset_ts)),
-        out: [restoreSegment(resume)] }
-      : { last: null, seenResets: [], out: [] };
-    const last = segState.last;
-    const inputs = (state.provider === "claude" ? [] : last
-      ? db.query(`SELECT * FROM limit_window_inputs WHERE provider=? AND account=? AND scope=? AND counter=?
-          AND (ts>? OR (ts=? AND (grp>? OR (grp=? AND ord>?)))) ORDER BY ts, grp, ord`)
-        .all(state.provider, state.account, state.scope, counter, last.ts, last.ts, last.grp ?? "", last.grp ?? "", last.ord)
-      : db.query(`SELECT * FROM limit_window_inputs WHERE provider=? AND account=? AND scope=? AND counter=? ORDER BY ts, grp, ord`)
-        .all(state.provider, state.account, state.scope, counter)) as InputRow[];
+    // Replay the overlapping reset tail for every provider, including resumable meters.
+    const first = windows.findIndex(row => Date.parse(row.reset_ts) >= changedFrom);
+    let fromSeq = Math.max(0, (first < 0 ? windows.length - 1 : first) - 1);
+    while (fromSeq > 0 && Math.abs(Date.parse(windows[fromSeq - 1]!.reset_ts) - Date.parse(windows[fromSeq]!.reset_ts)) <= RESET_JOIN_MS) fromSeq--;
+    const from = windows[fromSeq]?.start_ts ?? "";
+    const inputs = db.query(`SELECT * FROM limit_window_inputs WHERE provider=? AND account=? AND scope=? AND counter=?
+      AND ts>=? ORDER BY ts,grp,ord`).all(state.provider, state.account, state.scope, counter, from) as InputRow[];
     stats.inputRows += inputs.length;
-    let segments: RawSegment[];
-    let fromSeq = resume?.seq ?? 0;
-    if (state.provider === "claude") {
-      // Replay the overlapping tail, including its predecessor. A resumed meter can precede the latest row.
-      const first = windows.findIndex(row => Date.parse(row.reset_ts) >= changedFrom);
-      fromSeq = Math.max(0, (first < 0 ? windows.length - 1 : first) - 1);
-      while (fromSeq > 0 && Math.abs(Date.parse(windows[fromSeq - 1]!.reset_ts) - Date.parse(windows[fromSeq]!.reset_ts)) <= RESET_JOIN_MS) fromSeq--;
-      const from = windows[fromSeq]?.start_ts ?? "";
-      const tailInputs = db.query(`SELECT * FROM limit_window_inputs WHERE provider=? AND account=? AND scope=? AND counter=?
-        AND ts>=? ORDER BY ts,grp,ord`).all(state.provider, state.account, state.scope, counter, from) as InputRow[];
-      stats.inputRows += tailInputs.length;
-      segments = segmentClaudeReadings(state.account, counter, tailInputs.map(parseInput), periods, {
-        last: fromSeq > 0 ? JSON.parse(windows[fromSeq - 1]!.last_input) as SegmentInput : null,
-        seenResets: windows.slice(0, fromSeq).filter(row => row.seen_reset === 1).map(row => Date.parse(row.reset_ts)), out: [],
-      });
-    } else segments = segmentReadings(state.account, counter, inputs.map(parseInput), segState);
+    const segments = segmentLimitReadings(state.provider, state.account, counter, inputs.map(parseInput), periods, {
+      last: fromSeq > 0 ? JSON.parse(windows[fromSeq - 1]!.last_input) as SegmentInput : null,
+      seenResets: windows.slice(0, fromSeq).filter(row => row.seen_reset === 1).map(row => Date.parse(row.reset_ts)), out: [],
+    });
     const resolution: WindowResolution = windowResolution(state.provider, state.account, counter, periods, measurements);
     const rows = segments.map((segment, index) => windowRow(state.provider, fromSeq + index, segment, resolveSegment(segment, resolution)));
     const tail = windows.filter(row => row.seq >= fromSeq), before = new Map(tail.map(row => [row.seq, row]));
@@ -618,45 +598,6 @@ function publishWindows(db: Database, state: State, periods: readonly DatedPerio
       WHERE provider=? AND account=? AND scope=?`).run(state.changed_from, state.provider, state.account, state.scope);
   });
   stats.segmentations++;
-}
-
-/** Plan periods or manual measurements changed: re-resolve the stored segments without segmenting again. */
-function resolveWindows(db: Database, state: State, periods: readonly DatedPeriod[], options: LimitWindowProducerOptions,
-  stats: LimitWindowProducerStats): void {
-  const rows = db.query(`SELECT * FROM limit_windows WHERE provider=? AND account=? ${state.provider === "codex" ? "AND counter=?" : ""}`)
-    .all(...[state.provider, state.account, ...(state.provider === "codex" ? [state.scope] : [])]) as LimitWindowRow[];
-  const measurements = measurementsOf(options, state.provider);
-  const resolutions = new Map<string, WindowResolution>();
-  const updates: unknown[][] = [];
-  const sumsChanged: LimitWindowRow[] = [];
-  for (const row of rows) {
-    const resolution = resolutions.get(row.counter) ?? windowResolution(state.provider, state.account, row.counter, periods, measurements);
-    resolutions.set(row.counter, resolution);
-    const segment = { ...restoreSegment(row), end: row.end_ts, cycle_end_basis: row.cycle_end_basis as RawSegment["cycle_end_basis"],
-      endDrop: row.end_drop === null ? null : JSON.parse(row.end_drop) as RawSegment["endDrop"] };
-    const fresh = windowRow(state.provider, row.seq, segment, resolveSegment(segment, resolution));
-    const stored = storedWindowRow(row);
-    if (JSON.stringify(fresh) !== JSON.stringify(stored)) updates.push(fresh);
-    // Manual readings change what the window pairs; a plan alone changes no sum.
-    if (pairingReadings(String(fresh[13])) !== pairingReadings(String(stored[13])) || fresh[14] !== stored[14]) sumsChanged.push(row);
-  }
-  if (options.canWrite && !options.canWrite()) return;
-  write(db, stats, () => {
-    const replace = db.query(INSERT_WINDOW.replace("INSERT INTO", "INSERT OR REPLACE INTO"));
-    for (const row of updates) replace.run(...(row as never[]));
-    // A window's plan is shown by stored window screens even where its sums stay (db/window-answers.ts).
-    for (const row of updates) markWindowAnswersDirty(db, { provider: String(row[0]), account: String(row[1]),
-      fromMs: Date.parse(String(row[5])), untilMs: Date.parse(String(row[6])) });
-    stats.windowsWritten += updates.length;
-    for (const row of sumsChanged) {
-      markWindowUsageDirty(db, { provider: row.provider, account: row.account, counter: row.counter,
-        fromMs: Date.parse(row.start_ts), untilMs: Date.parse(row.end_ts) });
-      dropWindowEndEstimate(db, row.provider, row.account, row.counter, row.window_id);
-    }
-    db.query(`UPDATE limit_window_state SET resolve=0, revision=revision+? WHERE provider=? AND account=? AND scope=?`)
-      .run(updates.length ? 1 : 0, state.provider, state.account, state.scope);
-  });
-  stats.resolutions++;
 }
 
 /**
@@ -713,8 +654,7 @@ export function advanceLimitWindows(db: Database, options: LimitWindowProducerOp
           .run(LIMIT_WINDOW_ALL, state.provider, state.account, state.scope);
       } else if (state.inputs_from !== null) advanceInputs(db, state, resolver, cycles, options, stats);
       else if (state.changed_from !== null || state.status === "filling") publishWindows(db, state, periods, options, stats);
-      else if (state.provider === "claude") publishWindows(db, state, periods, options, stats);
-      else resolveWindows(db, state, periods, options, stats);
+      else publishWindows(db, state, periods, options, stats);
       progressed = true;
       const ms = performance.now() - stepStarted;
       if (ms > stats.slowestStep.ms) stats.slowestStep = { ms, step };

@@ -75,7 +75,7 @@ export const DATA_VIEWS:Readonly<Record<string,DataView>> = {
   "/api/account-history":rows(historical(apiHandleAccountHistory)),
   "/api/activity":rows(historical(apiHandleActivity)),
   // Output speed per model of one Claude subscription: the ledger's timed hour sums (model-speed.ts).
-  "/api/model-speed":rows(historical(apiHandleModelSpeed)),
+  "/api/model-speed":rows({...historical(apiHandleModelSpeed),sources:[...facts,...identity,"response_time_hours"]}),
   "/api/projects":rows(historical(apiHandleProjects)),
   "/api/projects/rows":rows(historical(apiHandleProjectsRows)),
   "/api/projects/unassigned":rows(historical(apiHandleProjectsRows)),
@@ -209,7 +209,7 @@ export const DIRECT_DATA_ROUTES:Readonly<Record<string,string>>={
 export async function serveDataView(ctx:AppContext,url:URL):Promise<Response> {
   const view=DATA_VIEWS[url.pathname];
   if(!view)throw new Error(`Unregistered data view: ${url.pathname}`);
-  const version=dataVersion(ctx.sqlite,{capacityCycles:view.sources.includes("capacity_cycle_results"),contextPrices:contextRequested(url) ? url.pathname : false});
+  const version=dataVersion(ctx.sqlite,{capacityCycles:view.sources.includes("capacity_cycle_results"),firstTokenTimes:view.sources.includes("response_time_hours"),contextPrices:contextRequested(url) ? url.pathname : false});
   let response:Response;
   try { response=await view.build(ctx,url); }
   catch(error) {

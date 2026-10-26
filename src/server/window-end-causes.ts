@@ -70,6 +70,7 @@ export interface EndWindow {
   plan: string | null;
   /** First and last % reading; null without readings. */
   first: number | null; last: number | null;
+  endBasis?: string;
 }
 export interface ResetCredit { id: string; granted_at: string; expires_at: string }
 export interface CreditReading { ts: number; count: number; list: ResetCredit[] | null }
@@ -118,8 +119,10 @@ function planChangesAt(window: EndWindow, next: EndWindow): boolean {
 export type OwnEnd = "open" | "scheduled" | "plan_change" | "not_reset" | "banked" | "early";
 /** What a window's own data says about its end, before other accounts are looked at. */
 export function ownEnd(window: EndWindow, next: EndWindow | null, credits: CreditEvidence | null, now: number):
-  { kind: OwnEnd; notReset?: "same_reset" | "no_drop" } {
+  { kind: OwnEnd; notReset?: "same_reset" | "no_drop" | "capacity_change" } {
   if (window.end > now) return { kind: "open" };
+  if (window.endBasis === "plan_change") return { kind: "plan_change" };
+  if (window.endBasis === "capacity_change") return { kind: "not_reset", notReset: "capacity_change" };
   if (window.reset - window.end <= SCHEDULED_SLACK_MS) return { kind: "scheduled" };
   if (next && planChangesAt(window, next)) return { kind: "plan_change" };
   if (next && window.last !== null && next.first !== null && next.first >= window.last - NO_DROP_PP) return { kind: "not_reset", notReset: "no_drop" };
@@ -257,8 +260,8 @@ const setMeta = (db: Database, key: string, value: string) =>
 
 interface DirtyEntry { provider: string; account: string; from_ms: number; until_ms: number | null; sequence: number }
 interface WindowRow { provider: string; account: string; counter: string; seq: number; start_ts: string; end_ts: string; reset_ts: string;
-  plan: string | null; plan_detail: string | null; first: number | null; last: number | null }
-const WINDOW_COLUMNS = `provider, account, counter, seq, start_ts, end_ts, reset_ts, plan, plan_detail,
+  plan: string | null; plan_detail: string | null; first: number | null; last: number | null; cycle_end_basis?: string }
+const WINDOW_COLUMNS = `provider, account, counter, seq, start_ts, end_ts, reset_ts, plan, plan_detail, cycle_end_basis,
   json_extract(readings,'$[0].percent') AS first, json_extract(readings,'$[#-1].percent') AS last`;
 // A window overlapping the range starts at most the longest stored window before it (`longestWindowMs`, read per turn): a
 // bound that lets the (start, provider, account, counter) index serve the ordered page read.
@@ -273,7 +276,7 @@ function planOf(row: WindowRow): string | null {
   } catch { return null; }
 }
 const toWindow = (row: WindowRow): EndWindow => ({ provider: row.provider, account: row.account, counter: row.counter, seq: row.seq,
-  start: Date.parse(row.start_ts), end: Date.parse(row.end_ts), reset: Date.parse(row.reset_ts), plan: planOf(row),
+  start: Date.parse(row.start_ts), end: Date.parse(row.end_ts), reset: Date.parse(row.reset_ts), plan: planOf(row), endBasis: row.cycle_end_basis,
   first: typeof row.first === "number" ? row.first : null, last: typeof row.last === "number" ? row.last : null });
 
 /**
@@ -363,13 +366,13 @@ class Inputs {
 }
 
 /** The stored columns `joinsPrevious` reads of a limit window (alias-free, as `WINDOW_COLUMNS` selects them). */
-export type JoinRow = Pick<WindowRow, "start_ts" | "end_ts" | "reset_ts" | "plan" | "plan_detail" | "first" | "last">;
+export type JoinRow = Pick<WindowRow, "start_ts" | "end_ts" | "reset_ts" | "plan" | "plan_detail" | "first" | "last" | "cycle_end_basis">;
 /**
- * Whether a window continues the allowance of the window before it on the same counter: the previous end was not a reset
- * (`ownEnd` rule 3, the same rule billing chains by). The point values use it to measure a later fragment's rise from the
- * meter where the previous one left it.
+ * Whether percentages continue from the previous fragment. A changed denominator can share a billing
+ * period but cannot borrow the old percentage baseline.
  */
 export function joinsPrevious(previous: JoinRow, window: JoinRow): boolean {
+  if (previous.cycle_end_basis === "capacity_change") return false;
   const as = (row: JoinRow, seq: number) => toWindow({ ...row, provider: "", account: "", counter: "", seq });
   return ownEnd(as(previous, 0), as(window, 1), null, Infinity).kind === "not_reset";
 }

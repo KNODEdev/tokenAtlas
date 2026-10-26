@@ -2,6 +2,7 @@ import type { Database } from "../db/sqlite";
 import type { TimedSums } from "../db/usage-ledger";
 import type { AccountReadPlan } from "./account-resolver";
 import { readOwnedLedgerHours, type SumVendor } from "./ledger-sums";
+import type { FirstTokenSamples } from "../shared/first-token";
 
 /**
  * Output speed of each model over time for one subscription (docs/verification/model-speed-2026-10-06.md):
@@ -15,6 +16,7 @@ import { readOwnedLedgerHours, type SumVendor } from "./ledger-sums";
  * start in its transcript, a retried request, a file not yet read by Claude parser 6 or Codex parser 7) is counted, never timed as 0.
  */
 export interface ModelSpeedPoint {
+  first_token?: FirstTokenSamples;
   /** UTC day (`YYYY-MM-DD`) or the ISO instant an hour starts. */
   at: string;
   calls: number; timed_calls: number; timed_out: number; timed_ms: number; speed: number | null;

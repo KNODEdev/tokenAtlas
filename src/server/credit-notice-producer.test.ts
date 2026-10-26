@@ -2,11 +2,11 @@ import { Database } from "bun:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, expect, setSystemTime, test } from "bun:test";
-import { acknowledgeCreditNotices, CREDIT_NOTICE_SCHEMA_SQL, ensureCreditNoticeSchema, readOpenCreditNotices } from "../db/credit-notices";
+import { acknowledgeCreditNotices, CREDIT_NOTICE_SCHEMA_SQL, ensureCreditNoticeSchema, readCreditNotices, readOpenCreditNotices, resolveExpiryNotices, writeCreditNotices } from "../db/credit-notices";
 import type { NoticePool } from "../shared/credit-notices";
 import { advanceCreditNotices } from "./credit-notice-producer";
 import { decodeNoticePools } from "./credit-notice-pools";
-import { handleCreditNotices } from "./credit-notices-api";
+import { handleCreditNotices, readCreditNoticeViews } from "./credit-notices-api";
 
 afterEach(() => setSystemTime());
 
@@ -37,7 +37,7 @@ function publish(db: Database, day: number, pools: NoticePool[] | null, account 
   db.query(`INSERT INTO current_probe_subjects(provider,subject,data,generated_at) VALUES('claude',?,?,?)
     ON CONFLICT(provider,subject) DO UPDATE SET data=excluded.data,generated_at=excluded.generated_at`).run(account, data, at(day));
 }
-const open = (db: Database, day: number) => readOpenCreditNotices(db, Date.parse(at(day))).map(row => `${row.kind}:${row.amount}`);
+const open = (db: Database, _day: number) => readOpenCreditNotices(db).map(row => `${row.kind}:${row.amount}`);
 const advance = (db: Database, day: number) => advanceCreditNotices(db, { decode, now: () => Date.parse(at(day)) });
 
 test("notices follow the published card: baseline, receipt, rolling spend, acknowledgement and no rework", () => {
@@ -56,11 +56,16 @@ test("notices follow the published card: baseline, receipt, rolling spend, ackno
   expect(advance(db, 4)).toMatchObject({ accounts: 0, notices: 0 });
   db.query("UPDATE current_probe_subjects SET generated_at=?").run(at(4.5));
   expect(advance(db, 4.5)).toMatchObject({ accounts: 1, notices: 0 });
-  acknowledgeCreditNotices(db, readOpenCreditNotices(db, Date.parse(at(4))).map(row => row.id), at(4));
+  acknowledgeCreditNotices(db, readOpenCreditNotices(db).map(row => row.id), at(4));
   publish(db, 5, [grant(60)]);
   advance(db, 5);
   expect(open(db, 5)).toEqual(["spent:10"]);
-  expect((db.query("SELECT count(*) AS n FROM credit_notices").get() as { n: number }).n).toBe(2);
+  expect((db.query("SELECT count(*) AS n FROM credit_notices").get() as { n: number }).n).toBe(3);
+  expect(readCreditNotices(db).map(row => [row.kind, row.amount, row.acknowledged_at])).toEqual([
+    ["spent", 10, null], ["spent", 50, at(4)], ["received", 250, at(4)],
+  ]);
+  expect(advance(db, 5)).toMatchObject({ accounts: 0, notices: 0 });
+  expect(readCreditNotices(db)).toHaveLength(3);
 });
 
 test("a database built from the archive starts from the newest reading without replaying receipts", () => {
@@ -72,6 +77,27 @@ test("a database built from the archive starts from the newest reading without r
   expect(state).toEqual({ baseline_at: at(10), baseline_used: 120 });
 });
 
+test("a failed spend rollover retains read history and a retry publishes one new total", () => {
+  const db = database();
+  const spent = (day: number) => ({ notice: "codex:credits|spent|", pool: "codex:credits", kind: "spent" as const,
+    unit: "credits" as const, amount: 0.1, amount_text: "0.1", expires_at: null, observed_at: at(day), detail: {} });
+  writeCreditNotices(db, "codex", "example", [spent(1)], at(1));
+  const original = readCreditNotices(db)[0]!;
+  acknowledgeCreditNotices(db, [original.id], at(2));
+  db.exec("CREATE TRIGGER interrupt_notice BEFORE INSERT ON credit_notices BEGIN SELECT RAISE(ABORT, 'interrupted'); END");
+  expect(() => writeCreditNotices(db, "codex", "example", [spent(3)], at(3))).toThrow("interrupted");
+  expect(readCreditNotices(db)).toHaveLength(1);
+  expect(readCreditNotices(db)[0]).toMatchObject({ id: original.id, notice: spent(1).notice,
+    amount_text: "0.1", acknowledged_at: at(2) });
+  db.exec("DROP TRIGGER interrupt_notice");
+  expect(writeCreditNotices(db, "codex", "example", [spent(3)], at(3))).toBe(1);
+  expect(writeCreditNotices(db, "codex", "example", [spent(3)], at(3))).toBe(0);
+  expect(readCreditNotices(db).map(row => [row.amount_text, row.acknowledged_at])).toEqual([["0.1", null], ["0.1", at(2)]]);
+  const restored = Database.deserialize(db.serialize());
+  expect(readCreditNotices(restored)).toEqual(readCreditNotices(db));
+  restored.close();
+});
+
 test("expiry warnings are raised from the stored state and resolved when the grant is used up", () => {
   const db = database();
   publish(db, 10, [grant(0)]);
@@ -79,7 +105,7 @@ test("expiry warnings are raised from the stored state and resolved when the gra
   publish(db, 20, [grant(50)]);
   advance(db, 20);
   // $5 a day leaves $150 of $250 at expiry on day 30.
-  const warning = readOpenCreditNotices(db, Date.parse(at(20))).find(row => row.kind === "expiring");
+  const warning = readOpenCreditNotices(db).find(row => row.kind === "expiring");
   expect(warning).toMatchObject({ kind: "expiring", detail: { stage: "14d", remaining: 200 } });
   expect(warning!.amount).toBeCloseTo(150, 6);
   publish(db, 21, [grant(250)]);
@@ -99,8 +125,8 @@ test("an expired grant with money left is reported as lost, once", () => {
   advance(db, 31);
   publish(db, 32, []);
   advance(db, 32);
-  expect(readOpenCreditNotices(db, Date.parse(at(32))).filter(row => row.kind === "expired_unused").map(row => row.amount)).toEqual([50]);
-  expect(readOpenCreditNotices(db, Date.parse(at(32))).some(row => row.kind === "expiring")).toBe(false);
+  expect(readOpenCreditNotices(db).filter(row => row.kind === "expired_unused").map(row => row.amount)).toEqual([50]);
+  expect(readOpenCreditNotices(db).some(row => row.kind === "expiring")).toBe(false);
 });
 
 test("readings that state no pools and a refold onto an older reading write no notices", () => {
@@ -125,7 +151,7 @@ test("the migration creates the schema the register declares", () => {
   expect(normalize(migration)).toBe(normalize(CREDIT_NOTICE_SCHEMA_SQL));
 });
 
-test("the API lists open notices under the subscription's name and marks them read", async () => {
+test("the API keeps notices under the subscription's name after marking them read", async () => {
   setSystemTime(new Date(at(2)));
   const db = database();
   db.exec("CREATE TABLE subscription_current (id TEXT PRIMARY KEY, data TEXT NOT NULL)");
@@ -143,7 +169,39 @@ test("the API lists open notices under the subscription's name and marks them re
     { method: "POST", body: JSON.stringify({ ids: listed.notices.map(row => row.id) }) }));
   expect(await read.json()).toEqual({ acknowledged: 1 });
   // Acknowledged rows stay stored; only the open list is empty.
-  expect(readOpenCreditNotices(db, Date.now())).toEqual([]);
+  expect(readOpenCreditNotices(db)).toEqual([]);
+  const history = await (await handleCreditNotices(db, new Request("http://local/api/credit-notices"))).json();
+  expect(history.notices).toHaveLength(1);
+  expect(history.notices[0]).toMatchObject({ id: listed.notices[0]!.id, acknowledged_at: at(2), occurred_at: at(2) });
+});
+
+test("history uses event time across accounts, retains old and read rows, and only reads stored notices", () => {
+  const db = database();
+  const save = (account: string, kind: "received" | "expired_unused" | "spent" | "expiring", observed_at: string,
+    eventAt: string, created_at = observed_at) => {
+    writeCreditNotices(db, "codex", account, [{ notice: `${account}|${kind}`, pool: "codex:resets", kind,
+      unit: "resets", amount: 1, amount_text: null, observed_at,
+      expires_at: kind === "expired_unused" || kind === "expiring" ? eventAt : at(80),
+      detail: kind === "received" ? { granted_at: eventAt } : {} }], created_at);
+  };
+  save("early-expiry", "expired_unused", at(24), at(22));
+  save("late-expiry", "expired_unused", at(23), at(22.5));
+  save("early-receipt", "received", at(20), at(-9));
+  save("late-receipt", "received", at(19), at(-2));
+  save("old-read", "received", at(-30), at(-30));
+  save("spend", "spent", at(25), at(25));
+  save("warning", "expiring", at(1), at(28), at(26));
+  const oldRead = readCreditNotices(db).find(row => row.account === "old-read")!;
+  acknowledgeCreditNotices(db, [oldRead.id], at(27));
+  resolveExpiryNotices(db, "codex", "warning", new Set(), at(27));
+  const expected = ["warning", "spend", "late-expiry", "early-expiry", "late-receipt", "early-receipt", "old-read"];
+  db.exec("DROP TABLE probe_windows; DROP TABLE current_probe_subjects");
+  setSystemTime(new Date(at(100)));
+  expect(readCreditNoticeViews(db).map(row => row.account)).toEqual(expected);
+  expect(readCreditNoticeViews(db).at(-1)).toMatchObject({ acknowledged_at: at(27), occurred_at: at(-30) });
+  expect(readCreditNoticeViews(db)[0]).toMatchObject({ resolved_at: at(27), occurred_at: at(26) });
+  expect(readOpenCreditNotices(db).map(row => row.account)).toEqual(expected.slice(1, -1));
+  expect(readCreditNoticeViews(db).map(row => row.account)).toEqual(expected);
 });
 
 test("until pools are decoded the job only keeps its cursors and writes no notices", () => {

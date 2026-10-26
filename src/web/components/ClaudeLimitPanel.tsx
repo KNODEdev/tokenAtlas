@@ -12,7 +12,7 @@ export function ClaudeCalibrationHistoryCard({ data, account, bounds }: {
   data: ClaudeLimitResponse; account: string; bounds?: { from: string; until: string } | null;
 }) {
   const state = useAsync<ClaudeLimitResponse>(signal => api.claudeLimit(account,bounds,signal), [account,bounds?.from,bounds?.until]);
-  return state.error ? <ErrorState message={state.error} onRetry={state.reload} /> : <ClaudeCalibrationCard data={state.data ?? data} />;
+  return state.error ? <ErrorState message={state.error} onRetry={state.reload} /> : <ClaudeCalibrationCard data={state.data ?? data} showModels />;
 }
 const CONFIDENCE_TONE: Record<string, Tone> = {
   high: "ok",

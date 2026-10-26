@@ -364,7 +364,7 @@ export function advanceWindowPointValues(db: Database, options: PointValueOption
   const usageOf = db.query("SELECT json_extract(cycle,'$.usage') AS usage, json_array_length(readings) AS n FROM window_usage WHERE provider=? AND account=? AND counter=? AND window_id=?");
   const readingOf = db.query("SELECT json_extract(readings, ?5) AS reading FROM window_usage WHERE provider=?1 AND account=?2 AND counter=?3 AND window_id=?4");
   const storedOf = db.query("SELECT * FROM window_point_values WHERE provider=? AND account=? AND counter=? AND window_start=?");
-  const previousOf = db.query(`SELECT start_ts, end_ts, reset_ts, plan, plan_detail, json_extract(readings,'$[0].percent') AS first,
+  const previousOf = db.query(`SELECT start_ts, end_ts, reset_ts, plan, plan_detail, cycle_end_basis, json_extract(readings,'$[0].percent') AS first,
     json_extract(readings,'$[#-1].percent') AS last FROM limit_windows WHERE provider=? AND account=? AND counter=? AND seq=?`);
   const longest = longestWindowMs(db);
   const select = db.query(`SELECT l.* FROM limit_windows l WHERE ${ENTRY_SCOPE} AND ${COVERED} AND ${AFTER_PAGE}
@@ -381,7 +381,7 @@ export function advanceWindowPointValues(db: Database, options: PointValueOption
         const sorted = [...window.readings].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
         const regime = windowRegime(window, row.provider, options.plans, options.catalog);
         const previous = row.seq > 0 ? previousOf.get(row.provider, row.account, row.counter, row.seq - 1) as JoinRow | null : null;
-        const own: JoinRow = { start_ts: row.start_ts, end_ts: row.end_ts, reset_ts: row.reset_ts, plan: row.plan, plan_detail: row.plan_detail,
+        const own: JoinRow = { start_ts: row.start_ts, end_ts: row.end_ts, reset_ts: row.reset_ts, plan: row.plan, plan_detail: row.plan_detail, cycle_end_basis: row.cycle_end_basis,
           first: sorted[0]?.percent ?? null, last: sorted.at(-1)?.percent ?? null };
         const meterStart = previous && typeof previous.last === "number" && Date.parse(row.start_ts) - Date.parse(previous.end_ts) <= 2 * 60_000
           && joinsPrevious(previous, own) ? Math.min(previous.last, own.first ?? previous.last) : null;

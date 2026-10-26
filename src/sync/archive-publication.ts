@@ -11,10 +11,10 @@ import {
 } from "./archive-local-state";
 import { assertSafeArchiveRelative, containedArchivePath, isRecoverableArchiveSource } from "./archive-source-path";
 import { acceptedArchiveFingerprint } from "./file-queue";
-import { fileStamp, inspectJsonl, fileDigest } from "./jsonl-inspection";
+import { fileStamp, inspectJsonl, fileDigest, validateArchivedJsonl } from "./jsonl-inspection";
 export { fileDigest } from "./jsonl-inspection";
 import { originalUnchanged, readOriginalRecord, recordOriginal } from "./archive-originals";
-import { prefixMatches, archiveRepresentations, withDecodedArchiveFiles } from "../ingest/archive-codec";
+import { prefixMatches, archiveRepresentations, withArchiveDecodeCache, withDecodedArchiveFiles } from "../ingest/archive-codec";
 import { archiveCodecSource, archiveSourceIdentity, compressedArchiveSource } from "../shared/archive-codec-path";
 
 const missing = (error: unknown) => (error as NodeJS.ErrnoException)?.code === "ENOENT";
@@ -594,7 +594,26 @@ function publishEncodedJsonlArchive(source: string, destination: string, options
       if (!acceptedFiles.length && !state && [archiveSourceIdentity(destination), `${archiveSourceIdentity(destination)}.zst`]
         .some(file => acceptedArchiveFingerprint(options.archiveRoot, file, options.localStateRoot)))
         throw new Error(`Archived source is missing and its accepted bytes have no publication checkpoint: ${destination}`);
-      return withDecodedArchiveFiles([source, ...acceptedFiles], (decoded, assertStable) => {
+      return withArchiveDecodeCache(() => withDecodedArchiveFiles([source, ...acceptedFiles], (decoded, assertStable) => {
+        // A cold local checkpoint can reuse byte-identical compacted history without parsing both transcripts.
+        if (!state && !options.representationOnly
+          && acceptedFiles.length === 1 && compressedArchiveSource(acceptedFiles[0]!)) {
+          const compared = compareWithArchived(decoded[0]!, decoded[1]!);
+          if (compared.prefixEqual && compared.sourceBytes === compared.destinationBytes && compared.destinationEndsRecord) {
+            validateArchivedJsonl(decoded[1]!);
+            const retained = acceptedFiles[0]!, retainedStamp = fileStamp(retained)!;
+            const digest = fileDigest(retained), bytes = fs.statSync(retained).size;
+            assertStable(); guardArchiveSource();
+            if (fileStamp(retained) !== retainedStamp) throw new Error(`Archive destination changed while reading: ${retained}`);
+            const next: PublicationState = { schema: 1, archiveId: readArchiveIdentity(options.archiveRoot), relative: paths.relative,
+              source: path.resolve(options.provenance ?? source), format: "jsonl", sourceStamp, destinationStamp: retainedStamp,
+              acceptedDigest: digest, acceptedBytes: bytes, observedSourceBytes: fs.statSync(source).size,
+              publishableSourceBytes: fs.statSync(source).size, logicalBytes: compared.destinationBytes,
+              logicalDigest: compared.destinationDigest, representation: paths.relative + ".zst", updatedAt: new Date().toISOString() };
+            atomicLocalWrite(paths.state, JSON.stringify(next));
+            return "unchanged";
+          }
+        }
         const observed = inspectJsonl(decoded[0]!);
         if (compressedArchiveSource(source) && observed.incompleteTail)
           throw new Error(`Incomplete compressed JSONL; archive publication deferred: ${source}`);
@@ -670,7 +689,7 @@ function publishEncodedJsonlArchive(source: string, destination: string, options
           withArchiveFileWriter(item.file, () => fs.unlinkSync(item.file));
         }
         return sameRepresentation && accepted.length === 1 ? "unchanged" : "copied";
-      }, true);
+      }, true));
     });
   });
 }

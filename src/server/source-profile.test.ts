@@ -92,7 +92,7 @@ test("saving an AGY source keeps its declared account separate from Gemini CLI l
   fs.writeFileSync(path.join(profile, "google_accounts.json"), JSON.stringify({ active: "cli@example.test" }));
   const accounts = path.join(directory, "accounts.json"), archive = path.join(root, "archive", "gemini", "LAPTOP-sample_a");
   fs.writeFileSync(accounts, JSON.stringify({ version: 2,
-    subscriptions: [{ id: "agy3", vendor: "gemini", account: "agy@example.test" }],
+    subscriptions: [{ id: "agy3", vendor: "gemini", account: "account_0000@example.test" }],
     sources: [{ vendor: "gemini", machine: "LAPTOP", login: "sample_a", home: archive }] }));
   const script = path.join(root, "save.ts");
   fs.writeFileSync(script, `
@@ -108,6 +108,6 @@ test("saving an AGY source keeps its declared account separate from Gemini CLI l
     expect({ exit: await proc.exited, stderr }).toEqual({ exit: 0, stderr: "" });
     const saved = JSON.parse(fs.readFileSync(accounts, "utf8"));
     expect(saved.sources[0]).toMatchObject({ source_home: profile, home: archive });
-    expect(saved.subscriptions).toEqual([{ id: "agy3", vendor: "gemini", account: "agy@example.test" }]);
+    expect(saved.subscriptions).toEqual([{ id: "agy3", vendor: "gemini", account: "account_0000@example.test" }]);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

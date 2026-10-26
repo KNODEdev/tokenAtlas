@@ -59,6 +59,16 @@ export interface CreditNoticeDraft {
   detail: Record<string, string | number | boolean | null>;
 }
 
+/** Prefer the provider's event date; an expiry warning starts when it was raised. */
+export function creditNoticeOccurredAt(notice: Pick<CreditNoticeDraft, "kind" | "observed_at" | "expires_at" | "detail">
+  & { created_at?: string }): string {
+  const eventAt = notice.kind === "received" ? notice.detail.granted_at
+    : notice.kind === "expired_unused" ? notice.expires_at
+    : notice.kind === "expiring" ? notice.created_at : null;
+  return typeof eventAt === "string" && Number.isFinite(Date.parse(eventAt))
+    ? new Date(eventAt).toISOString() : notice.observed_at;
+}
+
 const DAY = 86_400_000;
 /** A pool first seen on an account with no earlier pool reading is a baseline, unless its items state a grant this recent. */
 export const FIRST_SIGHT_RECENT_MS = 7 * DAY;
@@ -226,7 +236,7 @@ export function addSpent(stored: { amount: number | null; amount_text: string | 
   return { amount: (stored.amount ?? 0) + (next.amount ?? 0), amount_text: null };
 }
 
-/** One open notice as `/api/credit-notices` sends it; `label` is the subscription's name. */
+/** One stored notice as `/api/credit-notices` sends it; `label` is the subscription's name. */
 export interface CreditNoticeView {
   id: number;
   provider: string;
@@ -240,5 +250,11 @@ export interface CreditNoticeView {
   amount_text: string | null;
   expires_at: string | null;
   observed_at: string;
+  occurred_at: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
   detail: Record<string, string | number | boolean | null>;
 }
+
+export const isOpenCreditNotice = (notice: Pick<CreditNoticeView, "acknowledged_at" | "resolved_at">): boolean =>
+  notice.acknowledged_at == null && notice.resolved_at == null;

@@ -106,6 +106,8 @@ export interface ClaudeSurfaceBreakdown {
   rows: ClaudeSurfaceBreakdownRow[];
 }
 export interface ClaudeCurrentWindow {
+  /** Absent in older stored answers; no token categories are inferred from gross/fresh spend. */
+  model_usage?: import("../../../shared/window-model-usage").WindowModelUsage[] | null;
   window_start: string;
   reset_at: string;
   elapsed_hours: number;

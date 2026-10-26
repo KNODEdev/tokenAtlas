@@ -32,6 +32,7 @@ function row(overrides: Partial<CodexWindowModelRow> = {}): CodexWindowModelRow 
     input: 1_000,
     cached: 400,
     cache_write: 50,
+    cache_write_complete: true,
     output: 300,
     reasoning: 80,
     tokens: 1_300,
@@ -112,7 +113,12 @@ describe("CodexWindowModels", () => {
     expect(html).toContain("81.3% of tokens have a dated rate");
     expect(html).toContain("300 without one (model-a)");
     expect(html).toContain("1,300 / 1,600"); // coverage counts in the tooltip
-    expect(html).not.toContain("Fresh input"); // input pieces moved to the drawer
+    expect(html).toContain("In total");
+    expect(html).toContain("Fresh In");
+    expect(html).toContain("1,200"); // all input
+    expect(html).toContain("695"); // fresh input excludes both cache reads and writes
+    expect(html).toContain("450"); // cache reads
+    expect(html).toContain("55"); // cache writes
     expect(html).toContain("Invalid token events");
     expect(html).not.toContain("Show dated rates"); // the rates open in a drawer, not a fold
     expect(html).toContain('aria-haspopup="dialog"');

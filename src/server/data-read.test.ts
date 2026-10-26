@@ -61,6 +61,18 @@ test("Claude calibration changes invalidate only the stored screens consuming it
   } finally { close(); }
 });
 
+test("model-usage answer version refreshes only Claude window projections", () => {
+  const { ctx, close } = fixture();
+  try {
+    for (const route of ["/api/claude-limit", "/api/claude-limit-card"])
+      expect(JSON.parse(storedAnswerConfiguration(ctx, new URL(`http://local${route}?account=claude-seat`))))
+        .toContain("window-model-usage-1");
+    for (const route of ["/api/windows?account=claude-seat", "/api/cycle-breakdown?account=codex-seat", "/api/account-history"])
+      expect(JSON.parse(storedAnswerConfiguration(ctx, new URL(`http://local${route}`))))
+        .not.toContain("window-model-usage-1");
+  } finally { close(); }
+});
+
 test("context response version is scoped to the series and breakdown, with window-sum dependencies", () => {
   const { ctx, close } = fixture();
   try {
@@ -607,7 +619,7 @@ test("another view reads a stored answer only while nothing it read has changed"
   try {
     storeWindowAnswers(sqlite, [answer("other")]);
     expect(currentStoredBody(ctx, url, now)).toBeNull();
-    storeWindowAnswers(sqlite, [{ ...answer(storedAnswerConfiguration(ctx)), builtAt: now + 1 }]);
+    storeWindowAnswers(sqlite, [{ ...answer(storedAnswerConfiguration(ctx, url)), builtAt: now + 1 }]);
     expect(currentStoredBody(ctx, url, now + 1)).toEqual({ plan: "max", current: null });
     markWindowAnswersDirty(sqlite, { provider: "claude", account: "claude-b", fromMs: 0, untilMs: null });
     expect(currentStoredBody(ctx, url, now + 1)).not.toBeNull();

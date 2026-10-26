@@ -41,6 +41,8 @@ export function ensureLimitWindowSchema(db: Database): void {
     db.exec(LIMIT_WINDOW_SCHEMA_SQL);
     if (!(db.query("PRAGMA table_info(limit_window_inputs)").all() as Array<{ name: string }>).some(column => column.name === "source_plan"))
       db.exec("ALTER TABLE limit_window_inputs ADD COLUMN source_plan TEXT");
+    if (!(db.query("PRAGMA table_info(limit_window_inputs)").all() as Array<{ name: string }>).some(column => column.name === "meter_evidence"))
+      db.exec("ALTER TABLE limit_window_inputs ADD COLUMN meter_evidence TEXT");
     if (!(db.query("PRAGMA table_info(limit_windows)").all() as Array<{ name: string }>).some(column => column.name === "activity"))
       db.exec("ALTER TABLE limit_windows ADD COLUMN activity TEXT");
   });

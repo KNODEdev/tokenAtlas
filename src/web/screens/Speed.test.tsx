@@ -28,6 +28,46 @@ const props = (id: string, vendor: string): ScreenProps => ({ model: emptyModel(
   setUnit() {}, setProject() {}, selectAccount() {}, selectCycle() {}, openDrawer() {}, goto() {}, setCompare() {}, triggerSync() {} });
 const card = (id: string, group: string, active = true) => ({ id, group, active, vendorAccount: `${id}@example.test` }) as RosterCard;
 const nodes = (node: TestNode): TestNode[] => [node, ...node.children.flatMap(nodes)];
+
+test("every supported provider uses the same table and leaves unverified timings missing", async () => {
+  setLanguage("en"); bustApiMemo();
+  const dom = installTestDom(), root = createRoot(dom.host as unknown as Element);
+  const read = spyOn(api, "modelSpeed").mockImplementation(async ({ account }) => {
+    const p = { ...point("2026-10-25", 1, 0, 0), timed_calls: 0, long_calls: 0, first_token: { turns: 0, histogram: [] } };
+    return { ...RESPONSE, account, models: [{ model: "fixture-model", total: p, points: [p] }] };
+  });
+  try {
+    for (const provider of ["gemini", "grok", "glm", "claude"]) {
+      await act(async () => root.render(<Speed {...props(provider, provider)} />));
+      await flushUntil(() => dom.host.textContent.includes("Per model"));
+      expect(nodes(dom.host).filter(n => n.attributes.title === "No verified first-token measurements").map(n => n.textContent)).toEqual(["—", "—"]);
+    }
+  } finally { await act(async () => root.unmount()); read.mockRestore(); dom.restore(); }
+});
+
+test("first-token columns show seconds, turn coverage and a dash for unverified sources", async () => {
+  setLanguage("en"); bustApiMemo();
+  const dom = installTestDom(), root = createRoot(dom.host as unknown as Element);
+  const p = { ...point("2026-10-25", 50, 10000, 100000), first_token: { turns: 10, histogram: [[3731, 8], [5627, 1]] as Array<[number, number]> } };
+  const read = spyOn(api, "modelSpeed").mockResolvedValue({ ...RESPONSE, models: [{ model: "fixture", total: p, points: [p] },
+    { model: "unverified", total: point("total", 2, 0, 0), points: [point("2026-10-25", 2, 0, 0)] }] });
+  try {
+    await act(async () => root.render(<Speed {...props("codex1", "codex")} />));
+    await flushUntil(() => dom.host.textContent.includes("Per model"));
+    expect(dom.host.textContent).toContain("First token · median");
+    expect(dom.host.textContent).toContain("First token · P90");
+    expect(dom.host.textContent).toContain("3.7 s");
+    expect(dom.host.textContent).toContain("5.6 s");
+    expect(nodes(dom.host).some(n => n.attributes.title === "9 of 10 completed turns measured · 90.0% coverage")).toBe(true);
+    expect(nodes(dom.host).filter(n => n.attributes.title === "No verified first-token measurements").map(n => n.textContent)).toEqual(["—", "—"]);
+    const medianTab = nodes(dom.host).find(n => n.tagName === "BUTTON" && n.textContent === "First token · median")!;
+    await invoke(medianTab, "onClick");
+    expect(nodes(dom.host).some(n => n.tagName === "SVG" && n.attributes["aria-label"] === "Time to first token")).toBe(true);
+    expect(dom.host.textContent).toContain("3.7 s");
+    await invoke(nodes(dom.host).find(n => n.tagName === "BUTTON" && n.textContent === "First token · P90")!, "onClick");
+    expect(dom.host.textContent).toContain("5.6 s");
+  } finally { await act(async () => root.unmount()); read.mockRestore(); dom.restore(); }
+});
 const toggles = (host: TestNode, label: string) => nodes(host).filter(node => node.tagName === "BUTTON" && node.className.includes("speed-toggle")
   && node.textContent === label);
 function withStorage(storage: unknown): () => void {
@@ -36,16 +76,16 @@ function withStorage(storage: unknown): () => void {
   return () => { if (previous) Object.defineProperty(globalThis, "localStorage", previous); else Reflect.deleteProperty(globalThis, "localStorage"); };
 }
 
-test("a subscription without response times shows why instead of an error, without reading the endpoint", async () => {
+test("an unsupported subscription shows why without reading the endpoint", async () => {
   setLanguage("en");
   const dom = installTestDom(), root = createRoot(dom.host as unknown as Element);
   const read = spyOn(api, "modelSpeed").mockResolvedValue(RESPONSE);
   try {
-    await act(async () => root.render(<Speed {...props("gemini-main", "gemini")} />));
-    expect(dom.host.textContent).toContain("Response times are recorded for Claude and Codex subscriptions");
+    await act(async () => root.render(<Speed {...props("unsupported", "unsupported")} />));
+    expect(dom.host.textContent).toContain("No supported provider selected");
     // "All" without an active Claude or Codex subscription has nothing to read either.
-    await act(async () => root.render(<Speed {...props(ALL_ACCOUNT, "codex")} cards={[card("gemini-main", "gemini")]} />));
-    expect(dom.host.textContent).toContain("No Claude or Codex subscription");
+    await act(async () => root.render(<Speed {...props(ALL_ACCOUNT, "codex")} cards={[card("unsupported", "unsupported")]} />));
+    expect(dom.host.textContent).toContain("No supported subscription");
     expect(read).not.toHaveBeenCalled();
   } finally { await act(async () => root.unmount()); read.mockRestore(); dom.restore(); }
 });
@@ -160,7 +200,7 @@ test("model labels follow a language switch on a mounted screen without reading 
 
 /** Three eligible subscriptions of "All"; a Gemini card and an inactive card are not read. */
 const CARDS = [card(ALL_ACCOUNT, "all"), card("codex1", "codex"), card("codex2", "codex"), card("claude-a", "claude"),
-  card("gemini-main", "gemini"), card("codex-old", "codex", false)];
+  card("unsupported", "unsupported"), card("codex-old", "codex", false)];
 const ANSWERS: Record<string, ModelSpeedResponse["models"]> = {
   // The same model in two subscriptions: 100 tok/s from 70 calls and 10 tok/s from 60 calls.
   codex1: [model("gpt-5.6-sol", [point("2026-10-05", 70, 70_000, 700_000)])],

@@ -66,9 +66,9 @@ test("missing model and missing cache-write rates stay unknown", () => {
   expect(f.event(b).extra_n).toBeNull(); expect(f.event(b).reason).toBe("missing_cache_write_rate");
   const sum = readCodexContextPrices(f.db); expect(sum.extra).toBeNull(); expect(sum.missingCalls).toBe(2);
 });
-test("unknown and unmapped modes preserve Standard split and quality", () => {
+test("an omitted mode is Standard; only an unmapped recorded mode is unknown", () => {
   const f = fixture(); f.seed({ raw: null }); f.seed({ raw: "mystery" }); f.drain();
-  const sum = readCodexContextPrices(f.db); expect(sum.unknownModeCalls).toBe(2); expect(sum.missingCalls).toBe(0); expect(sum.extra!.n).toBeGreaterThan(0n);
+  const sum = readCodexContextPrices(f.db); expect(sum.unknownModeCalls).toBe(1); expect(sum.missingCalls).toBe(0); expect(sum.extra!.n).toBeGreaterThan(0n);
 });
 for (const included of [false, true]) test(`stored premium included=${included} is recorded per published band`, () => {
   const f = fixture(policy(included)), id = f.seed(); f.drain(); const row = f.event(id);

@@ -32,6 +32,16 @@ test("billing uses paired usage, holding running sums at the first limit reading
   expect(billingContextPrice([row()], ts(0), ts(6), 70)).toBeUndefined();
 });
 
+test("billing preserves an activation zero but holds a resized meter at its first reading", () => {
+  const stored = row();
+  const activity = { plan: "pro", spans: [{ start: stored.start_ts, end: stored.end_ts }] };
+  const activation = { ...stored, window_minutes: 10080, activity: JSON.stringify({ ...activity, start_basis: "activation" }) };
+  expect(billingContextPrice([activation], ts(0), ts(4), 60)).toEqual({ base: 60, extra: 12, stored: 60 });
+  const resized = { ...stored, window_minutes: 360, activity: JSON.stringify({ ...activity, start_basis: "partial",
+    capacity_change: { before: 100, after: 200 } }) };
+  expect(billingContextPrice([resized], ts(0), ts(4), 40)).toEqual({ base: 40, extra: 10, stored: 40 });
+});
+
 test("partial classification, missing windows and corrections cannot label stale amounts", () => {
   const incomplete = row(), cycle = JSON.parse(incomplete.cycle);
   cycle.usage.context_priced_tokens = 99;
@@ -55,11 +65,11 @@ test("mixed normalization subtracts the stored split before scaling a boundary p
 test("the split reader works with only stored window tables, scopes account/counter and writes nothing", () => {
   const db = new Database(":memory:");
   try {
-    db.exec(`CREATE TABLE limit_windows(provider,account,counter,window_id,start_ts,end_ts,reset_ts,readings,start_drop);
+    db.exec(`CREATE TABLE limit_windows(provider,account,counter,window_id,start_ts,end_ts,reset_ts,readings,start_drop,activity,window_minutes);
       CREATE TABLE window_usage(provider,account,counter,window_id,cycle,readings);`);
     const stored = row();
     for (const [account, counter] of [["one", "weekly"], ["one", "5h"], ["two", "weekly"]] as const) {
-      db.query("INSERT INTO limit_windows VALUES('codex',?,?,?, ?,?,?,?,?)")
+      db.query("INSERT INTO limit_windows VALUES('codex',?,?,?, ?,?,?,?, ?,NULL,10080)")
         .run(account!, counter!, account + counter, stored.start_ts, stored.end_ts, stored.reset_ts, stored.meter, stored.start_drop);
       db.query("INSERT INTO window_usage VALUES('codex',?,?,?,?,?)").run(account!, counter!, account + counter, stored.cycle, stored.readings);
     }

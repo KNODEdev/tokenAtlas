@@ -1,6 +1,6 @@
 /* Models in the window: one compact row per model; a model's dated rates open in a drawer instead of folding
    into the table, where their own columns broke its layout (user, 2026-10-14). */
-.codex-models-table :is(.ui-th, .ui-td):nth-child(6) { border-left: 1px solid var(--line); }
+.codex-models-table .codex-models-price { border-left: 1px solid var(--line); }
 /* Each model's share of the window's tokens: a plain bar in a recessed track (paper-atlas §4). */
 .codex-models-share { display: inline-flex; align-items: center; gap: var(--s-5); }
 .codex-models-share-track {

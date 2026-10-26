@@ -8,6 +8,8 @@ import { accountResolverOf, resolveAccountScope, knownAccountIds } from "./accou
 import { parseCommonDateParams } from "./api-request-params";
 import { eventAccountScope } from "./api-events";
 import { modelSpeedSeries, readModelSpeed } from "./model-speed";
+import { attachFirstTokenTimes, readFirstTokenTimes } from "./first-token-read";
+import { ledgerProviderOf } from "./subscription-accounting-adapters";
 import { LONG_CALL_OUT } from "../db/usage-ledger";
 
 interface ActivityCell {
@@ -223,12 +225,12 @@ export function handleModelSpeed(ctx: AppContext, url: URL): Response {
   if (!accountParam) return Response.json({ error: "Missing 'account' parameter." }, { status: 400 });
   const scope = resolveAccountScope(ctx, accountParam);
   if (!scope) return Response.json({ error: `Unknown 'account' parameter: '${accountParam}'. Known: ${knownAccountIds(ctx).join(", ")}.` }, { status: 400 });
-  if (scope.vendor !== "claude" && scope.vendor !== "codex")
-    return Response.json({ error: `'account=${scope.id}' is a ${scope.vendor} subscription; response times are recorded for Claude and Codex calls.` }, { status: 400 });
+  if (scope.vendor !== "codex" && !ledgerProviderOf(scope.vendor))
+    return Response.json({ error: `No usage adapter for '${scope.vendor}'.` }, { status: 400 });
   const { since, until } = dateParams;
   const range = { ...(since ? { since } : {}), ...(until ? { until } : {}) };
   let models: ReturnType<typeof modelSpeedSeries> = [];
-  if (scope.vendor === "claude") models = readModelSpeed(ctx.sqlite, "claude", accountResolverOf(ctx).plan("claude", scope.id), { grain, ...range });
+  if (scope.vendor !== "codex") models = readModelSpeed(ctx.sqlite, scope.vendor, accountResolverOf(ctx).plan(scope.vendor, scope.id), { grain, ...range });
   else if (apiHasCodexHistory(ctx)) {
     // The readiness of the ledger's priced readers (a preparing ledger answers "preparing"), then the account's canonical
     // Codex calls by hour, owned through the periods as /api/activity owns them, read without valuing them.
@@ -236,6 +238,7 @@ export function handleModelSpeed(ctx: AppContext, url: URL): Response {
     apiCodexLedgerContext(ctx, { grain: "hour", ...range, dependencyBases });
     models = modelSpeedSeries(readCodexOwnedTimedHours(ctx.sqlite, accountResolverOf(ctx), scope.id, { ...range, dependencyBases }), grain);
   }
+  const timing = readFirstTokenTimes(ctx.sqlite, accountResolverOf(ctx), scope.vendor, scope.id, { grain, ...range });
   return Response.json({ account: scope.id, provider: scope.vendor, grain, since: since ?? null, until: until ?? null,
-    long_out_min: LONG_CALL_OUT, models });
+    long_out_min: LONG_CALL_OUT, first_token_pending: timing.pending, models: attachFirstTokenTimes(models, timing) });
 }

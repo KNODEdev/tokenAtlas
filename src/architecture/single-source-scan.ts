@@ -13,6 +13,7 @@ export const PROTECTED_TABLES: readonly string[] = [
   "usage_ledger_facts", "usage_ledger_days", "usage_ledger_hours",
   "codex_price_ledger_events", "codex_price_ledger_copies", "codex_price_ledger_aggregates", "codex_price_ledger_file_models",
   "window_usage", "window_usage_intervals",
+  "response_time_copies", "response_time_turns", "response_time_hours",
 ];
 const TABLE = PROTECTED_TABLES.join("|");
 const READ = new RegExp(String.raw`\b(?:FROM|JOIN)\s+["'` + "`" + String.raw`]?(?:${TABLE})\b(?![\w-])`, "gi");

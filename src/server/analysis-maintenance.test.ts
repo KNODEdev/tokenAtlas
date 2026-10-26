@@ -4,6 +4,42 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { startAnalysisMaintenance } from "./analysis-maintenance";
+import { EventEmitter } from "node:events";
+import type { Worker } from "node:worker_threads";
+
+test("native completions drain separately, retain gated work and give full turns a fair share", async () => {
+  const messages: { firstTokenOnly?: boolean; close?: boolean }[] = [];
+  class FakeWorker extends EventEmitter {
+    unref() {} ref() {}
+    postMessage(message: typeof messages[number]) {
+      messages.push(message);
+      if (message.close) queueMicrotask(() => this.emit("exit", 0));
+    }
+  }
+  const worker = new FakeWorker();
+  let now = 0, allowed = true, taken = 0;
+  const timers: (() => void)[] = [];
+  const maintenance = startAnalysisMaintenance(":memory:", () => ({ subscriptions: [], sources: [] }), () => allowed,
+    () => {}, { now: () => now, createWorker: () => worker as unknown as Worker,
+      setTimeout: ((fn: () => void) => { timers.push(fn); return { unref() {} }; }) as unknown as typeof setTimeout,
+      clearTimeout: (() => {}) as typeof clearTimeout, answers: { take: () => { taken++; return []; }, giveBack() {} } });
+  const finish = (catchUpNeeded = false) => worker.emit("message", { catchUpNeeded, errors: {}, answersStored: true });
+  try {
+    maintenance.update(); expect(messages.at(-1)?.firstTokenOnly).toBe(false); expect(taken).toBe(1);
+    // Many completions coalesce while the full turn is still writing.
+    for (let i = 0; i < 32; i++) worker.emit("message", { type: "first-token-ready" });
+    finish(); timers.shift()!(); expect(messages).toHaveLength(2); expect(messages.at(-1)?.firstTokenOnly).toBe(true);
+    expect(taken).toBe(1);
+    maintenance.update(); // A full turn becomes due while the short turn is running.
+    now = 500; finish(true); timers.shift()!(); expect(messages.at(-1)?.firstTokenOnly).toBe(true);
+    now = 1100; finish(true); timers.shift()!(); expect(messages.at(-1)?.firstTokenOnly).toBe(false);
+    expect(taken).toBe(2);
+    finish(); allowed = false; worker.emit("message", { type: "first-token-ready" });
+    expect(maintenance.running).toBe(false); expect(maintenance.pending).toBe(true);
+    allowed = true; maintenance.update(); expect(messages.at(-1)?.firstTokenOnly).toBe(true);
+    finish();
+  } finally { await maintenance.close(); }
+});
 
 test("maintenance respects the writer gate and releases queued readers when idle", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-maintenance-"));

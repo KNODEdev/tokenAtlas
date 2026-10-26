@@ -44,7 +44,7 @@ describe("Codex ledger declarations", () => {
     const compiled = compileCodexLedgerPolicy(p);
     expect(compiled.resolveTier("default", "2026-10-01")).toBe("standard");
     expect(compiled.resolveTier("priority", "2026-10-01")).toBe("fast");
-    expect(compiled.resolveTier(null, "2026-10-01")).toBeNull();
+    expect(compiled.resolveTier(null, "2026-10-01")).toBe("standard");
     expect(compiled.resolveTier("future", "2026-10-01")).toBeNull();
   });
 
@@ -57,7 +57,7 @@ describe("Codex ledger declarations", () => {
     expect(compiled.multiplier("test-model", "chatgpt_credits", "ultrafast", "2026-10-01")).toEqual({ n: 7n, d: 3n });
     expect(compiled.resolveTier("hyper", "2026-09-30")).toBeNull();
     expect(compiled.resolveTier("hyper", "2026-10-01")).toBe("ultrafast");
-    expect(compiled.resolveTier(null, "2026-10-01")).toBeNull();
+    expect(compiled.resolveTier(null, "2026-10-01")).toBe("standard");
     expect(result.effects.base_reprice).toEqual([]);
     expect(result.effects.derivative_regroup).toEqual([{ side: "after", raw_value: "hyper", tier: "ultrafast",
       valid_from: "2026-10-01", include_unpriced: true }]);

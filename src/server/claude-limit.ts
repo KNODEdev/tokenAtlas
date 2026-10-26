@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { WindowModelUsage } from "../shared/window-model-usage";
 import { windowActiveAt } from "../shared/window-activity";
 import { preparedClaudeCardMetadata } from "../db/claude-card-metadata";
 import { readClaudeCapacityResult } from "./claude-capacity-result";
@@ -77,6 +78,8 @@ export interface ClaudeObservationReport {
 }
 export type { ClaudeCapacityModelResult as ClaudeModelCost } from "../shared/claude-capacity-result";
 export interface ClaudeCurrentWindow {
+  /** Counted model quantities from the same prepared rail as this window's traffic. */
+  model_usage?: WindowModelUsage[] | null;
   window_id: string;
   window_start: string;
   reset_at: string;
@@ -788,6 +791,11 @@ export function buildClaudeLimit(
     const startIso = currentWindow.start;
     const resetIso = currentWindow.end;
     const byModel = spendByModel(currentWindow.spend);
+    const traffic = currentWindow.rail?.by_model.filter(row => row.excluded === null);
+    // Legacy rails omit unknown-lifetime writes; stored fresh spend includes only uncached input and output.
+    const modelUsage = traffic && traffic.every(row => byModel.has(row.model || "?"))
+      ? traffic.map(({ excluded, ...row }) => ({ ...row,
+        cache_write: row.input - row.cached - (byModel.get(row.model || "?")!.fresh - row.output) })) : null;
     const spend = totalOf(byModel);
     const unpricedModels = unpricedSpendModels(byModel);
     const fableSpend = totalOf(byModel, isFable);
@@ -835,6 +843,7 @@ export function buildClaudeLimit(
       ...(unpricedModels.length ? { unpriced_models: unpricedModels } : {}),
       days: tokensByLocalDay(currentWindow.rail),
       hours: claudeHourBlocks(currentWindow.rail, currentWindow.sums, currentWindow.spend),
+      model_usage: modelUsage,
       ...(currentWindow.rail?.credit_funded ? { credit_funded: currentWindow.rail.credit_funded } : {}),
     };
   }

@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { addSpent, type CreditNoticeDraft, type CreditNoticeKind, type NoticePool, type StoredPool } from "../shared/credit-notices";
+import { addSpent, creditNoticeOccurredAt, type CreditNoticeDraft, type CreditNoticeKind, type NoticePool, type StoredPool } from "../shared/credit-notices";
 import { asSchemaWriter } from "./schema-writer";
 
 /**
@@ -86,14 +86,15 @@ export function replaceStoredPools(db: Database, provider: string, account: stri
 
 /**
  * Writes drafts of one account. A notice identity is written once; a `spent` notice is one rolling row per
- * pool that adds up use until it is acknowledged, after which the next use starts a new total. An `expiring`
- * notice keeps its row and follows the current projection (amount, detail) while it holds.
+ * pool until acknowledgement. Later use preserves that row and starts a new total. An `expiring` notice
+ * keeps its row and follows the current projection (amount, detail) while it holds.
  */
 export function writeCreditNotices(db: Database, provider: string, account: string, drafts: readonly CreditNoticeDraft[], now: string): number {
   let written = 0;
   const find = db.query("SELECT * FROM credit_notices WHERE provider=? AND account=? AND notice=?");
   const insert = db.query(`INSERT INTO credit_notices(provider,account,notice,pool,kind,unit,amount,amount_text,expires_at,
     observed_at,detail,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  const archiveSpent = db.query("UPDATE credit_notices SET notice=? WHERE id=?");
   const update = db.query(`UPDATE credit_notices SET amount=?,amount_text=?,expires_at=?,observed_at=?,detail=?,updated_at=?,
     resolved_at=NULL,acknowledged_at=? WHERE id=?`);
   for (const draft of drafts) {
@@ -107,9 +108,17 @@ export function writeCreditNotices(db: Database, provider: string, account: stri
       written++;
     } else if (draft.kind === "spent") {
       if (existing.observed_at >= draft.observed_at) continue;
-      const fresh = existing.acknowledged_at != null;
-      const total = fresh ? { amount: draft.amount, amount_text: draft.amount_text } : addSpent(existing, draft);
-      const since = fresh ? draft.observed_at : (JSON.parse(existing.detail) as { since?: string }).since ?? existing.created_at;
+      if (existing.acknowledged_at != null) {
+        db.transaction(() => {
+          archiveSpent.run(`${draft.notice}|history:${existing.observed_at}`, existing.id);
+          insert.run(provider, account, draft.notice, draft.pool, draft.kind, draft.unit, draft.amount, draft.amount_text,
+            draft.expires_at, draft.observed_at, JSON.stringify({ ...draft.detail, since: draft.observed_at }), now, now);
+        })();
+        written++;
+        continue;
+      }
+      const total = addSpent(existing, draft);
+      const since = (JSON.parse(existing.detail) as { since?: string }).since ?? existing.created_at;
       update.run(total.amount, total.amount_text, draft.expires_at, draft.observed_at, JSON.stringify({ ...draft.detail, since }),
         now, null, existing.id);
       written++;
@@ -132,15 +141,22 @@ export function resolveExpiryNotices(db: Database, provider: string, account: st
   return resolved;
 }
 
-/** Received and used notices stay open this long unless acknowledged; expiry warnings until resolved. */
-export const NOTICE_OPEN_MS = 14 * 86_400_000;
+function decodeNotices(rows: RawNotice[]): CreditNoticeRow[] {
+  return rows.map(decodeRow).sort((a, b) =>
+    Date.parse(creditNoticeOccurredAt(b)) - Date.parse(creditNoticeOccurredAt(a)) || b.id - a.id);
+}
 
-/** The open notices, newest first: an indexed read of a few rows. */
-export function readOpenCreditNotices(db: Database, now: number): CreditNoticeRow[] {
+/** Stored history, including acknowledged notices and resolved warnings; no reading-history scan. */
+export function readCreditNotices(db: Database): CreditNoticeRow[] {
   if (!hasCreditNoticeSchema(db)) return [];
-  const since = new Date(now - NOTICE_OPEN_MS).toISOString();
-  return (db.query(`SELECT * FROM credit_notices WHERE acknowledged_at IS NULL AND resolved_at IS NULL
-    AND (kind='expiring' OR observed_at>=?) ORDER BY observed_at DESC, id DESC`).all(since) as RawNotice[]).map(decodeRow);
+  return decodeNotices(db.query("SELECT * FROM credit_notices").all() as RawNotice[]);
+}
+
+/** Open notices do not silently disappear with age. */
+export function readOpenCreditNotices(db: Database): CreditNoticeRow[] {
+  if (!hasCreditNoticeSchema(db)) return [];
+  return decodeNotices(db.query(`SELECT * FROM credit_notices
+    WHERE acknowledged_at IS NULL AND resolved_at IS NULL`).all() as RawNotice[]);
 }
 
 export function acknowledgeCreditNotices(db: Database, ids: readonly number[], now: string): number {

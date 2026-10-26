@@ -17,6 +17,8 @@ export type SingleSourceKind = "register" | "producer" | "ingest" | "detail" | "
 export interface SingleSourceEntry { reads: number; sums: number; kind: SingleSourceKind; reason: string }
 
 export const SINGLE_SOURCE_ALLOWED: Readonly<Record<string, SingleSourceEntry>> = {
+  "db/first-token.ts": { reads: 8, sums: 0, kind: "producer", reason: "atomically canonicalizes turn timing copies and updates only their exact hourly histogram contributions" },
+  "server/first-token-read.ts": { reads: 2, sums: 0, kind: "register", reason: "reads prepared TTFT histograms and bounded canonical turns only at dated ownership boundaries" },
   // Read modules of the ledgers and window sums.
   "server/ledger-sums.ts": { reads: 41, sums: 12, kind: "register", reason: "the one read module of day and hour sums of both ledgers (timed sums included, the Codex owned timed hours of Speed among them), of their missing-rate valuations, of an account's stored activity and Codex calls, tokens and activity per owner (facts only across an ownership boundary or for mixed sessions), of the day rows' rate keys (a row the project cost cannot split from its sums read from its own calls) and of the calls' stored gaps of selected day rows (wall-clock activity per computer)" },
   "server/window-usage-read.ts": { reads: 5, sums: 0, kind: "register", reason: "stored window sums, prepared model-capacity samples and model usage share behind the window-usage read API" },

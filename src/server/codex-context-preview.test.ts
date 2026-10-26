@@ -131,8 +131,8 @@ test("accounting keeps API-only and joint credit-priced cohorts separate", () =>
     undefined, {}, { provider_groups: [] }, f.ctx.resolver, f.ctx.accounts.sources));
   expect(report.context_preview_status).toMatchObject({ ready: true, missing_groups: 0 });
   expect(report.context_preview!.normalization.standard_api_usd.priced_subtotal).toBeCloseTo(14.05, 12);
-  expect(report.context_preview!.normalization.normalized_usd.priced_subtotal).toBeCloseTo(9, 12);
-  expect(report.context_preview!.normalization.normalized_usd.unpriced_events).toBe(4);
+  expect(report.context_preview!.normalization.normalized_usd.priced_subtotal).toBeCloseTo(11, 12);
+  expect(report.context_preview!.normalization.normalized_usd.unpriced_events).toBe(3);
 });
 test("project allocation uses preview numerator and denominator, conserves bills and catalog facts", async () => {
   const f = fixture(); f.fill();

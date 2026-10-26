@@ -105,6 +105,7 @@ const ADDITIVE_MIGRATIONS: ReadonlySet<number> = new Set([
   1789776000058, // 0090_codex_context_final_scopes: triggers write only the new companion queue
   1789776000059, // 0091_codex_context_final_queues: two new empty companion queues
   1789776000060, // 0092_claude_billing_mode: nullable columns on claude_events and usage_ledger_facts, tracking-trigger handoff
+  1789776000063, // 0095_first_token: empty companion tables; background adapters install their file queues
 ]);
 
 interface PreMigrationSnapshotOptions {
@@ -347,7 +348,7 @@ export function ensureRawSyncIndexes(sqlite: ReturnType<typeof initDb>["sqlite"]
       ensureCodexFileModelsIndex(sqlite);
     }
     const evidence = new Set((sqlite.query("PRAGMA table_info(codex_file_evidence)").all() as Array<{ name: string }>).map(c => c.name));
-    for (const name of ["provider_thread_id", "provider_session_id", "provider_forked_from_id"])
+    for (const name of ["provider_thread_id", "provider_session_id", "provider_forked_from_id", "first_token_json"])
       if (!evidence.has(name)) sqlite.exec(`ALTER TABLE codex_file_evidence ADD COLUMN ${name} TEXT`);
     sqlite.exec(CODEX_FORKED_FROM_INDEX_SQL);
     if (sqlite.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='codex_price_ledger_events'").get())

@@ -4,12 +4,12 @@ import { ARCHIVE_LOGICAL_ROOT } from "../config/paths";
 import { Database } from "../db/sqlite";
 import { installFactDayRevisions } from "../db/fact-day-revisions";
 import { ACCOUNT_PERIODS, loadPeriods } from "../db/period-store";
-import { readLimitWindows } from "../db/limit-windows";
+import { readLimitWindows, markLimitWindowsDirty } from "../db/limit-windows";
 import { createTestDatabase } from "../sync/test-support";
 import { prepareProbeReaderFixture } from "./probe-reader.fixture";
 import { fillUsageLedger } from "./usage-ledger.fixture";
 import { prepareWindowUsageFixture } from "./window-usage.fixture";
-import { advanceLimitWindows } from "./limit-window-producer";
+import { advanceLimitWindows, computeLimitWindowsFull, emptyLimitWindowStats } from "./limit-window-producer";
 import { readLedgerSums } from "./ledger-sums";
 import { readWindowSums } from "./window-usage";
 import { registerSubscriptionAccountingAdapter, type SubscriptionAccountingAdapter } from "./subscription-accounting-adapters";
@@ -93,4 +93,38 @@ test("a provider registered only in this test reaches ledger sums, limit windows
     expect({ window: window.id, events: usage.events, tokens: usage.tokens })
       .toEqual({ window: window.id, events: inside.length, tokens: inside.reduce((sum, call) => sum + call.prompt + call.completion, 0) });
   }
+  // Absolute allowance changes survive the same projection/writer/reader path as real providers.
+  const boundary = iso(START + 96 * HOUR);
+  const factsBefore = db.query("SELECT * FROM usage_ledger_facts WHERE provider='testprovider'").all();
+  db.query(`UPDATE probe_windows SET allowance=CASE WHEN ts<? THEN 100 ELSE 200 END, used=used_percent,
+    used_percent=CASE WHEN ts<? THEN used_percent ELSE used_percent/2 END,
+    vendor_percent=CASE WHEN ts<? THEN vendor_percent ELSE vendor_percent/2 END
+    WHERE provider='testprovider' AND resets_at=?`).run(boundary,boundary,boundary,iso(START+WEEK));
+  markLimitWindowsDirty(db,"testprovider",ACCOUNT,START);
+  const settle = (connection = db) => { for (let i=0;i<100;i++) if (!advanceLimitWindows(connection,{sources:[],cycles:{windows:[]},manualCapacity:()=>[],budgetMs:1e9}).pending) return;
+    throw new Error("window publication did not settle"); };
+  settle();
+  const resized = readLimitWindows(db,"testprovider",ACCOUNT,counter);
+  expect(resized[0]!.id).toBe(windows[0]!.id);
+  expect(resized[0]).toMatchObject({end:boundary,cycle_end_basis:"capacity_change"});
+  expect(resized[1]).toMatchObject({start:boundary,activity:{start_basis:"partial",capacity_change:{before:100,after:200}}});
+  expect(db.query("SELECT meter_evidence FROM limit_window_inputs WHERE provider='testprovider' AND ts=?").get(boundary))
+    .toEqual({meter_evidence:JSON.stringify({allowance:200,used:56})});
+  const options = {sources:[],cycles:{windows:[]},manualCapacity:()=>[]};
+  expect(resized).toEqual(computeLimitWindowsFull(db,options).get(JSON.stringify(["testprovider",ACCOUNT,counter]))!);
+  prepareWindowUsageFixture(db,{rateCards:CARD,subscriptions:[],claudeGauge:{},manualCapacity:()=>[],cycles:{windows:[]}});
+  const resizedSums = readWindowSums(db,"testprovider",ACCOUNT,counter,resized,["cycle"]);
+  for (const window of resized) {
+    const inside=calls.filter(call=>call.ts>=window.start&&call.ts<window.end);
+    expect(resizedSums.get(window.id)!.cycle.cycle_usage.tokens).toBe(inside.reduce((sum,call)=>sum+call.prompt+call.completion,0));
+  }
+  expect(db.query("SELECT * FROM usage_ledger_facts WHERE provider='testprovider'").all()).toEqual(factsBefore);
+  const reopened = new Database(dbPath);
+  try {
+    const stats=emptyLimitWindowStats();
+    advanceLimitWindows(reopened,{...options,stats,budgetMs:1e9});
+    expect([stats.probeRows,stats.inputRows,stats.windowsWritten]).toEqual([0,0,0]);
+    expect(readLimitWindows(reopened,"testprovider",ACCOUNT,counter)).toEqual(resized);
+    expect(readWindowSums(reopened,"testprovider",ACCOUNT,counter,resized,["cycle"])).toEqual(resizedSums);
+  } finally { reopened.close(); }
 }, 60_000);

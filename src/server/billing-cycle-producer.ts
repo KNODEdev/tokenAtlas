@@ -137,7 +137,7 @@ function knownAccounts(db: Database, plans: ReturnType<typeof loadPeriods>): Acc
 
 interface WindowRow { counter: string; start_ts: string; end_ts: string; cycle_end_basis: string; window_minutes: number; plan: string | null;
   final_percent: number | null; first_percent: number | null; api_usd: number | null; has_usage: number; window_id: string; usage: string | null;
-  has_drop: number }
+  has_drop: number; activity: string | null; reset_ts: string }
 type AccountWindow = CycleUsageWindow & CycleUnitsWindow & { plan: string | null; firstPercent: number | null; events: number | null };
 
 /** One account's derivation inputs and its windows, read once for all of its cycles. */
@@ -158,7 +158,7 @@ class AccountInputs {
   windowsOf(counter: string): AccountWindow[] {
     const cached = this.windows.get(counter);
     if (cached) return cached;
-    const rows = this.db.query(`SELECT l.counter, l.start_ts, l.end_ts, l.cycle_end_basis, l.window_minutes, l.plan, l.window_id,
+    const rows = this.db.query(`SELECT l.counter, l.start_ts, l.end_ts, l.cycle_end_basis, l.window_minutes, l.plan, l.window_id,l.activity,l.reset_ts,
         json_extract(l.readings, '$[#-1].percent') AS final_percent, json_extract(u.cycle, '$.usage.api_standard') AS api_usd,
         u.window_id IS NOT NULL AS has_usage, json_extract(u.cycle, '$.usage') AS usage,
         json_extract(l.readings, '$[0].percent') AS first_percent, l.start_drop IS NOT NULL AS has_drop
@@ -169,10 +169,12 @@ class AccountInputs {
       let detail: ReturnType<CycleUsageWindow["detail"]> | null = null;
       let units: Array<readonly [number, CycleUnitAmounts]> = [];
       const usage = row.usage ? JSON.parse(row.usage) as Partial<WindowUsage> : null;
+      const activity = row.activity ? JSON.parse(row.activity) as ProbeLimitWindow["activity"] : undefined;
       return {
         start: Date.parse(row.start_ts), end: Date.parse(row.end_ts), basis: row.cycle_end_basis, plan: row.plan,
         finalPercent: typeof row.final_percent === "number" ? row.final_percent : null,
         firstPercent: typeof row.first_percent === "number" ? row.first_percent : null,
+        ...(activity?.start_basis === "partial" && row.first_percent !== null ? { meterStart: row.first_percent } : {}),
         events: row.has_usage && typeof usage?.events === "number" ? usage.events : null,
         apiUsd: row.has_usage ? (typeof row.api_usd === "number" ? row.api_usd : 0) : null,
         usage: row.has_usage ? { tokens: usage?.tokens ?? 0, input: usage?.input ?? 0, cached: usage?.cached ?? 0, output: usage?.output ?? 0,
@@ -191,7 +193,8 @@ class AccountInputs {
             .map((r) => [Date.parse(r.ts), r.usage] as const).sort((a, b) => a[0] - b[0]);
           // The running sums on the window's paired interval, the same traffic as its usage (pairingBounds).
           const pairing = readings.length ? pairingBounds({ start: row.start_ts, readings: [...readings].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts)),
-            startDrop: row.has_drop ? { before: 0, after: 0 } : null }) : null;
+            startDrop: row.has_drop ? { before: 0, after: 0 } : null, reset: row.reset_ts, window_minutes: row.window_minutes,
+            ...(activity ? { activity } : {}) }) : null;
           const bounds = pairing ? { fromReset: pairing.fromReset, start: Date.parse(pairing.start), end: Date.parse(pairing.last.ts) }
             : { fromReset: true, start: Date.parse(row.start_ts), end: Infinity };
           const running = pairedRunning(sums.map(([t, u]) => [t, u.api_standard ?? 0] as const), bounds, (value, base) => value - base);
@@ -219,7 +222,7 @@ class AccountInputs {
           window.allowanceMs = allowance;
           // A chain's last fragment may itself end in a plan change: still no early reset.
           window.notReset = i < last || planChange.has(window.start);
-          if (i > first && previous?.finalPercent != null)
+          if (i > first && previous?.finalPercent != null && window.meterStart === undefined)
             window.meterStart = window.firstPercent === null ? previous.finalPercent : Math.min(previous.finalPercent, window.firstPercent);
         }
       }

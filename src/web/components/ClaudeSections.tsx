@@ -1,7 +1,7 @@
 import type { AccountCapabilities, ClaudeLimitResponse, ClaudeSurfaceBreakdown } from "../lib/api";
 import { claudeReading } from "../lib/claude";
 import { useBreakpoint, splitColumns } from "../lib/useBreakpoint";
-import { ClaudeCalibrationHistoryCard, ClaudeModelsCard } from "./ClaudeLimitPanel";
+import { ClaudeCalibrationHistoryCard } from "./ClaudeLimitPanel";
 import { ClaudeStatusCard, claudeWindowModel, sameInstant, type ClaudeWindowModel } from "./ClaudeStatusCard";
 import { MissingSection, missingVendorSections, type VendorOverviewSections } from "./VendorOverview";
 import { BudgetCard, PaceCard, VersusCard, percentUnit, type BudgetUnit } from "./WindowForecastPanel";
@@ -17,6 +17,9 @@ import { getLocale, translate, useI18n } from "../lib/i18n";
 import { useState, type ReactNode } from "react";
 import { claudeAccountSplit, type ClaudeAccountSplit } from "../../shared/claude-code-capacity";
 import { AccountSplitTable } from "./AccountSplitTable";
+import { ClaudeWindowModels } from "./ClaudeWindowModels";
+import { TokenComposition } from "./CycleComposition";
+import { sumWindowTokens } from "../lib/window-tokens";
 import { RailWindowTable } from "./RailWindowTable";
 import { FullHistoryLink } from "./CycleHistoryTable";
 import { sampleCurveAt, type WindowInsight } from "../lib/window-insights";
@@ -82,25 +85,15 @@ export function claudeSections({
       selectedHistorical={selectedHistorical} meters={weeklyHost?.accountMeters ?? null} creditPools={weeklyHost?.creditPools ?? null} />,
     planWindows: <ClaudeForecast data={data} model={model} session={session} />,
     history: <ClaudeWindowHistory windows={windows} windowHours={data.window_hours} reportedStart={cur.window_start} onFullHistory={onFullHistory} />,
-    models: data.models.length ? (
-      <ClaudeModelsCard data={data} />
-    ) : (
-      <MissingSection
-        title={translate("No model calibration", "Brak kalibracji modeli")}
-        detail={translate(
-          "The models are in the index, but without a usable All models reading there is no honest way to calculate tokens or calls per weekly point.",
-          "Modele są w indeksie, ale bez użytecznego odczytu All models nie da się uczciwie policzyć tokenów ani wywołań przypadających na jeden punkt tygodnia."
-        )}
-      />
-    ),
-    traffic: <ClaudeTraffic cur={cur} />,
+    models: <ClaudeWindowModels rows={cur.model_usage} />,
+    traffic: <TokenComposition tokens={cur.model_usage == null ? null : sumWindowTokens(cur.model_usage)} />,
     provenance: <ClaudeCaveats caveats={data.caveats} fableShare={data.fable_share_of_all} cur={cur} />,
     calibration: <ClaudeCalibrationHistoryCard data={data} account={account} bounds={bounds} />,
     subs: {
-      models: data.models.length
-        ? `${localizedNumber(data.models.length)} ${translate("models", "modeli")} · ${translate("cost of one weekly point", "koszt jednego punktu tygodnia")}`
+      models: cur.model_usage
+        ? `${localizedNumber(cur.model_usage.length)} ${translate("models", "modeli")}`
         : undefined,
-      traffic: translate("gross and uncached traffic in the current window", "brutto i ruch bez cache w bieżącym oknie"),
+      traffic: translate("token types in the selected window", "typy tokenów w wybranym oknie"),
     },
   };
 }
@@ -341,26 +334,6 @@ function ClaudeSessionCard({ session }: { session: Session }) {
         {t(
           "The session cap is not calibrated. This shows percentage and usage, not how many dollars remain.",
           "Pułap sesji nie jest skalibrowany — dlatego jest tu procent i zużycie, a nie „ile dolarów zostało”."
-        )}
-      </div>
-    </Card>
-  );
-}
-function ClaudeTraffic({ cur }: { cur: Current }) {
-  const { t } = useI18n();
-  const freshShare = cur.spend.gross > 0 ? (cur.spend.fresh / cur.spend.gross) * 100 : null;
-  return (
-    <Card>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-4)" }}>
-        <Line label={t("Gross tokens", "Tokeny brutto")} value={compact(cur.spend.gross)} />
-        <Line label={t("Uncached tokens", "Tokeny bez cache")} value={compact(cur.spend.fresh)} />
-        <Line label={t("Uncached share", "Udział bez cache")} value={freshShare != null ? pct(freshShare, 1) : "—"} />
-        <Line label={t("Calls", "Wywołania")} value={full(cur.spend.calls)} />
-      </div>
-      <div className="mono" style={{ marginTop: "var(--s-5)", fontSize: "var(--fs-2)", color: "var(--faint)", lineHeight: 1.55 }}>
-        {t(
-          "Claude keeps cache reads separate from input, so gross is not comparable with Codex gross. Both numbers come from the index, not the account counter.",
-          "Claude trzyma odczyty cache osobno od inputu — „brutto” nie jest porównywalne z brutto Codeksa. Obie liczby pochodzą z indeksu, nie z licznika konta."
         )}
       </div>
     </Card>

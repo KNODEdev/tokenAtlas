@@ -1,4 +1,5 @@
 import type { CodexTokenRates } from "./codex-accounting";
+import type { WindowTokenCounts } from "./window-model-usage";
 
 export interface WindowPriceParts {
   rates: CodexTokenRates;
@@ -13,17 +14,12 @@ export interface WindowPriceParts {
 }
 
 /** A row has one dated price and context band; model names may repeat. */
-export interface CodexWindowModelRow {
+export interface CodexWindowModelRow extends WindowTokenCounts {
   model: string;
   speed: "standard" | "fast" | "unknown";
   first: string;
   last: string;
   calls: number;
-  input: number;
-  cached: number;
-  cache_write: number;
-  output: number;
-  reasoning: number;
   tokens: number;
   long_context: boolean;
   api: WindowPriceParts | null;

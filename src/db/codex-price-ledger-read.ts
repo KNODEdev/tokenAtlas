@@ -159,9 +159,8 @@ export function deriveCodexLedgerGroup<Requested extends readonly LedgerVariant[
   }
   const fastCredit = policy.multiplier(row.model, "chatgpt_credits", "fast", row.day);
   const cf = tierPrice(cs, fastCredit, "credit", row.model);
-  // A call that records no tier is valued at the Standard API rate, a lower bound (UNKNOWN_MODE_RATE_RULE);
-  // its tier stays unknown for credits and for the quality measures. An unmapped recorded tier stays unpriced.
-  const apiTier = tier ?? (row.service_tier == null ? "standard" : null);
+  // The shared policy resolves omitted tiers to Standard; unmapped recorded tiers stay unpriced.
+  const apiTier = tier;
   const actualApiMultiplier = apiTier === "standard" ? one : apiTier ? policy.multiplier(row.model, "api_equivalent_usd", apiTier, row.day) : null;
   const apiActual = apiTier ? tierPrice(api, actualApiMultiplier, "api", row.model) : null;
   const variants = {} as Record<LedgerVariant, LedgerAmount>;

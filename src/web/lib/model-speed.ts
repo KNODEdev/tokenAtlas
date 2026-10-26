@@ -3,8 +3,10 @@
  * ratio of sums (`out * 1000 / ms` over the summed calls), never an average of daily speeds.
  */
 import type { TimeRangeDays } from "../../shared/time-range-presets";
+import { firstTokenSummary, mergeFirstToken, type FirstTokenSamples } from "../../shared/first-token";
 
 export interface ModelSpeedPoint {
+  first_token?: FirstTokenSamples;
   at: string;
   calls: number; timed_calls: number; timed_out: number; timed_ms: number; speed: number | null;
   long_calls: number; long_out: number; long_ms: number; long_speed: number | null;
@@ -12,11 +14,13 @@ export interface ModelSpeedPoint {
 }
 export interface ModelSpeedSeries { model: string | null; total: ModelSpeedPoint; points: ModelSpeedPoint[] }
 export interface ModelSpeedResponse {
-  account: string; provider: "claude" | "codex"; grain: "day" | "hour"; since: string | null; until: string | null;
+  account: string; provider: SpeedProvider; grain: "day" | "hour"; since: string | null; until: string | null;
+  first_token_pending?: boolean;
   long_out_min: number; models: ModelSpeedSeries[];
 }
 export type SpeedKind = "long" | "all";
 export type SpeedGrain = "day" | "week";
+export type SpeedChartMetric = "speed" | "first-token-median" | "first-token-p90";
 /** The period the whole report covers, in UTC days, or the whole history. */
 export type SpeedRange = `${TimeRangeDays}d` | "all";
 
@@ -75,12 +79,35 @@ export function chartBuckets(points: readonly ModelSpeedPoint[], grain: SpeedGra
   return speedBuckets(points, grain, kind).filter((bucket): bucket is SpeedBucket & { speed: number } =>
     bucket.speed !== null && bucket.n >= MIN_POINT_CALLS);
 }
+/** The latency chart merges raw frequencies before computing each day's/week's percentile. */
+export function modelChartBuckets(points: readonly ModelSpeedPoint[], grain: SpeedGrain, kind: SpeedKind, metric: SpeedChartMetric) {
+  if (metric === "speed") return chartBuckets(points, grain, kind).map(p => ({ at: p.at, value: p.speed, n: p.n, measured: p.timed, total: p.calls }));
+  const buckets = new Map<string, FirstTokenSamples[]>();
+  for (const point of points) {
+    if (!point.first_token) continue;
+    const at = grain === "week" ? weekStart(point.at) : point.at;
+    const list = buckets.get(at) ?? []; list.push(point.first_token); buckets.set(at, list);
+  }
+  return [...buckets].sort(([a], [b]) => a.localeCompare(b)).flatMap(([at, samples]) => {
+    const summary = firstTokenSummary(mergeFirstToken(samples));
+    const ms = metric === "first-token-median" ? summary.median_ms : summary.p90_ms;
+    return ms === null ? [] : [{ at, value: ms / 1000, n: summary.measured, measured: summary.measured, total: summary.turns }];
+  });
+}
+/** Latency keeps every measured value on the scale, including slow turns. */
+export function firstTokenChartScale(values: readonly number[]): { max: number; step: number } {
+  const top = Math.max(0.1, ...values) * 1.05;
+  const power = 10 ** Math.floor(Math.log10(top / 5));
+  const step = [1, 2, 5, 10].map(n => n * power).find(n => n >= top / 5)!;
+  return { max: Math.ceil(top / step) * step, step };
+}
 /** Whether two consecutive drawn buckets are joined: gaps without traffic stay open. */
 export function joined(previousAt: string, at: string, grain: SpeedGrain): boolean {
   return Date.parse(`${at}T00:00:00Z`) - Date.parse(`${previousAt}T00:00:00Z`) <= bucketMs(grain) * GAP_BUCKETS;
 }
 
 export interface ModelTotals {
+  firstToken?: ReturnType<typeof firstTokenSummary>;
   calls: number; timed: number; longCalls: number;
   long: number | null; all: number | null;
   first: string | null; last: string | null;
@@ -88,6 +115,7 @@ export interface ModelTotals {
 export function modelTotals(series: ModelSpeedSeries): ModelTotals {
   const { total } = series;
   return { calls: total.calls, timed: total.timed_calls, longCalls: total.long_calls,
+    firstToken: firstTokenSummary(total.first_token),
     long: total.long_ms > 0 ? total.long_out * 1000 / total.long_ms : null,
     all: total.timed_ms > 0 ? total.timed_out * 1000 / total.timed_ms : null,
     first: series.points[0]?.at ?? null, last: series.points.at(-1)?.at ?? null };
@@ -181,10 +209,11 @@ export function writeHiddenModels(account: string, hidden: ReadonlySet<string>, 
 
 /* ---- All subscriptions (approved 2026-10-07): one line per model across the chosen subscriptions, or split. ---- */
 
-export type SpeedProvider = "claude" | "codex";
+export type SpeedProvider = "claude" | "codex" | "grok" | "gemini" | "glm";
 export function speedProviderOf(vendor: string | null | undefined): SpeedProvider | null {
   const value = (vendor ?? "").toLowerCase();
-  return value === "claude" || value === "anthropic" ? "claude" : value === "codex" || value === "openai" ? "codex" : null;
+  return value === "claude" || value === "anthropic" ? "claude" : value === "codex" || value === "openai" ? "codex"
+    : value === "grok" || value === "xai" ? "grok" : value === "gemini" ? "gemini" : value === "glm" ? "glm" : null;
 }
 export interface SpeedSubscription { id: string; provider: SpeedProvider; name: string; label: string; active: boolean }
 /**
@@ -228,11 +257,13 @@ export function mergeSpeedParts(parts: readonly SpeedPart[], split: boolean): Sp
     const key = entryKey(part.account, series.model!, split);
     const entry = entries.get(key) ?? { model: series.model!, accounts: new Set<string>(), total: emptyPoint("total"), points: new Map() };
     entries.set(key, entry);
-    if (series.total.calls > 0) entry.accounts.add(part.account);
+    if (series.total.calls > 0 || series.total.first_token?.turns) entry.accounts.add(part.account);
     for (const field of ADDITIVE) entry.total[field] += series.total[field];
+    entry.total.first_token = mergeFirstToken([entry.total.first_token, series.total.first_token]);
     for (const point of series.points) {
       const sum = entry.points.get(point.at) ?? emptyPoint(point.at);
       for (const field of ADDITIVE) sum[field] += point[field];
+      sum.first_token = mergeFirstToken([sum.first_token, point.first_token]);
       entry.points.set(point.at, sum);
     }
   }
@@ -257,7 +288,8 @@ export function entriesSince(entries: readonly SpeedEntry[], since: string | nul
     const points = entry.series.points.filter(point => point.at >= since);
     const total = emptyPoint("total");
     for (const point of points) for (const field of ADDITIVE) total[field] += point[field];
-    return total.calls > 0 ? [{ ...entry, series: { ...entry.series, total: finish(total), points } }] : [];
+    total.first_token = mergeFirstToken(points.map(point => point.first_token));
+    return total.calls > 0 || total.first_token.turns > 0 ? [{ ...entry, series: { ...entry.series, total: finish(total), points } }] : [];
   });
 }
 

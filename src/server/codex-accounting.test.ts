@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { accountingOptions, handleCodexAccounting,buildCodexAccountingReport as readPreparedCodexAccountingReport } from "./codex-accounting";
 import { codexLedgerReadContext } from "../db/codex-ledger-adapters";
+import { codexModelUsage } from "../web/lib/model-usage";
 import { SubscriptionFactsPending } from "../db/subscription-facts";
 import {buildFixtureCodexReport as buildCodexAccountingReport,codexFixturePeriods,codexFixtureSources} from "./codex-v8.fixture";
 import { priceCodexEvent, prepareCodexPricing, resolveCodexAccountingConfig, validateCodexAccountingConfig,
@@ -690,7 +691,7 @@ test("accounting honors pending publication and modern tier corrections",()=>{
     expect(()=>read(corrected)).toThrow(SubscriptionFactsPending);
     db.query("UPDATE usage_ledger_state SET status='ready',rules_digest=?,rules_json=? WHERE provider='codex'").run(context.rulesRevision!,JSON.stringify(policy));
     const after=read(corrected);
-    expect(after.amounts.chatgpt_credits.priced_subtotal).toBe(87.75);
+    expect(after.amounts.chatgpt_credits.priced_subtotal).toBe(107.25);
     expect(after.normalization.normalized_usd.priced_subtotal).toBeGreaterThan(before.normalization.normalized_usd.priced_subtotal);
     expect(after.amounts.api_equivalent_usd).toEqual(before.amounts.api_equivalent_usd);
     expect(after.rule_source).toBe("configured");
@@ -775,27 +776,28 @@ test("accounting windows include adjacent lexical-date instants and their correc
   } finally {db.close();}
 });
 
-test("report filters, mirror deduplication, missing-speed fallback and partial coverage preserve token totals", () => {
+test("omitted tiers are Standard in reports and model bars, preserving filters, mirrors and token totals", () => {
   const db = new Database(":memory:");
   try {
     fixture(db);
     const options = { since: "2026-09-08", until: "2026-09-08", account: "codex1" };
     const report = buildCodexAccountingReport(db, card, options);
     expect(report.events).toBe(3); expect(report.tokens).toBe(330000);
-    expect(report.excluded_mirror_events).toBe(1); expect(report.known_speed_tokens).toBe(220000);
-    expect(report.amounts.chatgpt_credits).toMatchObject({ value: null, priced_subtotal: 68.25, status: "partial", unpriced_tokens: 110000 });
-    // The call without a recorded tier has its API equivalent at Standard (a lower bound); its credits stay unpriced.
+    expect(report.excluded_mirror_events).toBe(1); expect(report.known_speed_tokens).toBe(330000);
+    expect(report.amounts.chatgpt_credits).toMatchObject({ value: 87.75, priced_subtotal: 87.75, status: "complete", unpriced_tokens: 0 });
     expect(report.amounts.api_equivalent_usd.priced_subtotal).toBeCloseTo(3.12, 10);
     expect(report.amounts.api_equivalent_usd).toMatchObject({ status: "complete", unpriced_events: 0, reasons: {} });
-    expect(report.unknown_speed_tokens).toBe(110000);
-    expect(report.amounts.chatgpt_credits.reasons).toEqual({ unknown_speed: { events: 1, tokens: 110000 } });
-    expect(report.breakdown.reduce((s, r) => s + r.amounts.chatgpt_credits.priced_subtotal, 0)).toBe(68.25);
+    expect(report.unknown_speed_tokens).toBe(0);
+    expect(report.amounts.chatgpt_credits.reasons).toEqual({});
+    expect(report.breakdown.reduce((s, r) => s + r.amounts.chatgpt_credits.priced_subtotal, 0)).toBe(87.75);
+    expect(codexModelUsage(report.breakdown)).toMatchObject({ tokens: 330000, calls: 3,
+      modes: { standard: 220000, fast: 110000, unknown: 0 } });
     expect(buildCodexAccountingReport(db, card, { ...options, project: "project-a" }).amounts.chatgpt_credits.value).toBe(48.75);
     expect(buildCodexAccountingReport(db, card, { ...options, account: "other" }).amounts.chatgpt_credits.status).toBe("empty");
     db.exec("ALTER TABLE events DROP COLUMN speed");
     const legacy = buildCodexAccountingReport(db, card, options);
-    expect(legacy.tokens).toBe(330000); expect(legacy.unknown_speed_events).toBe(3);
-    expect(legacy.amounts.chatgpt_credits.status).toBe("unpriced");
+    expect(legacy.tokens).toBe(330000); expect(legacy.unknown_speed_events).toBe(0);
+    expect(legacy.amounts.chatgpt_credits).toMatchObject({ status: "complete", value: 58.5 });
   } finally { db.close(); }
 });
 

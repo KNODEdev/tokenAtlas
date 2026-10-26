@@ -13,8 +13,9 @@ import { buildWindowInsights } from "../lib/window-insights";
 import { railWindowsFromCycles } from "../lib/windows";
 import { comparableStatWindows, cyclePlanDescription, cyclePlanLabel, historyThroughCycle, modelThroughCycle, withWindowTraffic, observationOf, observedRates, usageAtSameTime, windowForecast, trafficRangeOf, windowRates, windowTrafficSummary, medianDailyTraffic } from "../lib/codex-window-stats";
 import { CycleBreakdown } from "../components/CycleBreakdown";
-import { CycleMilestones, UsageComposition } from "../components/CycleComposition";
+import { CycleMilestones, TokenComposition } from "../components/CycleComposition";
 import { BudgetCard, PaceCard, VersusCard, percentUnit, type BudgetUnit } from "./WindowForecastPanel";
+import { sumWindowTokens } from "../lib/window-tokens";
 import { CodexModelsHelp, CodexWindowModels, codexModelCount } from "./CodexWindowModels";
 import { CycleRail } from "../components/CycleRail";
 import { CycleHistoryTable, FullHistoryLink } from "./CycleHistoryTable";
@@ -358,7 +359,7 @@ export function useCodexSections(props: ScreenProps): VendorOverviewSections {
       ),
     traffic: hasIndexedTelemetry ? (
       <>
-        <UsageComposition cycle={cur} />
+        <TokenComposition tokens={modelBreakdown.data?.model_detail ? sumWindowTokens(modelBreakdown.data.model_detail.rows) : null} loading={modelBreakdown.loading} error={modelBreakdown.error} />
         <CycleBreakdown
           data={breakdown.data}
           windowHours={cur.windowHours}

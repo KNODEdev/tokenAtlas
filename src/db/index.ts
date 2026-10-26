@@ -9,10 +9,10 @@ import { selectedDatabasePath } from "./location";
 export function activeDatabasePath(envFile?: string): string {
   return selectedDatabasePath(envFile) ?? resolveDbPath();
 }
-// The saved selection is read from the repository .env by path, so a process started outside
-// the repository (where Bun does not load .env) never falls through to an empty default database.
+// Read the installation's saved settings by absolute path, including the legacy managed .env
+// selection, so a process started elsewhere never falls through to an empty default database.
 export function resolveDbPath(customPath?: string, env: Record<string, string | undefined> = process.env): string {
-  let p = customPath || env.TOKENATLAS_DB || selectedDatabasePath();
+  let p = customPath || (env === process.env ? selectedDatabasePath() : undefined) || env.TOKENATLAS_DB || selectedDatabasePath();
   if (!p) {
     p = path.join(os.homedir(), ".tokenatlas", "atlas.sqlite");
   } else if (p.startsWith("~")) {

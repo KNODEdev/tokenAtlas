@@ -20,6 +20,7 @@ import { latestGeminiState } from "../providers/adapters/gemini";
 import { loadCycles } from "./cycles";
 import { ACCOUNT_PERIODS_REVISION, PLAN_PERIODS_REVISION, PLAN_PERIODS, loadPeriods } from "../db/period-store";
 import { planPeriodIndex } from "./account-periods";
+import { planReconstructionSpans } from "./window-plan-periods";
 import { markWindowAnswersDirty } from "../db/window-answers";
 import { readWindowIntervals } from "./window-usage-read";
 import { bumpWindowUsageClocks } from "./window-usage-clock";
@@ -141,6 +142,7 @@ const DECLARED_INTERVALS_VERSION = 2;
 function fallbackIntervals(db: Database, options: WindowUsageProducerOptions, cfg: GrokGaugeConfig, resolver: AccountResolver,
   published: readonly WindowInterval[], meta: Map<string, string>, state: PartState): WindowInterval[] {
   const out: WindowInterval[] = [];
+  const plans = planPeriodIndex(tableExists(db, "plan_periods") ? loadPeriods(db, PLAN_PERIODS) : []);
   const configured = grokGaugeAccount(cfg);
   for (const observation of grokGaugeObservations(cfg)) {
     const span = grokObservationSpan(cfg, observation);
@@ -163,7 +165,7 @@ function fallbackIntervals(db: Database, options: WindowUsageProducerOptions, cf
       }
     }
     const key = `window_usage_${provider}_fallbacks`;
-    const inputs = digest([ledgerRevision(db, provider), accounts.map(account => [account, resolver.plan(provider, account).ranges]), minutes,
+    const inputs = digest([1, metaValue(db, `${PLAN_PERIODS_REVISION}:${provider}`), ledgerRevision(db, provider), accounts.map(account => [account, resolver.plan(provider, account).ranges]), minutes,
       provider === "grok" ? [configured, cfg.reset_anchor?.ts ?? null, hours] : [...weekly!]]);
     if (metaValue(db, key) === inputs) { out.push(...keep()); continue; }
     const computed: WindowInterval[] = [];
@@ -190,7 +192,12 @@ function fallbackIntervals(db: Database, options: WindowUsageProducerOptions, cf
       continue;
     }
     meta.set(key, inputs);
-    out.push(...computed);
+    out.push(...computed.filter(interval => {
+      // Rolling spans describe recorded traffic, not a promise of a paid reset window.
+      if (interval.kind !== "anchored") return true;
+      const spans = planReconstructionSpans(plans, provider, interval.account);
+      return spans === null || spans.some(span => span.from < Date.parse(interval.end) && span.until > Date.parse(interval.start));
+    }));
   }
   return out;
 }
@@ -221,7 +228,8 @@ export function syncIntervals(db: Database, options: WindowUsageProducerOptions,
   let rates = rateCardDigests.get(options.rateCards);
   if (!rates) rateCardDigests.set(options.rateCards, rates = digest(options.rateCards));
   const periods = metaValue(db, ACCOUNT_PERIODS_REVISION), subscriptions = digest(options.subscriptions ?? []), probes = probeStamp(db);
-  const fallbackStamp = digest([grok, ledgerRevision(db, "grok"), ledgerRevision(db, "gemini"), periods, subscriptions, probes, rates]);
+  const fallbackStamp = digest([1, grok, ledgerRevision(db, "grok"), ledgerRevision(db, "gemini"),
+    metaValue(db, `${PLAN_PERIODS_REVISION}:grok`), metaValue(db, `${PLAN_PERIODS_REVISION}:gemini`), periods, subscriptions, probes, rates]);
   const declaredStamp = digest([DECLARED_INTERVALS_VERSION, cycles, periods, metaValue(db, `${PLAN_PERIODS_REVISION}:claude`), subscriptions, probes,
     claudeAccountId(gauge.subscription), gauge.limits?.fable?.models ?? []]);
   const stamp = digest([fallbackStamp, declaredStamp, configured]);

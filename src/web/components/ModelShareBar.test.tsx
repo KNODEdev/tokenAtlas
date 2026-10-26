@@ -1,8 +1,7 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ModelShareBar, modelShares } from "./ModelShareBar";
-import { UsageComposition } from "./CycleComposition";
-import type { CycleView } from "../lib/cycle";
+import { TokenComposition } from "./CycleComposition";
 
 test("missing prices stay unknown, including the merged tail and total", () => {
   const rows = [
@@ -19,19 +18,22 @@ test("missing prices stay unknown, including the merged tail and total", () => {
   expect(renderToStaticMarkup(<ModelShareBar rows={rows} usedPercent={50} limit={1} />)).toContain("≥ $1.00");
 });
 
-test("token composition counts reasoning once and excludes ambiguous cache writes from the total", () => {
-  const cycle = { label: "#31", raw: { tokens: { in: 100, cached_in: 40, out: 20, reasoning: 7, cache_write: 5, total: 120 } } } as CycleView;
-  const html = renderToStaticMarkup(<UsageComposition cycle={cycle} />);
-  expect(html).toContain("120 gross");
-  expect(html).not.toContain("#31");
-  expect(html).not.toContain("in window");
-  expect(html).toContain("output (without reasoning)");
-  expect(html).toContain("reasoning (within output)");
-  expect(html).toContain("cache write (overlap unknown)");
-  expect(html).not.toContain("132 gross");
+test("canonical composition counts cache writes and reasoning exactly once", () => {
+  const html = renderToStaticMarkup(<TokenComposition tokens={{ input: 100, cached: 40, cache_write: 5, output: 20, reasoning: 7 }} />);
+  expect(html).toContain("120 total");
+  expect(html).toContain("In total");
+  expect(html).toContain("Fresh In");
+  expect(html).toContain("55");
+  expect(html).toContain("Cache read");
+  expect(html).toContain("Cache write");
+  expect(html).toContain("Including reasoning: 7");
+  expect(html).not.toContain("overlap unknown");
+  expect(html).not.toContain("132 total");
 });
 
-test("token composition hides the cache-write legend when no writes exist", () => {
-  const cycle = { label: "#31", raw: { tokens: { in: 100, cached_in: 40, out: 20, reasoning: 7, cache_write: 0, total: 120 } } } as CycleView;
-  expect(renderToStaticMarkup(<UsageComposition cycle={cycle} />)).not.toContain("cache write (overlap unknown)");
+test("both providers keep zero cache-write counts visible without inventing missing token categories", () => {
+  const html = renderToStaticMarkup(<TokenComposition tokens={{ input: 100, cached: 40, cache_write: 0, output: 20, reasoning: 0 }} />);
+  expect(html).toContain("Cache write");
+  expect(renderToStaticMarkup(<TokenComposition tokens={null} />)).toContain("not prepared yet");
+  expect(renderToStaticMarkup(<TokenComposition tokens={null} />)).not.toContain("0 total");
 });

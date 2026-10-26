@@ -198,12 +198,10 @@ export function referenceCodexEvent(config: Config, event: Event) {
   const prices = [priceCodexEventExact(c, standard, "chatgpt_credits"), priceCodexEventExact(c, fast, "chatgpt_credits"),
     priceCodexEventExact(c, standard, "api_equivalent_usd"), priceCodexEventExact(c, fast, "api_equivalent_usd")] as const;
   const [cs, cf, api, apiFast] = prices;
-  const speed = event.speed === "standard" || event.speed === "fast" ? event.speed : "unknown";
+  const speed = event.speed === "standard" || event.speed === "fast" ? event.speed
+    : event.service_tier == null ? "standard" : "unknown";
   const actual = speed === "standard" ? cs : speed === "fast" ? cf : null;
-  // A call that records no tier has its API price at the Standard rate, a lower bound (user decision 06.10.2026);
-  // an unrecognised recorded tier has none.
-  const unrecorded = event.service_tier == null && (event.speed == null || event.speed === "unknown");
-  const apiActual = speed === "standard" ? api : speed === "fast" ? apiFast : unrecorded ? api : null;
+  const apiActual = speed === "standard" ? api : speed === "fast" ? apiFast : null;
   const usable = safe(event.in_tok) && safe(event.out_tok) && Number.isSafeInteger(event.in_tok + event.out_tok);
   const reported = usable ? BigInt(event.in_tok) + BigInt(event.out_tok) : 0n;
   const burden = ratio(actual?.amount ?? null, cs.amount);

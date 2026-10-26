@@ -3,7 +3,7 @@ import { anchoredWindows, MIN_HISTORY_PERIOD_HOURS, resolveCadence, type Anchore
   type ObservedCadence } from "./cycles";
 import { ProbeAccountIndexUnavailable, readPreparedProbeCadences } from "./current/probe-account-reader";
 import type { PeriodIndex } from "./account-periods";
-import { isFreePlan, isNoPlan } from "../shared/period-end";
+import { planReconstructionSpans } from "./window-plan-periods";
 
 /** Nominal length of a counter in hours: the reading's own duration, else the counter kind's. */
 export function railWindowHours(provider: string, kind: string, windowMinutes: number | null): number | null {
@@ -46,19 +46,6 @@ export const CLAUDE_HISTORY_KINDS = [
 export type DeclaredWindow = Omit<AnchoredWindow, "offset" | "isCurrent">;
 export interface DeclaredWindowSet { kind: string; scope: string | null; windows: DeclaredWindow[] }
 
-/** Resolved plan spans; null preserves reconstruction when the account has no plan history. */
-function reconstructionSpans(plans: PeriodIndex | null, account: string): Array<{ from: number; until: number }> | null {
-  const periods = plans?.periodsOf("claude", account) ?? [];
-  if (!periods.length) return null;
-  const edges = [...new Set(periods.flatMap(period => [Date.parse(period.from),
-    ...(period.until === null ? [] : [Date.parse(period.until)])]))].sort((a, b) => a - b);
-  return edges.flatMap((from, i) => {
-    const plan = plans!.resolve("claude", account, new Date(from).toISOString()).value;
-    return plan !== null && !isNoPlan(plan) && !isFreePlan(plan) && plan !== "unknown"
-      ? [{ from, until: edges[i + 1] ?? Infinity }] : [];
-  });
-}
-
 /**
  * Claude windows reconstructed from the cadence (cycles.json declarations or the observed reset) for the
  * weeks the meter never reported, as the rail shows them. `earliestMs` is the start of the account's first
@@ -67,7 +54,7 @@ function reconstructionSpans(plans: PeriodIndex | null, account: string): Array<
  */
 export function claudeDeclaredWindows(db: Database, account: string, cycles: CyclesConfig, nowMs: number,
   earliestMs: number | null, plans: PeriodIndex | null = null): DeclaredWindowSet[] {
-  const spans = reconstructionSpans(plans, account);
+  const spans = planReconstructionSpans(plans, "claude", account, true);
   if (spans?.length === 0) return [];
   return CLAUDE_HISTORY_KINDS.map(spec => {
     const cadence = resolveCadence(cycles, account, spec.kind, observedCadence(db, "claude", account, spec.kind));

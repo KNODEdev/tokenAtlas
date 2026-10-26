@@ -78,13 +78,20 @@ describe("event pricing and contribution semantics", () => {
     const bounded = config(); bounded.rules[0]!.valid_until = "2026-04-03";
     expect(priceCodexEventExact(bounded, event({ ts: "2026-04-03T00:00:00Z" }), "chatgpt_credits").reason).toBe("missing_rate");
   });
-  test("NULL/unknown actual speed collapses while hypothetical prices survive", () => {
+  test("an omitted service tier is Standard for every actual valuation and quality measure", () => {
+    const row = ref({ speed: null, service_tier: null });
+    expect(row.speed).toBe("standard");
+    expect(row.quality.unknown_speed_tokens).toBe(0n);
+    expect(row.counts.api_actual).toEqual(row.counts.api_standard);
+    expect(text(row.counts.normalized_usd.value)).toBe(text(row.counts.api_standard.value));
+    expect(row.counts.window_credits_low).toEqual(row.counts.window_credits_high);
+    expect(text(row.counts.extra_credits.value)).toBe("0");
+  });
+  test("an unmapped recorded tier keeps actual speed unknown while hypothetical prices survive", () => {
     for (const speed of [null, "turbo"]) {
-      const row = ref({ speed });
+      const row = ref({ speed, service_tier: "future-unmapped" });
       expect(row.speed).toBe("unknown"); expect(row.quality.unknown_speed_tokens).toBe(13n);
-      // An unrecorded tier has its API price at Standard (a lower bound); an unrecognised one has none.
-      if (speed === null) expect(text(row.counts.api_actual.value)).toBe(text(row.counts.api_standard.value));
-      else expect(reason(row.counts.api_actual)).toBe("unknown_speed");
+      expect(reason(row.counts.api_actual)).toBe("unknown_speed");
       expect(reason(row.counts.normalized_usd)).toBe("unknown_speed");
       expect(row.counts.credits_standard.pricedEvents).toBe(1n);
       expect(text(row.counts.window_credits_low.value)).toBe("0.000015");
@@ -138,7 +145,8 @@ describe("event pricing and contribution semantics", () => {
     expect(text(early.counts.window_credits_high.value)).toBe("0");
     expect(text(early.counts.window_normalized.value)).toBe("0.00003");
     const c = config(); c.rules = c.rules.filter(rule => rule.id !== "cf");
-    const late = ref({ speed: null }, c);
+    expect(ref({ speed: null }, c).counts.window_credits_high.pricedEvents).toBe(1n);
+    const late = ref({ speed: null, service_tier: "future-unmapped" }, c);
     for (const name of VARIANTS.filter(name => name.startsWith("window_"))) {
       expect(late.counts[name].unpricedEvents).toBe(1n);
       expect(reason(late.counts[name])).toBe("missing_rate");

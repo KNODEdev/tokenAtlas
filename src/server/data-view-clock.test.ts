@@ -103,8 +103,8 @@ test("window-sum publications move the data version only of views that read wind
     expect(dataVersion(sqlite)).not.toBe(reader);
     expect(dataVersion(sqlite,{windowSums:false})).toBe(other);
     // Declared readers follow window sums; every other exception view does not; an undeclared route is assumed to.
-    expect(["/api/codex-accounting","/api/claude-limit","/api/plan-capacity","/api/project-cost"].map(readsWindowSums)).toEqual([true,true,true,true]);
-    expect(["/api/accounts","/api/cycle-breakdown","/api/planhealth","/api/gauge","/api/health"].map(readsWindowSums)).toEqual([false,false,false,false,false]);
+    expect(["/api/codex-accounting","/api/claude-limit","/api/plan-capacity","/api/project-cost","/api/cycle-breakdown"].map(readsWindowSums)).toEqual([true,true,true,true,true]);
+    expect(["/api/accounts","/api/planhealth","/api/gauge","/api/health"].map(readsWindowSums)).toEqual([false,false,false,false]);
   } finally {sqlite.close();}
 });
 

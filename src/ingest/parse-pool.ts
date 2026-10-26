@@ -25,7 +25,7 @@ export interface ParseFormats {
     output: { events: NewClaudeEvent[]; limitHits: NewClaudeLimitHit[]; source?: { sha256: string; byteLength: number } };
   };
   /** A whole Codex rollout up to `size` bytes (src/ingest/codex-storage.ts). */
-  codex: { input: { file: string; size: number; validate?: boolean }; output: CodexFilePreparation };
+  codex: { input: { file: string; size: number; validate?: boolean; firstTokenOnly?: boolean }; output: CodexFilePreparation };
   /** The sync queue's content identity of one file (src/sync/file-fingerprint.ts). */
   fingerprint: { input: { file: string }; output: { fingerprint: string } };
   /** Complete, parseable JSONL records of an accepted archive file (src/sync/jsonl-inspection.ts). */

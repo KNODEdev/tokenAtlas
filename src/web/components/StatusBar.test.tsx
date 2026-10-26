@@ -154,6 +154,7 @@ test("a model without a price turns the current state into one alert line that s
 
 const expiring: CreditNoticeView = { id: 7, provider: "claude", account: "max-1", label: "Claude Max", pool: "claude:g@2026-11-05T12:00:00.000Z",
   kind: "expiring", unit: "usd", amount: 150, amount_text: null, expires_at: "2026-11-05T12:00:00Z", observed_at: "2026-10-24T10:00:00Z",
+  occurred_at: "2026-10-24T10:00:00Z", acknowledged_at: null, resolved_at: null,
   detail: { stage: "14d", granted: 250, remaining: 200, pace_per_day: 5, days_left: 12 } };
 const received: CreditNoticeView = { ...expiring, id: 8, kind: "received", amount: 250, detail: {} };
 const creditNow = Date.parse("2026-10-24T12:00:00Z");
@@ -178,6 +179,19 @@ test("the details list every open notice with its actions", () => {
   expect(html).toContain("New package");
   expect(html.match(/Open subscription/g)).toHaveLength(1);
   expect(html).toContain("Mark as read");
+});
+
+test("read and resolved notices remain in history without active warning actions", () => {
+  const html = renderToStaticMarkup(<CreditNotices notices={[
+    { ...expiring, resolved_at: "2026-10-24T11:00:00Z", acknowledged_at: "2026-10-24T11:30:00Z" },
+    { ...received, acknowledged_at: "2026-10-24T11:30:00Z" },
+  ]} now={creditNow} onOpenAccount={() => {}} onRead={() => {}} />);
+  expect(html).toContain("Will expire unused");
+  expect(html).toContain("New package");
+  expect(html).toContain("Read:");
+  expect(html).toContain("Resolved:");
+  expect(html).not.toContain("Open subscription");
+  expect(html).toContain("disabled");
 });
 
 test("an expired sign-in is a warning line per account and computer, before a missing price", async () => {

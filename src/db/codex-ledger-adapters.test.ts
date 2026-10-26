@@ -179,17 +179,33 @@ describe("published Codex compatibility adapters", () => {
 
   test("an unrecorded tier is priced at Standard, an unrecognized one stays unknown, a confirmed zero stays priced", () => fixture([
     { raw: null }, { raw: "unmapped" }, { input: 0, output: 0, raw: "hyper" },
-  ], (db, context) => {
+  ], (db, context, card) => {
+    const changes = db.query("SELECT total_changes() n").get();
     const result = readCodexLedgerCompatibilityTotals(db, context, range, "range");
     expect(result.variants!.api_standard!.pricedEvents).toBe("3");
-    // The NULL tier takes the Standard API price (a lower bound); the unmapped tier has no price.
+    // An omitted tier is Standard; an explicitly unmapped tier has no actual price.
     expect(result.variants!.api_actual!.pricedEvents).toBe("2");
     expect(result.variants!.api_actual!.unpricedEvents).toBe("1");
     expect(result.variants!.api_actual!.pricedSubtotal).toBe("1");
     expect(result.variants!.api_actual!.reasons).toEqual({ unknown_speed: { events: "1", tokens: "1000000" } });
     expect(result.variants!.api_actual!.value).toBeNull();
-    // Both stay flagged as calls of unknown mode.
-    expect(result.quality!.unknown_speed_tokens).toBe("2000000");
+    expect(result.quality!.unknown_speed_tokens).toBe("1000000");
+    const groups = readCodexLedgerSeries(db, context.policy, { range });
+    const standard = groups.find(group => group.stored.service_tier === null)!;
+    expect(standard.tier).toBe("standard");
+    expect(standard.quality.unknown_speed_tokens).toBe(0n);
+    expect(standard.variants.normalized_usd.value).toEqual(rational(1n));
+    expect(standard.variants.extra_credits.value).toEqual(rational(0n));
+    expect(standard.variants.window_credits_low).toEqual(standard.variants.window_credits_high);
+    const rows = readCodexRegisterDays(db, CODEX_LEDGER_SCOPE, range, resolver(), context);
+    expect(rows.find(row => row.speed === "standard")!.quality.unknown_speed_tokens).toBe(0);
+    expect(readCodexLedgerCompatibilityTotals(db, codexLedgerReadContext(card), range, "range")).toEqual(result);
+    expect(db.query("SELECT total_changes() n").get()).toEqual(changes);
+    const reopened = Database.deserialize(db.serialize(), { readonly: true });
+    try {
+      expect(readCodexLedgerCompatibilityTotals(reopened, codexLedgerReadContext(card), range, "range")).toEqual(result);
+      expect(reopened.query("SELECT total_changes() n").get()).toEqual({ n: 0 });
+    } finally { reopened.close(); }
   }));
 
   test("bounded stored event reads preserve offset instants and carry exact valuation evidence", () => fixture([

@@ -171,8 +171,11 @@ export function compileCodexLedgerPolicy(input: CodexLedgerPolicy): CompiledCode
     ? bases.get(JSON.stringify([model, basis]))?.find(rule => contains(rule, day)) ?? null : null;
   const resolveTierRule = (model: string | null, basis: LedgerBillingBasis, tier: string, day: string) => dayValid(day)
     ? tiers.get(JSON.stringify([model, basis, tier]))?.find(rule => contains(rule, day)) ?? null : null;
-  const resolveTier = (raw: string | null, day: string) => raw !== null && dayValid(day)
-    ? mappings.get(raw)?.find(rule => contains(rule, day))?.tier ?? null : null;
+  // An omitted Codex service tier means Standard (user decision, 2026-10-25).
+  const resolveTier = (raw: string | null, day: string) => {
+    if (!dayValid(day)) return null;
+    return raw === null ? "standard" : mappings.get(raw)?.find(rule => contains(rule, day))?.tier ?? null;
+  };
   return { policy, baseBands, contextBands, resolveBaseRule, resolveTier, resolveTierRule, classify: resolveTier,
     multiplier(model, basis, tier, day) {
       const rule = resolveTierRule(model, basis, tier, day);

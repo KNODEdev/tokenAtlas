@@ -1,14 +1,17 @@
 import { afterEach, expect, test } from "bun:test";
-import type { CreditNoticeView } from "../../shared/credit-notices";
+import { creditNoticeOccurredAt, type CreditNoticeView } from "../../shared/credit-notices";
 import { creditNoticeAlert, creditNoticeLine, creditNoticeSuffix, timeLeft } from "./credit-notices";
 import { setLanguage } from "./i18n";
 
 const DAY = 86_400_000;
 const now = Date.parse("2026-10-24T12:00:00Z");
 let nextId = 1;
-const notice = (fields: Partial<CreditNoticeView> & Pick<CreditNoticeView, "kind" | "unit">): CreditNoticeView => ({
-  id: nextId++, provider: "claude", account: "max-1", label: "Claude Max", pool: "claude:iguana_necktie@2026-11-05T00:00:00.000Z",
-  amount: null, amount_text: null, expires_at: null, observed_at: "2026-10-24T10:00:00Z", detail: {}, ...fields });
+const notice = (fields: Partial<CreditNoticeView> & Pick<CreditNoticeView, "kind" | "unit">): CreditNoticeView => {
+  const row = { id: nextId++, provider: "claude", account: "max-1", label: "Claude Max", pool: "claude:iguana_necktie@2026-11-05T00:00:00.000Z",
+    amount: null, amount_text: null, expires_at: null, observed_at: "2026-10-24T10:00:00Z", detail: {},
+    acknowledged_at: null, resolved_at: null, ...fields };
+  return { ...row, occurred_at: fields.occurred_at ?? creditNoticeOccurredAt(row) };
+};
 
 const grantWarning = notice({ kind: "expiring", unit: "usd", amount: 150, expires_at: "2026-11-05T12:00:00Z",
   detail: { stage: "14d", granted: 250, remaining: 200, pace_per_day: 5, days_left: 12 } });
@@ -28,10 +31,11 @@ test("lines in Polish name the subscription, the amount and the date", () => {
     detail: "Claude Max · grant $250 · zostało $200 · zużycie $5/dzień · ok. $150 przepadnie 5 lis",
     facts: "grant $250 · zostało $200 · zużycie $5/dzień · ok. $150 przepadnie 5 lis", when: null });
   expect(creditNoticeLine(grantReceived, now)).toMatchObject({ tone: "ok", title: "Nowy pakiet",
-    detail: "Claude Max · grant $250, ważny do 5 lis · otrzymany 6 paź", facts: "grant $250, ważny do 5 lis", when: "otrzymany 6 paź" });
+    facts: "grant $250, ważny do 5 lis", when: `otrzymany ${new Intl.DateTimeFormat("pl-PL", { day: "numeric", month: "short" }).format(new Date(grantReceived.occurred_at))} ${new Intl.DateTimeFormat("pl-PL", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(grantReceived.occurred_at))}` });
   expect(creditNoticeLine(resetReceived, now).detail).toStartWith("Codex Pro · pełny reset limitów, ważny do 8 lis · otrzymany 9 paź");
   expect(creditNoticeLine(creditsSpent, now)).toMatchObject({ tone: "info", title: "Zużyto kredyty",
-    detail: "Codex Pro · −1234,5 kredytów od 6 paź · saldo 60 749,96 kredytów" });
+    facts: "−1234,5 kredytów od 6 paź · saldo 60 749,96 kredytów" });
+  expect(creditNoticeLine(creditsSpent, now).when).toBeTruthy();
 });
 
 test("a grant without a day of observation says its pace is not known yet", () => {
@@ -61,4 +65,14 @@ test("arrivals extend the current-data line", () => {
 test("time left is in days, under a day in hours", () => {
   expect(timeLeft(new Date(now + 12 * DAY).toISOString(), now)).toBe("in 12 days");
   expect(timeLeft(new Date(now + 5 * 3_600_000).toISOString(), now)).toBe("in 5 h");
+});
+
+test("read and resolved history never raises current warnings or arrival summaries", () => {
+  const history = [{ ...grantWarning, resolved_at: "2026-10-24T11:00:00Z" },
+    { ...resetWarning, acknowledged_at: "2026-10-24T11:00:00Z" },
+    { ...grantReceived, acknowledged_at: "2026-10-24T11:00:00Z" }];
+  expect(creditNoticeAlert(history, now)).toBeNull();
+  expect(creditNoticeSuffix(history)).toBeNull();
+  expect(creditNoticeAlert([...history, resetWarning], now)!.title).toBe("A limit reset will expire unused");
+  expect(creditNoticeSuffix([...history, grantReceived])).toBe("new package: Claude Max $250");
 });

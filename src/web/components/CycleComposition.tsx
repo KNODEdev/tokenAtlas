@@ -4,7 +4,10 @@ import type { CycleView } from "../lib/cycle";
 import { milestones } from "../lib/cycle";
 import { compact, dayTime, duration, full, pct } from "../lib/format";
 import { useI18n } from "../lib/i18n";
-import { Card, CardTitle, Eyebrow } from "./ui";
+import { Card, CardTitle, EmptyState, ErrorState, Eyebrow, Fact, Facts, HelpBlock, LoadingCard } from "./ui";
+import type { WindowTokenCounts } from "../../shared/window-model-usage";
+import { freshWindowInput, totalWindowTokens, windowTokenDefinitions, windowTokenLabels } from "../lib/window-tokens";
+import "./CodexWindowModels.css";
 function medianOf(xs: number[]): number | null {
   const v = xs.filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
   if (v.length === 0) return null;
@@ -14,62 +17,49 @@ function medianOf(xs: number[]): number | null {
   const hi = v[mid];
   return lo != null && hi != null ? (lo + hi) / 2 : null;
 }
-export function UsageComposition({ cycle }: { cycle: CycleView }) {
+export function TokenComposition({ tokens, loading = false, error = null }: {
+  tokens: WindowTokenCounts | null;
+  loading?: boolean;
+  error?: string | null;
+}) {
   const { t } = useI18n();
-  const tokens = cycle.raw.tokens;
-  const freshIn = Math.max(0, tokens.in - tokens.cached_in);
-  const reasoning = Math.min(tokens.out, Math.max(0, tokens.reasoning));
+  const labels = windowTokenLabels(t), definitions = windowTokenDefinitions(t);
+  if (error) return <ErrorState message={error} />;
+  if (tokens == null) return loading
+    ? <LoadingCard label={t("Loading token composition…", "Wczytywanie podziału tokenów…")} height={180} />
+    : <EmptyState title={t("Token composition is not prepared yet", "Podział tokenów jeszcze nieprzygotowany")} />;
+  const total = totalWindowTokens(tokens);
   const parts = [
-    { label: t("input (cached)", "input (z cache)"), tokens: tokens.cached_in, color: "var(--accent)" },
-    { label: t("input (fresh)", "input (świeży)"), tokens: freshIn, color: "var(--violet)" },
-    { label: t("output (without reasoning)", "output (bez rozumowania)"), tokens: tokens.out - reasoning, color: "var(--ok)" },
-    { label: t("reasoning (within output)", "rozumowanie (w output)"), tokens: reasoning, color: "var(--warn)" },
-  ];
-  const total = parts.reduce((acc, p) => acc + p.tokens, 0);
-  const denom = total > 0 ? total : 1;
-  const rows = [...parts.map((p) => {
-    const share = (p.tokens / denom) * 100;
-    return { ...p, pctStr: total > 0 ? pct(share, 1) : "0%", w: `${Math.max(0, share).toFixed(1)}%` };
-  }), ...(tokens.cache_write > 0 ? [{ label: t("cache write (overlap unknown)", "zapis cache (pokrywanie nieznane)"), tokens: tokens.cache_write, color: "color-mix(in oklab, var(--violet) 45%, var(--faint))", pctStr: t("unknown", "nieznany"), w: "0%" }] : [])];
-  return (
-    <Card>
-      <CardTitle title={t("Token composition", "Podział tokenów")} sub={`${compact(total)} ${t("gross", "brutto")}`} />
-      <div
-        style={{
-          marginTop: 12,
-          display: "flex",
-          height: 12,
-          borderRadius: "var(--r-bar)",
-          overflow: "hidden",
-          border: "1px solid var(--line)",
-          background: "var(--sunk)",
-        }}
-      >
-        {rows
-          .filter((r) => r.tokens > 0 && r.w !== "0%")
-          .map((r) => (
-            <div key={r.label} title={`${r.label}: ${compact(r.tokens)} (${r.pctStr})`} style={{ width: r.w, background: r.color, minWidth: 2 }} />
-          ))}
-      </div>
-      <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 7 }}>
-        {rows.map((r) => (
-          <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "var(--fs-4)" }}>
-            <span style={{ width: 8, height: 8, borderRadius: "var(--r-bar)", background: r.color, flexShrink: 0 }} />
-            <span style={{ color: "var(--text)" }}>{r.label}</span>
-            <span className="mono" style={{ marginLeft: "auto", color: "var(--muted)" }} title={`${full(r.tokens)} ${t("tokens", "tokenów")}`}>
-              {compact(r.tokens)}
-            </span>
-            <span className="mono" style={{ width: 46, textAlign: "right", color: "var(--text)", fontWeight: 500 }}>
-              {r.pctStr}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="mono" style={{ marginTop: 12, fontSize: "var(--fs-3)", color: "var(--muted)", lineHeight: 1.5 }}>
-        {t("Total = input + output. Cache reads are within input; reasoning is within output. Cache writes are shown separately because their overlap is unknown.", "Suma = input + output. Odczyty cache są częścią inputu, a rozumowanie częścią outputu. Zapis cache pokazano osobno, bo jego pokrywanie się z inputem jest nieznane.")}
-      </div>
-    </Card>
-  );
+    { key: "cached", label: labels.cached, tokens: tokens.cached, color: "var(--accent)" },
+    { key: "fresh", label: labels.fresh, tokens: freshWindowInput(tokens), color: "var(--violet)" },
+    { key: "cache_write", label: labels.cache_write, tokens: tokens.cache_write, color: "var(--warn)" },
+    { key: "output", label: labels.output, tokens: tokens.output, color: "var(--ok)" },
+  ] as const;
+  return <Card>
+    <CardTitle title={t("Token composition", "Podział tokenów")} sub={`${compact(total)} ${t("total", "razem")}`}
+      help={<>{Object.values(definitions).map(definition => <HelpBlock key={definition}>{definition}</HelpBlock>)}
+        <HelpBlock>{t("Percentages beside token types divide by all tokens in the window. Cache / In divides by all input only.", "Procenty przy typach tokenów odnoszą się do wszystkich tokenów okna. Cache / In odnosi się wyłącznie do całego inputu.")}</HelpBlock></>} />
+    <Facts>
+      <Fact label={<span title={definitions.input}>{labels.input}</span>} value={compact(tokens.input)} />
+      <Fact label={<span title={definitions.cache_share}>{labels.cache_share}</span>}
+        value={tokens.input > 0 ? pct(100 * tokens.cached / tokens.input, 1) : "—"} />
+    </Facts>
+    <div className="codex-models-split-bar">
+      {parts.filter(part => part.tokens > 0).map(part => <span key={part.key}
+        title={`${part.label}: ${full(part.tokens)} (${pct(total > 0 ? 100 * part.tokens / total : 0, 1)})`}
+        style={{ width: `${total > 0 ? 100 * part.tokens / total : 0}%`, background: part.color }} />)}
+    </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-3)", marginTop: "var(--s-6)" }}>
+      {parts.map(part => <div key={part.key} title={definitions[part.key] + (part.key === "output" && tokens.reasoning > 0
+        ? ` ${t("Including reasoning", "W tym rozumowanie")}: ${full(tokens.reasoning)}.` : "")}
+        style={{ display: "flex", alignItems: "center", gap: "var(--s-4)", fontSize: "var(--fs-4)" }}>
+        <span className="codex-models-split-dot" style={{ background: part.color }} />
+        <span>{part.label}</span>
+        <span className="mono" style={{ marginLeft: "auto", color: "var(--muted)" }} title={full(part.tokens)}>{compact(part.tokens)}</span>
+        <span className="mono" style={{ minWidth: "var(--s-10)", textAlign: "right" }}>{total > 0 ? pct(100 * part.tokens / total, 1) : "—"}</span>
+      </div>)}
+    </div>
+  </Card>;
 }
 const MARKS = [25, 50, 75, 90, 100];
 /**

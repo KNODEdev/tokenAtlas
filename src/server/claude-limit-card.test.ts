@@ -256,3 +256,35 @@ test("the current window carries its stored grant-funded hours for the chart, an
     expect(after.current!.credit_funded).toEqual(funded);
   } finally { f.teardown(); }
 });
+
+
+test("model input uses stored canonical categories, including unknown-lifetime writes, without reading facts or writing on reopen", () => {
+  const f = createClaudeCodeAcceptanceFixture();
+  try {
+    const insert = f.db.query(`INSERT INTO claude_events
+      (store,call_id,session_id,path,ts,model,speed,subscription_id,entrypoint,cc_version,
+       in_uncached,in_cache_read,in_cache_write,cache_write_5m,cache_write_1h,out_total,out_thinking,billing_mode)
+      VALUES('fixture-primary',?,?,?,? ,?,'standard',?,'cli','2.1.0',450,400,150,50,40,300,80,?)`);
+    for (const [name, funding] of [["cache-pieces", null], ["funded-cache", "grant"]] as const)
+      insert.run(name, name, `fixture/${name}.jsonl`, TIMES.asOf, name, ACCOUNTS.a, funding);
+    f.prepareFacts();
+    f.db.exec(CLAUDE_CARD_METADATA_SCHEMA);
+    for (let i = 0; i < 100; i++) if (!advanceClaudeCardMetadata(f.db).pending) break;
+    const cfg = { subscription: ACCOUNTS.a, window_hours: 168, observations: [] };
+    const read = () => buildClaudeLimitCard(f.db, cfg, (m, d, s) => getClaudeRate(f.rates, m, d, s), TIMES.asOf, { rateCards: f.rates });
+    const measured = measureAnalysis(f.db, read);
+    const rows = measured.value.current!.model_usage!;
+    expect(rows.find(row => row.model === "cache-pieces")).toMatchObject({
+      calls: 1, input: 1_000, cached: 400, cache_write: 150, output: 300, reasoning: 80,
+      api_standard: 0, unpriced_tokens: 1_300,
+    });
+    expect(rows.some(row => row.model === "funded-cache")).toBe(false);
+    expect(measured.rawOrFactQueries).toEqual([]);
+    const before = f.db.query("SELECT total_changes() AS n").get();
+    expect(read().current!.model_usage).toEqual(rows);
+    expect(f.db.query("SELECT total_changes() AS n").get()).toEqual(before);
+    f.reopen();
+    expect(measureAnalysis(f.db, read).value.current!.model_usage).toEqual(rows);
+    expect(f.db.query("SELECT total_changes() AS n").get()).toEqual({ n: 0 });
+  } finally { f.teardown(); }
+});

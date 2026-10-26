@@ -147,6 +147,20 @@ test("source-plan migration adds nullable metadata without changing prepared inp
   } finally { db.close(); }
 });
 
+test("meter-evidence migration preserves existing inputs and adds no invented counters", () => {
+  const db = new Database(":memory:");
+  try {
+    db.exec(LIMIT_WINDOW_SCHEMA_SQL);
+    db.query(`INSERT INTO limit_window_inputs(provider,account,scope,counter,ts,grp,ord,used_percent,resets_at,window_minutes,source,anchor)
+      VALUES('glm','account','*','weekly','2026-10-20T00:00:00Z','',0,40,'2026-10-25T00:00:00Z',10080,'probe',1)`).run();
+    const before=db.query("SELECT * FROM limit_window_inputs").get() as Record<string,unknown>;
+    db.exec(fs.readFileSync(path.resolve(import.meta.dir,"../../drizzle/0094_window_meter_evidence.sql"),"utf8"));
+    const {meter_evidence,...after}=db.query("SELECT * FROM limit_window_inputs").get() as Record<string,unknown>;
+    expect(meter_evidence).toBeNull();
+    expect(after).toEqual(before);
+  } finally { db.close(); }
+});
+
 test("readers answer preparing until the worker has filled an account, never computing", () => {
   const { db, options } = claudeFixture(2);
   // As right after migration 0048: the worker has not run yet.
@@ -300,10 +314,17 @@ test("plan switches, resume, restart and a historical correction preserve one du
   };
   append(1, 0, "max-20x"); append(144, 94, "max-20x");
   const original = readLimitWindows(db, "claude", CLAUDE, counter)[0]!.id;
+  replaceDeclaredPeriods(db, PLAN_PERIODS, [{ provider: "claude", subject: CLAUDE, value: "pro",
+    from: iso(START + 146.5 * HOUR), until: null, origin: "declared", firstSeen: null, lastSeen: null, readings: 0, evidence: "activation" }]);
   append(147, 3, "pro"); append(148, 14, "pro"); append(149, 94, "max-20x"); append(150, 99, "max-20x");
   const result = readLimitWindows(db, "claude", CLAUDE, counter);
   expect(result.map(window => [window.plan, window.readings.at(-1)!.percent])).toEqual([["max-20x", 99], ["pro", 14]]);
   expect(result[0]!.id).toBe(original);
+  expect(result[1]!.end).toBe(iso(START + 149 * HOUR));
+  expect(result[1]!.cycle_end_basis).toBe("plan_change");
+  expect(result[1]!.reset).toBe(iso(START + WEEK));
+  expect(result[1]!.start).toBe(iso(START + 146.5 * HOUR));
+  expect(result[1]!.activity?.start_basis).toBe("activation");
   const reopened = new Database((db.query("PRAGMA database_list").get() as { file: string }).file);
   try {
     const stats = emptyLimitWindowStats(); settle(reopened, { ...options, stats });

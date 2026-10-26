@@ -45,8 +45,8 @@ function workspace(): AccountPeriodsContext & { dir: string; close: () => void }
   applyDrizzleMigrations(drizzle(db));
   const accountsFile = path.join(dir, "accounts.json");
   fs.writeFileSync(accountsFile, JSON.stringify(splitProbeReaderFixtureConfig([
-    { id: "claude-sm", vendor: "claude", machine: "EXAMPLE-MAIN", home: `${ARCHIVE}/claude/EXAMPLE-MAIN`, source_home: "C:/Users/sample_a/.claude", account: "socialmedia@example.pl" },
-    { id: "claude-kn", vendor: "claude", account: "knawrocki@example.pl" },
+    { id: "claude-sm", vendor: "claude", machine: "EXAMPLE-MAIN", home: `${ARCHIVE}/claude/EXAMPLE-MAIN`, source_home: "C:/Users/sample_a/.claude", account: "account_0006@example.test" },
+    { id: "claude-kn", vendor: "claude", account: "account_0002@example.test" },
     { id: "codex3", vendor: "codex", machine: "EXAMPLE-MAIN", home: `${ARCHIVE}/codex/EXAMPLE-MAIN-sample_b`, source_home: "C:/Users/sample_a/.codex-2", account: "hello@k-node.eu" },
     { id: "codex1::business", vendor: "codex", home: "", account: "hello@k-node.eu" },
   ])));
@@ -90,8 +90,8 @@ test("the view lists observed and declared rows with their ids, notes and declar
     ]);
     // Accounts come from the period tables and from `accounts.json`; a billing variant is not an account.
     expect(view.accounts).toEqual([
-      { provider: "claude", id: "claude-kn", label: "knawrocki@example.pl", current: false },
-      { provider: "claude", id: "claude-sm", label: "socialmedia@example.pl", current: false },
+      { provider: "claude", id: "claude-kn", label: "account_0002@example.test", current: false },
+      { provider: "claude", id: "claude-sm", label: "account_0006@example.test", current: false },
       { provider: "codex", id: "codex3", label: "hello@k-node.eu", current: false },
     ]);
   } finally { ctx.close(); }

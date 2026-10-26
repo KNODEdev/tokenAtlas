@@ -365,7 +365,7 @@ test("all subscriptions: sums per period, what resets added, credits over Codex 
   const read = spyOn(api, "billingCycles").mockResolvedValue({ accounts: accounts.map((entry) => entry.account === "claude-2e09" ? entry
     : { ...entry, cycles: entry.cycles.map((cycle) => ({ ...cycle, current: cycle.start === current.start })) }) });
   const selected: string[] = [];
-  const cards = [{ id: "codex1", vendor: "codex", group: "codex", vendorAccount: "socialmedia@example.pl", plan: "pro" },
+  const cards = [{ id: "codex1", vendor: "codex", group: "codex", vendorAccount: "account_0006@example.test", plan: "pro" },
     { id: "Claude-EA41", vendor: "claude", group: "claude", vendorAccount: "sample_a@example.test", plan: "max" },
     { id: "claude-2e09", vendor: "claude", group: "claude", vendorAccount: "old@example.test", plan: null }] as unknown as RosterCard[];
   setLanguage("en");
@@ -383,7 +383,7 @@ test("all subscriptions: sums per period, what resets added, credits over Codex 
     expect(text).not.toContain("$100");
     // The rail's name and product · plan, not the raw id.
     const codex = findByAttribute(dom.host, "data-subscription-row", "codex|codex1")!;
-    expect(codex.textContent).toContain("socialmedia@example.pl");
+    expect(codex.textContent).toContain("account_0006@example.test");
     expect(codex.textContent).toContain("OpenAI / Codex · ");
     expect(codex.textContent).not.toContain("codex1");
     // The plan of the cycle in the vendor's ink, then the shared columns: paid, capacity, used, used %, unused, return, potential.

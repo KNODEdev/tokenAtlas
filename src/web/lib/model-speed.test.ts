@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
+import { firstTokenSummary } from "../../shared/first-token";
 import {
-  chartBuckets, joined, latestWeek, modelTotals, outlierSeries, rankedModels, readHiddenModels, speedBuckets, speedScaleMax, weekStart,
+  chartBuckets, modelChartBuckets, firstTokenChartScale, joined, latestWeek, modelTotals, outlierSeries, rankedModels, readHiddenModels, speedBuckets, speedScaleMax, weekStart,
   accountSelected, accountState, modelSelected, setAccounts, readHiddenModels as readHidden, mergeSpeedParts, readSpeedSelection, selectedParts, seriesStroke, speedModels, speedSubscriptions, toggleAccount, toggleModel,
   writeHiddenModels, writeSpeedSelection, entriesSince, rangeStart, HIDDEN_MODELS_KEY, SPEED_SELECTION_KEY, EMPTY_SELECTION, type ModelSpeedPoint, type ModelSpeedSeries,
 } from "./model-speed";
@@ -15,10 +16,36 @@ const series = (model: string, points: ModelSpeedPoint[]): ModelSpeedSeries => {
   return { model, total, points };
 };
 
+test("TTFT merges measured turns, not daily/account percentiles, and preserves missing values and date filters", () => {
+  const a = day("2026-10-01", { first_token: { turns: 10, histogram: [[1000, 9]] } });
+  const b = day("2026-10-25", { first_token: { turns: 1, histogram: [[9000, 1]] } });
+  const parts = [{ account: "a", models: [{ model: "fixture", total: a, points: [a] }] },
+    { account: "b", models: [{ model: "fixture", total: b, points: [b] }] }];
+  const merged = mergeSpeedParts(parts, false);
+  expect(modelTotals(merged[0]!.series).firstToken).toEqual({ turns: 11, measured: 10, median_ms: 1000, p90_ms: 1000, coverage: 10 / 11 });
+  expect(merged[0]!.accounts).toEqual(["a", "b"]);
+  expect(modelTotals(entriesSince(merged, "2026-10-20")[0]!.series).firstToken?.median_ms).toBe(9000);
+  expect(mergeSpeedParts(parts, true).map(e => modelTotals(e.series).firstToken?.median_ms)).toEqual([1000, 9000]);
+  expect(firstTokenSummary(undefined).median_ms).toBeNull();
+  expect(firstTokenSummary({ turns: 2, histogram: [[1000, 1], [3000, 1]] }).median_ms).toBe(2000);
+});
+
 test("weeks start on Monday in UTC", () => {
   expect(weekStart("2026-10-04")).toBe("2026-09-28"); // Sunday
   expect(weekStart("2026-10-05")).toBe("2026-10-05"); // Monday
   expect(weekStart("2026-10-07")).toBe("2026-10-05");
+});
+
+test("first-token charts merge weekly observations, show sparse/zero measurements and leave unknown days empty", () => {
+  const points = [day("2026-10-19", { first_token: { turns: 9, histogram: [[1000, 9]] } }),
+    day("2026-10-20", { first_token: { turns: 2, histogram: [[9000, 1]] } }), day("2026-10-21", {}),
+    day("2026-10-26", { first_token: { turns: 1, histogram: [[0, 1]] } })];
+  expect(modelChartBuckets(points, "week", "long", "first-token-median")).toEqual([
+    { at: "2026-10-19", value: 1, n: 10, measured: 10, total: 11 }, { at: "2026-10-26", value: 0, n: 1, measured: 1, total: 1 },
+  ]);
+  expect(modelChartBuckets(points, "day", "all", "first-token-p90").map(p => p.value)).toEqual([1, 9, 0]);
+  expect(firstTokenChartScale([1, 9, 120]).max).toBeGreaterThanOrEqual(120);
+  expect(firstTokenChartScale([0]).max).toBeGreaterThan(0);
 });
 
 test("a week's speed is the ratio of its summed tokens and time, never the average of daily speeds", () => {
@@ -124,7 +151,7 @@ test("All lists the active Claude and Codex subscriptions, then the inactive one
     { id: "claude-old", group: "claude", active: false, vendorAccount: null }, { id: "agy1", group: "gemini", active: true, vendorAccount: null }];
   expect(speedSubscriptions(cards, "__all__").map(sub => [sub.id, sub.provider, sub.active])).toEqual([
     ["codex1", "codex", true], ["claude-a", "claude", true], ["Codex1::Business", "codex", true],
-    ["claude-old", "claude", false]]);
+    ["agy1", "gemini", true], ["claude-old", "claude", false]]);
   // The pool and its account are separate scopes: their calls merge once each, never the pool's twice.
   const parts = [{ account: "codex1", models: [series("gpt", [day("2026-10-05", { calls: 10 })])] },
     { account: "Codex1::Business", models: [series("gpt", [day("2026-10-05", { calls: 3 })])] }];

@@ -9,6 +9,7 @@ import { runBackgroundTurn } from "./background-jobs";
 import type { JournalDeliveryTarget } from "../providers/core/journal";
 import { WriteLease } from "../db/write-lease";
 import type { WindowAnswer } from "../db/window-answers";
+import { NativeFirstTokenReader } from "./first-token-producer";
 
 /**
  * The background writer thread (U2.1): one connection, one turn per message, the jobs of
@@ -34,15 +35,17 @@ const progress = new ProgressRegistry(progressDirectory(options.dbPath));
 const backlog = new BacklogProgress(progress);
 db.exec("PRAGMA synchronous=NORMAL; PRAGMA cache_size=-65536; PRAGMA mmap_size=268435456; PRAGMA temp_store=MEMORY");
 const lease = new WriteLease(db, "background");
-parentPort!.on("message", (message: { config: CurrentConfig; journal?: JournalDeliveryTarget | null; answers?: WindowAnswer[] } | { close: true }) => {
-  if ("close" in message) { db.close(); parentPort!.close(); return; }
+const firstTokenReader = new NativeFirstTokenReader(() => parentPort!.postMessage({ type: "first-token-ready" }));
+parentPort!.on("message", (message: { config: CurrentConfig; firstTokenOnly?: boolean; journal?: JournalDeliveryTarget | null; answers?: WindowAnswer[] } | { close: true }) => {
+  if ("close" in message) { void firstTokenReader.close().finally(() => { db.close(); parentPort!.close(); }); return; }
   try {
     const rates = readRateCards();
     const writing = lease.tryAcquire();
     let result: AnalysisMaintenanceResult;
     try {
       result = runBackgroundTurn({ db, config: message.config, rates, journal: message.journal ?? null, answers: message.answers ?? [],
-        turnMs, canWrite: () => writing && lease.mayContinue(), holdsWriter: () => writing && lease.held, progress, backlog });
+        firstTokenReader, firstTokenOnly: message.firstTokenOnly, turnMs,
+        canWrite: () => writing && lease.mayContinue(), holdsWriter: () => writing && lease.held, progress, backlog });
     } finally { if (lease.held) lease.release(); }
     parentPort!.postMessage(result satisfies AnalysisMaintenanceResult);
   } catch (error) {

@@ -58,10 +58,10 @@ function seed(sqlite: Database): void {
       'fixture','{"home":"C:/Users/fixture/.claude"}');`);
 }
 function raw(sqlite: Database) {
-  // W9 retires only the derived era flag; compare every retained probe field. Columns added later (0065: resp_ms) read NULL.
+  // Retain all probe fields; later nullable Claude columns (0065, 0092) read NULL before their migrations.
   const probes=(sqlite.query("SELECT * FROM probe_windows").all() as Array<Record<string,unknown>>)
     .map(({era_unattributed:_retired,...row})=>row);
-  return [sqlite.query("SELECT * FROM claude_events").all().map(row=>({account_key:null,resp_ms:null,...row as object})),probes];
+  return [sqlite.query("SELECT * FROM claude_events").all().map(row=>({account_key:null,resp_ms:null,billing_mode:null,...row as object})),probes];
 }
 function snapshot(sqlite: Database): BootstrapSnapshot {
   return currentSnapshot({ sqlite, accounts }, NOW) as BootstrapSnapshot;

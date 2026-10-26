@@ -98,6 +98,7 @@ worker.onmessage = async (message: MessageEvent<DataWork | { close: true }>) => 
     const build = request.kind === "view" ? () => buildDataView(ctx, url) : () => buildWindowScreen(ctx, url);
     response = await withReadSnapshotAsync(read, async () => ({ snapshot: { checked: windowAnswerMarkSeq(read),
       version: dataVersion(read, { windowSums: readsWindowSums(url.pathname), capacityCycles: DATA_VIEWS[url.pathname]?.sources.includes("capacity_cycle_results") ?? false,
+        firstTokenTimes: DATA_VIEWS[url.pathname]?.sources.includes("response_time_hours") ?? false,
         contextPrices: contextRequested(url) ? url.pathname : false }) }, report: await build() }));
   } catch (error) {
     // A register that is still being prepared is a preparation state, not a failure. The class cannot

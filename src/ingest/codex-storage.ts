@@ -135,6 +135,7 @@ export interface CodexSourceEvidence {
 }
 
 export interface CodexRolloutParse {
+  firstToken?: { version: number; turns: import("../providers/first-token/types").FirstTokenTurn[] } | null;
   events: CodexEventRow[];
   rateLimits: CodexRateLimitRow[];
   consumed: number;

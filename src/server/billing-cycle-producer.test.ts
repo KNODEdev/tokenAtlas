@@ -53,6 +53,28 @@ test("the first turn fills every account; the stored rows equal the full derivat
   expect(billingCyclesStale(db, { provider: "codex", account: "codex1" }, NOW)).toBe(false);
 });
 
+test("a resized allowance keeps one capacity period and uses the new meter's own baseline", () => {
+  const db = database();
+  try {
+    const start = Date.parse("2026-09-01T00:00:00Z"), change = start + D, end = start + 7 * D;
+    replaceDeclaredPeriods(db, PLAN_PERIODS, [declared("resized", "pro", iso(start), iso(end))]);
+    addWindow(db, "resized", MAIN, start, change, 20, 20);
+    addWindow(db, "resized", MAIN, change, end, 90, 10);
+    db.query("UPDATE limit_windows SET reset_ts=?,cycle_end_basis='capacity_change' WHERE account='resized' AND start_ts=?")
+      .run(iso(end), iso(start));
+    db.query("UPDATE limit_windows SET activity=?,readings=? WHERE account='resized' AND start_ts=?").run(
+      JSON.stringify({ plan: "pro", spans: [{ start: iso(change), end: iso(end) }], start_basis: "partial",
+        capacity_change: { before: 400, after: 100 } }),
+      JSON.stringify([{ ts: iso(change), percent: 80, source: "probe" }, { ts: iso(end - H), percent: 90, source: "probe" }]), iso(change));
+    settle(db);
+    const cycle = stored(db).find(row => row.account === "resized")!;
+    expect(cycle.used_pp).toBe(30); // 20 old points and 10 new points, not a spurious 70-point rise.
+    expect(cycle.windows_share).toBe(1);
+    expect(JSON.parse(cycle.detail).early_resets).toBe(0);
+    expect(withoutClock([cycle])).toEqual(reference(db, [cycle]));
+  } finally { db.close(); }
+});
+
 test("a new % reading recomputes only the account and cycle it falls in; the result equals the full derivation", () => {
   const db = database();
   seed(db);

@@ -21,7 +21,7 @@ const sub = (subscription: string, plan: string | null, vendor = "codex"): PlanS
     : { plan: null, plan_id: null, basis: "none", from: null, until: null },
 });
 const subscriptions = [sub("codex1", "pro"), sub("codex1::business", null), sub("codex2", "plus"), sub("grok", null, "grok")];
-const social: RailAccount = { provider: "codex", account: "codex1", aliases: ["chatgpt-aa", "codex1"], label: "socialmedia@example.pl" };
+const social: RailAccount = { provider: "codex", account: "codex1", aliases: ["chatgpt-aa", "codex1"], label: "account_0006@example.test" };
 const cycle = (subscription: string, vendor: string, kind: string): CycleSettingRow => ({
   subscription, vendor, kind, label: kind, period_hours: 168, period_source: "declared", anchor_ts: null, anchor_source: "none",
   history_windows: 40, history_source: "default", window_start: null, next_reset: null, history_available: 0,

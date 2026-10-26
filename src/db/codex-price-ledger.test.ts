@@ -31,7 +31,7 @@ const bands: LedgerBaseBand[] = card.rules.filter(rule => rule.speed === "standa
   { id: rule.id, model: rule.model, basis: rule.billing_basis, validFrom: rule.valid_from, band: "long" as const,
     threshold: 10, rates: rule.long_context!.rates, multiplier: String(rule.multiplier), evidence: JSON.stringify(rule) },
 ]);
-const policy: LedgerTierPolicy = { classify: raw => raw === "default" ? "standard" : raw === "priority" ? "fast" : null,
+const policy: LedgerTierPolicy = { classify: raw => raw == null || raw === "default" ? "standard" : raw === "priority" ? "fast" : null,
   multiplier: (model, basis, tier, day) => model !== "m" || basis === "chatgpt_credits" && day < "2026-04-02" ? null
     : tier === "standard" ? decimal(1) : tier === "fast" ? decimal(basis === "chatgpt_credits" ? 2.5 : 2) : null };
 type Input = Event & { home?: string; path?: string; service_tier?: string | null; offset?: number };

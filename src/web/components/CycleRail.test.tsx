@@ -5,6 +5,8 @@ import { buildCycleView } from "../lib/cycle";
 import { sampleCurveAt } from "../lib/window-insights";
 import { railWindowsFromCycles, type RailWindow } from "../lib/windows";
 import { WindowRail } from "./CycleRail";
+import { WindowChart } from "./WindowStatusCard";
+import { buildWindowInsights } from "../lib/window-insights";
 
 const shortenedCycle: ApiCycle = {
   index: 57,
@@ -187,6 +189,30 @@ describe("WindowRail reconstructed windows", () => {
 
     expect(html).toContain("57%");
     expect(html).not.toContain("API-eq");
+  });
+
+  it("draws a newly activated Pro from zero over its actual short lifetime in both charts", () => {
+    const startIso = "2026-10-24T12:47:00.000Z", resetIso = "2026-10-24T14:16:00.000Z";
+    const window: RailWindow = { ...reconstructed, startIso, resetIso, usedPercent: 14, percentBasis: "measured",
+      activity: { plan: "pro", start_basis: "activation", spans: [{ start: startIso, end: resetIso }] },
+      shape: [{ t: 10, pct: 3 }, { t: 40, pct: 7 }, { t: 90, pct: 14 }] };
+    const html = renderToStaticMarkup(<WindowRail windows={[window]} activeKey={window.key}
+      medianPercent={null} medianTokens={null} onSelect={() => {}} />);
+    expect(html).toContain('d="M0.00,100.00 L10.00,97.00');
+    expect(html).not.toContain("7d 00h");
+    const startMs = Date.parse(startIso), endMs = Date.parse(resetIso);
+    const chart = (row: RailWindow) => renderToStaticMarkup(<WindowChart startMs={startMs} endMs={endMs} spanMs={endMs - startMs}
+      active={false} insight={buildWindowInsights([row], endMs + 1, row.key)[0]!} reading={row.shape!.at(-1)!}
+      linearEnd={null} exhaustionIso={null} tokensByDay={null} />);
+    const points = (output: string) => output.match(/<polyline points="([^"]+)" fill="none" stroke="var\(--accent\)"/)![1]!.split(" ");
+    expect(points(chart(window))).toHaveLength(4);
+    expect(points(chart({ ...window, activity: { ...window.activity!, start_basis: undefined } }))).toHaveLength(3);
+    const resized: RailWindow = { ...window, activity: { ...window.activity!, plan: null, start_basis: "partial",
+      capacity_change: { before: 100, after: 200 } } };
+    expect(points(chart(resized))).toHaveLength(3);
+    const resizedRail = renderToStaticMarkup(<WindowRail windows={[resized]} activeKey={resized.key}
+      medianPercent={null} medianTokens={null} onSelect={() => {}} />);
+    expect(resizedRail).not.toContain('d="M0.00,100.00');
   });
 });
 

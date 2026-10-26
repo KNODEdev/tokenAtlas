@@ -171,11 +171,11 @@ test("only the four explicit companion cache dependencies follow final projectio
  paths.forEach((path,i)=>expect(dataVersion(f.db,{windowSums:false,contextPrices:"/api/"+path+"?context=1"})).not.toBe(before[i]));
 });
 
-test("window normalization retains the priced fallback cohort when the request mode is unknown",()=>{
+test("window normalization treats an omitted request mode as Standard",()=>{
  const f=fixture();f.db.exec("UPDATE codex_price_ledger_dims SET service_tier=NULL,speed='unknown' WHERE id=(SELECT dim_id FROM codex_price_ledger_events WHERE id=4)");
  const result=compute(f);expect(result.sums.cycle.usage.api_standard-f.sums.cycle.usage.api_standard).toBe(2);
  expect(result.sums.cycle.usage.api_normalized!-f.sums.cycle.usage.api_normalized!).toBe(2);
- expect(result.sums.slices.some(s=>s.model==='m'&&s.speed==='unknown'&&!s.context_classified)).toBe(true);
+ expect(result.sums.slices.some(s=>s.model==='m'&&s.speed==='standard'&&!s.context_classified)).toBe(true);
 });
 
 test("plan API medians use previewed sample values before selecting the central observation",()=>{

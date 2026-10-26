@@ -1,5 +1,11 @@
 # tokenAtlas
 
+Choose the local database folder during setup or in Settings. The installation saves that
+choice in private `tokenatlas.local.json`; machine identity and local preferences live in
+`local-state/` beside the selected database. Moving the database through Settings also copies
+that state and keeps the original as recovery evidence. Existing managed `.env` selections
+are migrated automatically; manual environment setup is not required.
+
 Desktop analytics for AI coding usage: compare models, projects, subscriptions,
 billing cycles and observed limits from one local history.
 

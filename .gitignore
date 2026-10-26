@@ -5,6 +5,7 @@ node_modules/
 /public/assets/
 /public/index.html
 .env
+/tokenatlas.local.json
 .env.*
 !.env.example
 .env.bak-*
@@ -49,3 +50,17 @@ cycles.json
 plans.json
 claude-gauge.json
 grok-gauge.json
+
+# Machine-local state and historical development material.
+/.local-maintainer/
+/.claude/
+/.codex/
+/.cbmignore
+/.design-sync/
+/.mdoprep/
+/do-work/
+/docs/verification/
+/docs/marketing/
+/docs/release/
+/public/
+/.github/workflows/

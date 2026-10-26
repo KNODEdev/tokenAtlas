@@ -6,6 +6,7 @@ import { vendorContextPremium } from "./vendor-context-premium";
 import type { MeterEvent } from "./subscription-window-comparison";
 import { classifyClaudeCodeEvent, type ClaudeCodeProductClass } from "../shared/claude-code-capacity";
 import { GROK_TICKS_PER_USD } from "../shared/grok-usage";
+import { canonicalPeriodPlan } from "../shared/period-end";
 
 export const TOKEN_BUCKETS = ["in_uncached", "in_cache_read", "in_cache_write_5m", "in_cache_write_1h", "in_cache_write_unknown", "out_total"] as const;
 export type TokenBucket = typeof TOKEN_BUCKETS[number];
@@ -136,6 +137,8 @@ export interface SubscriptionAccountingAdapter {
   defaultCounter: string;
   counterKinds: string[];
   defaultMinutes: Record<string, number>;
+  /** Only when provider evidence says a plan selects an independent cumulative meter. */
+  windowMeterPlan?(plan: string | null | undefined): string | null;
   counterIncludes(group: string | null, event: SubscriptionEvent): boolean;
   /** The native token columns in the ledger's categories; throws on counters that cannot be. */
   quantities(row: Row): TokenQuantities;
@@ -326,6 +329,10 @@ const BUILT_IN: readonly SubscriptionAccountingAdapter[] = [
   { id: "claude", label: "Anthropic / Claude", aliases: ["claude", "anthropic"], table: "claude_events", vendor: "claude",
     rateVendor: "anthropic", speed: true, speedNormalization: { rule: CLAUDE_SPEED_RULE, normalize: claudeSpeed },
     opaqueSources: ["live", "desktop"],
+    windowMeterPlan: plan => {
+      const canonical = canonicalPeriodPlan(plan?.trim().toLowerCase() ?? "");
+      return /^(pro|max-5x|max-20x)$/.test(canonical) ? canonical : null;
+    },
     defaultCounter: "weekly_all", counterKinds: ["weekly_all", "session"], defaultMinutes: { weekly_all: 10080, session: 300 }, counterIncludes: allModels,
     quantities: row => {
       const write5 = n(row, "cache_write_5m"), write1 = n(row, "cache_write_1h");

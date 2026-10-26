@@ -120,6 +120,15 @@ function rowFor(result: ReturnType<typeof readDetail>, model: string, firstDate:
   return result.detail.rows.find((row) => row.model === model && row.first.startsWith(firstDate));
 }
 
+test("stored write sums do not claim source completeness for a zero counter", () => {
+  const db = database();
+  db.exec("ALTER TABLE events ADD COLUMN cache_write_status TEXT DEFAULT 'missing'");
+  insertEvent(db, { cached_in: 90_000 });
+  const result = readDetail(db);
+  expect(result.detail.rows).toHaveLength(1);
+  expect(result.detail.rows[0]).toMatchObject({ input: 100_000, cached: 90_000, cache_write: 0, cache_write_complete: false });
+});
+
 test("dated Luna and Terra prices change exactly at the 30 July UTC boundary", () => {
   const db = database();
   for (const [model, before, after] of [
@@ -160,7 +169,7 @@ test("Astra short and long context are classified per request, not by aggregate 
   expect(long!.api).toMatchObject({ input: 6, cached: 0, output: 0, total: 6, rates: { in_uncached: 20, in_cache_read: 2, out_total: 75 } });
 });
 
-test("standard reference cost stays separate from Fast actual cost; an unrecorded tier is Standard for API, unpriced for credits", () => {
+test("Standard reference cost stays separate from Fast actual cost; omitted tiers are Standard for API and credits", () => {
   const db = database();
   insertEvent(db, { ts: "2026-09-11T10:00:00Z", path: "standard.jsonl", in_tok: 100_000, out_tok: 100_000, speed: "standard" });
   insertEvent(db, { ts: "2026-09-11T10:01:00Z", path: "fast.jsonl", in_tok: 100_000, out_tok: 100_000, speed: "fast" });
@@ -169,14 +178,13 @@ test("standard reference cost stays separate from Fast actual cost; an unrecorde
   const standard = result.detail.rows.find((row) => row.speed === "standard");
   const fast = result.detail.rows.find((row) => row.speed === "fast");
   const unknown = result.detail.rows.find((row) => row.speed === "unknown");
-  expect(standard).toMatchObject({ speed: "standard", actual_api: 6 });
-  expect(standard!.api?.total).toBe(6);
+  expect(standard).toMatchObject({ speed: "standard", calls: 2, actual_api: 12 });
+  expect(standard!.api?.total).toBe(12);
+  expect(standard!.actual_credits).toBeGreaterThan(0);
   expect(fast).toMatchObject({ speed: "fast", actual_api: 12 });
   expect(fast!.api?.total).toBe(6);
-  // No tier recorded: the API equivalent at Standard (a lower bound), credits stay unpriced, the tokens stay flagged.
-  expect(unknown).toMatchObject({ speed: "unknown", actual_api: 6, actual_credits: null });
-  expect(unknown!.api?.total).toBe(6);
-  expect(result.detail.unknown_speed_tokens).toBe(200_000);
+  expect(unknown).toBeUndefined();
+  expect(result.detail.unknown_speed_tokens).toBe(0);
 });
 
 test("cached input is a subset and reasoning output is reported without double charging", () => {

@@ -26,14 +26,18 @@ test("Max resumes its original weekly identity; Pro keeps its own final 14% and 
   expect(max!.id).toBe(before.id);
   expect(max!.readings.map(row => row.percent)).toEqual([0, 94, 94, 99]);
   expect(pro!.readings.map(row => row.percent)).toEqual([3, 7, 14]);
-  expect(max!.end).toBe(reset); expect(pro!.end).toBe(reset);
+  expect(max!.end).toBe(reset);
+  expect(pro!).toMatchObject({ start: "2026-10-24T12:47:00.000Z", end: "2026-10-24T14:16:00.000Z",
+    reset, cycle_end_basis: "plan_change" });
   expect(max!.plan).toBe("max-20x"); expect(pro!.plan).toBe("pro");
   expect(max!.activity?.spans).toEqual([
     { start: "2026-10-18T11:00:00.000Z", end: "2026-10-24T09:58:00.000Z" },
     { start: "2026-10-24T14:16:00.000Z", end: reset },
   ]);
   expect(pro!.activity?.spans).toEqual([{ start: "2026-10-24T12:47:00.000Z", end: "2026-10-24T14:16:00.000Z" }]);
-  expect(registerWindowShell(pro!, 10080)).toMatchObject({ start_basis: "partial", start_percent: 3, observed_pp: 11 });
+  expect(pro!.activity?.start_basis).toBe("activation");
+  expect(registerWindowShell(pro!, 10080)).toMatchObject({ start: "2026-10-24T12:47:00.000Z",
+    start_basis: "reset", start_percent: 0, observed_pp: 14, cycle_end: "2026-10-24T14:16:00.000Z" });
   expect(windowActiveAt(max!, Date.parse("2026-10-24T15:00Z"))).toBe(true);
   expect(windowActiveAt(pro!, Date.parse("2026-10-24T15:00Z"))).toBe(false);
 });
@@ -50,7 +54,8 @@ test("canonical placement counts each boundary once and excludes Pro and unpaid 
   expect(result.map(row => row.sums.cycle.cycle_usage.tokens)).toEqual([40, 20]);
   expect(result.map(row => row.sums.cycle.cycle_usage.api_standard)).toEqual([4, 2]);
   expect(result[0]!.comparison.observed_pp).toBe(99);
-  expect(result[1]!.comparison.observed_pp).toBe(11);
+  expect(result[1]!.comparison.observed_pp).toBe(14);
+  expect(result[1]!.comparison.usage.events).toBe(1);
   expect(result[0]!.sums.readings.map(row => row.usage.events)).toEqual([0, 1, 3, 4]);
 });
 
@@ -62,6 +67,16 @@ test("a second switch resumes Pro too, while the real weekly reset opens another
   expect(result[1]!.readings.map(row => row.percent)).toEqual([3, 7, 14, 14, 18]);
   expect(result[2]!.start).toBe(reset);
   expect(result[2]!.readings.map(row => row.percent)).toEqual([1]);
+  expect(result[1]!.activity?.spans).toHaveLength(2);
+  expect(registerWindowShell(result[1]!, 10080).observed_pp).toBe(18);
+});
+
+test("a switch without a declared activation clips the end but does not invent an initial zero", () => {
+  const result = buildProbeLimitWindows({ provider: "claude", account, counter,
+    readings: readings.map(row => ({ ...row, plan: row.plan === "max" ? "pro" : row.plan })), periods: [] });
+  expect(result[1]!.end).toBe("2026-10-24T14:16:00.000Z");
+  expect(result[1]!.activity?.start_basis).toBeUndefined();
+  expect(registerWindowShell(result[1]!, 10080)).toMatchObject({ start_basis: "partial", start_percent: 3, observed_pp: 11 });
 });
 
 test("a drop without plan evidence remains a separate uncertain segment", () => {
