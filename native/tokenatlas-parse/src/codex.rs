@@ -997,15 +997,15 @@ fn prepare_buffered(file: &str, size: u64, validate: bool, first_token_only: boo
     };
     let bytes = &buffer[..used];
     // A queued file is validated in this read instead of a separate pass over the whole file.
-    if !first_token_only && (validate || crate::rollout_codec::compressed(file)) {
-        if let Some(message) = crate::jsonl::invalid(file, bytes) {
-            return Ok(obj([
-                ("kind", V::from("read_error")),
-                ("errno", V::Num(if cfg!(windows) { -4071.0 } else { -22.0 })),
-                ("message", V::from(message)),
-                ("code", V::from("EINVAL")),
-            ]));
-        }
+    if !first_token_only && (validate || crate::rollout_codec::compressed(file))
+        && let Some(message) = crate::jsonl::invalid(file, bytes)
+    {
+        return Ok(obj([
+            ("kind", V::from("read_error")),
+            ("errno", V::Num(if cfg!(windows) { -4071.0 } else { -22.0 })),
+            ("message", V::from(message)),
+            ("code", V::from("EINVAL")),
+        ]));
     }
     let complete = &bytes[..bytes.iter().rposition(|b| *b == b'\n').map_or(0, |i| i + 1)];
     let first_token_valid = if !first_token_only && (validate || crate::rollout_codec::compressed(file)) {

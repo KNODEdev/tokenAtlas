@@ -68,10 +68,10 @@ fn places(declaration: &V) -> Vec<Place> {
 /// The container checkout rewritten to its local clone, so the project rules see the same place.
 fn local_cwd(cwd: &str, places: &[Place]) -> String {
     for place in places {
-        if let Some(rest) = cwd.strip_prefix(place.remote.as_str()) {
-            if rest.is_empty() || rest.starts_with('/') {
-                return format!("{}{rest}", place.local);
-            }
+        if let Some(rest) = cwd.strip_prefix(place.remote.as_str())
+            && (rest.is_empty() || rest.starts_with('/'))
+        {
+            return format!("{}{rest}", place.local);
         }
     }
     cwd.to_string()
