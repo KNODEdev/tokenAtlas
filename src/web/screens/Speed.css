@@ -1,0 +1,33 @@
+/* Speed (docs/design/model-speed-mockup.html, approved 2026-10-07); cards, heads and legends come from History.css. */
+.speed-controls { display: flex; gap: var(--s-4) var(--s-6); align-items: center; flex-wrap: wrap; }
+
+.speed-chart svg { display: block; font-family: var(--font-figure); font-variant-numeric: tabular-nums; }
+.speed-point { cursor: default; }
+
+/* Legend entries and table names toggle a model on the chart; a hidden model is dimmed. */
+.speed-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-8); margin-top: var(--s-3);
+  font-family: var(--font-sans); font-size: var(--fs-3); }
+.speed-toggle { display: inline-flex; align-items: center; gap: var(--s-3); padding: var(--s-1) 0; border: 0; background: none;
+  color: var(--muted); font: inherit; cursor: pointer; text-align: left; }
+.speed-toggle:hover { color: var(--text); }
+.speed-toggle.is-off { opacity: 0.35; }
+.speed-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.speed-legend-line { display: block; flex-shrink: 0; }
+.speed-swatch { display: inline-block; width: 8px; height: 8px; border-radius: var(--r-bar); flex-shrink: 0; }
+
+/* Measured share: a short meter and the percentage, highlighted below 90%. */
+.speed-cov { display: inline-flex; align-items: center; gap: var(--s-3); }
+.speed-cov > i { display: inline-block; width: 60px; height: 6px; box-sizing: border-box; border: 1px solid var(--line); border-radius: var(--r-bar);
+  overflow: hidden; background: var(--sunk); }
+.speed-cov > i > b { display: block; height: 100%; background: var(--ok); }
+.speed-cov.is-low { color: var(--warn); }
+.speed-cov.is-low > i > b { background: var(--warn); }
+
+.speed-foot { margin-top: var(--s-6); padding-top: var(--s-5); border-top: var(--rule); font-size: var(--fs-3); line-height: 1.6; color: var(--muted); }
+
+/* All subscriptions: the drawer button, the split switch and a note about subscriptions that could not be read. */
+.speed-split { display: inline-flex; align-items: center; gap: var(--s-3); font-size: var(--fs-4); color: var(--muted); cursor: pointer; }
+.speed-split input { accent-color: var(--accent); }
+.speed-warn { font-size: var(--fs-3); color: var(--warn); }
+.speed-note { font-size: var(--fs-3); color: var(--muted); }
+.speed-subs { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }

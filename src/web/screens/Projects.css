@@ -1,0 +1,50 @@
+/* Projects → Usage (docs/design/audit-models-events-projects-mockup.html); legends come from History.css. */
+.projects { display: flex; flex-direction: column; gap: var(--s-7); min-width: 0; }
+.projects-tile-stack { margin-top: var(--s-4); }
+.projects-faint { color: var(--faint); font-size: var(--fs-3); }
+.projects-warn { font-size: var(--fs-3); color: var(--warn); }
+/* The screen's tabs with the Rules tab's remap action beside them. */
+.projects-tabs { display: flex; align-items: center; gap: var(--s-6); margin-bottom: var(--s-8); }
+.projects-head { display: flex; flex-direction: column; gap: var(--s-3); padding: 0 0 var(--s-5); }
+.projects-head .archive-legend { margin: 0; }
+
+/* Ranking: fixed columns so long names clip instead of widening the card. */
+.projects-ranking { max-height: 560px; overflow-y: auto; }
+.projects-ranking table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--fs-4); }
+/* Selected = a wash, never a side bar (paper-atlas §4). */
+.projects-row { cursor: pointer; }
+.projects-row:hover { background: color-mix(in oklab, var(--accent) 6%, var(--surface)); }
+.projects-row.is-active { background: var(--accent-soft); }
+.projects-name { display: flex; align-items: baseline; gap: var(--s-3); min-width: 0; }
+/* Project name in Plex 500, as in the product page's project table. */
+.projects-name > span:first-child { overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-5); font-weight: var(--fw-medium); color: var(--text); }
+.projects-row.is-active .projects-name > span:first-child { font-weight: var(--fw-semibold); }
+.projects-badge {
+  flex-shrink: 0; padding: 0 var(--s-3); border: 1px solid var(--line2); border-radius: var(--r-pill);
+  font-family: var(--font-sans); font-size: var(--fs-2); color: var(--muted);
+}
+.projects-sub { margin-top: var(--s-1); font-size: var(--fs-3); color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+
+/* Assignment: rows a rule catches carry "+"; while it is being written they fade until the reload drops them. */
+.projects-mark { display: inline-block; min-width: 1.2em; margin-right: var(--s-2); color: var(--accent); font-weight: var(--fw-semibold); }
+.projects-assign-row.is-caught { background: color-mix(in oklab, var(--accent) 6%, var(--surface)); }
+.projects-assign-row.is-saving { opacity: .45; transition: opacity .2s; }
+.projects-assign-row.is-saving .projects-mark { animation: projects-mark-pulse 1.2s ease-in-out infinite; }
+@keyframes projects-mark-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .projects-assign-row.is-saving .projects-mark { animation: none; } }
+.projects-caught { font-size: var(--fs-3); color: var(--muted); }
+/* One line per directory; its vendor/account lines open beneath it, indented and quieter. */
+.projects-expand {
+  margin-right: var(--s-3); padding: 0 var(--s-2); border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-3); color: var(--muted);
+}
+.projects-expand:hover, .projects-expand[aria-expanded="true"] { color: var(--accent); }
+.projects-assign-row.is-nested td:nth-child(3) { padding-left: var(--s-9); color: var(--faint); }
+
+/* API-eq bar: its length is the subject's API-eq, its segments the subscriptions. */
+.projects-api { display: grid; grid-template-columns: minmax(0, 1fr) 76px; gap: var(--s-4); align-items: center; }
+.projects-api > span { text-align: right; font-family: var(--font-figure); letter-spacing: -0.02em; }
+/* Thin plain bar, no track: its length is already the comparison. */
+.projects-bar { display: flex; gap: 1px; height: 5px; border-radius: var(--r-bar); overflow: hidden; }
+.projects-bar > span { display: block; min-width: 1px; }
+.projects-incomplete { font-family: var(--font-sans); font-size: var(--fs-2); color: var(--warn); margin-top: 1px; }

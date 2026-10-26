@@ -1,0 +1,2 @@
+{"type":"assistant","remoteSourced":true,"sessionId":"s-1","timestamp":"2026-10-21T07:00:02.500Z","message":{"id":"msg_remote","model":"m","usage":{"input_tokens":1,"output_tokens":5}}}
+{"type":"assistant","sessionId":"s-1","timestamp":"2026-10-21T07:00:03.500Z","message":{"id":"msg_local","model":"m","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":5}}}

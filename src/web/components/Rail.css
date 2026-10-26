@@ -1,0 +1,53 @@
+/* Shared rail vocabulary (subscriptions, windows) — docs/design/tokenAtlas.dc.html. */
+.rail-head {
+  flex: 0 0 62px; min-height: 62px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;
+  padding: 0 var(--s-6); border-bottom: var(--rule);
+}
+.rail-head.has-lens { flex-basis: auto; padding-block: var(--s-4); }
+.rail-head-row { display: flex; align-items: center; gap: var(--s-3); }
+.rail-caption { font-size: var(--fs-5); font-weight: var(--fw-semibold); color: var(--text); line-height: 1.3; }
+.rail-sub { font-size: var(--fs-3); color: var(--muted); margin-top: var(--s-1); }
+.rail-empty { padding: var(--s-5) var(--s-6); font-family: var(--font-mono); font-size: var(--fs-3); color: var(--faint); }
+.rail-lens { display: flex; gap: var(--s-1); margin-top: var(--s-3); }
+.rail-lens > button {
+  flex: 1; padding: var(--s-1) 0 var(--s-2); border-radius: var(--r-control); border: 1px solid transparent; background: transparent;
+  color: var(--muted); font-family: var(--font-sans); font-size: var(--fs-3); font-weight: var(--fw-regular); cursor: pointer;
+}
+.rail-lens > button:hover { color: var(--text); }
+.rail-lens > button[aria-pressed="true"] {
+  border-color: var(--accent); background: var(--accent-soft); color: var(--text); font-weight: var(--fw-medium); box-shadow: var(--lift-pressed);
+}
+
+.window-rail { flex: 0 0 auto; background: var(--bg); border-right: 1px solid var(--line2); position: sticky; display: flex; flex-direction: column; min-height: 0; }
+.window-rail .rail-head { padding: 0 var(--s-5); }
+.window-rail .rail-head.has-lens { padding: var(--s-4) var(--s-5); }
+.rail-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+
+/* One window row */
+.rail-row {
+  display: block; width: 100%; text-align: left; background: transparent; border: 0; border-bottom: var(--rule);
+  padding: var(--s-4) var(--s-5); cursor: pointer; color: var(--text); font-family: var(--font-sans); letter-spacing: normal; line-height: 1.45;
+}
+.rail-row:hover { background: var(--raised); }
+
+.rail-row[aria-pressed="true"] { background: var(--band); }
+.rail-row.is-compact { padding: var(--s-3) var(--s-4); }
+.rail-row-head { display: flex; align-items: baseline; gap: var(--s-3); }
+.rail-row-label { font-size: var(--fs-3); color: var(--muted); }
+.rail-row[aria-pressed="true"] .rail-row-label { color: var(--text); font-weight: var(--fw-semibold); }
+.rail-row-tag { font-size: var(--fs-2); color: var(--accent); font-weight: var(--fw-medium); }
+.rail-row-pct { font-family: var(--font-figure); font-size: var(--fs-5); font-weight: var(--fw-medium); letter-spacing: var(--ls-figure); }
+.rail-row-reserve { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--muted); }
+.rail-row-credit { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--violet); }
+.rail-shape { display: block; width: 100%; height: 22px; margin-top: var(--s-2); background: var(--sunk); border-radius: var(--r-bar); }
+.rail-row-meta { display: flex; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-2); font-family: var(--font-mono); font-size: var(--fs-1); color: var(--faint); white-space: nowrap; }
+.rail-row-meta > :first-child { overflow: hidden; text-overflow: ellipsis; }
+
+.rail-foot { padding: var(--s-4) var(--s-5) var(--s-5); border-top: var(--rule); }
+.rail-credits { margin-top: var(--s-4); padding-top: var(--s-4); border-top: var(--rule); }
+.rail-credits-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-3); }
+.rail-credits-balance { font-family: var(--font-figure); font-size: var(--fs-4); font-weight: var(--fw-semibold); color: var(--violet); }
+.rail-credits-line { display: flex; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-1); font-family: var(--font-mono); font-size: var(--fs-2); color: var(--faint); white-space: nowrap; }
+.rail-credits-line > :first-child { white-space: normal; }
+.rail-credits-line > :last-child { flex: none; }
+.rail-foot-note { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--faint); line-height: 1.5; }

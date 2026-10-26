@@ -1,0 +1,14 @@
+{
+  "_comment": [
+    "WZORZEC. Skopiuj do <TOKENATLAS_CONFIG>/grok-gauge.json.",
+    "xAI nie ma endpointu quoty. Skala bierze sie z odczytu przy wyczerpaniu,",
+    "a granica tygodnia z `reset_anchor` - patrz ekran Data sources ->",
+    "Deklaracje -> Reset tygodnia groka."
+  ],
+  "vendor": "grok",
+  "subscription": "grok",
+  "store": "grok",
+  "plan": "xai",
+  "window_hours": 168,
+  "observations": []
+}

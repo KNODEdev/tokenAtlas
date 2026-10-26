@@ -1,0 +1,7 @@
+﻿{"type": "assistant", "timestamp": "2026-09-23T21:46:18.888Z", "sessionId": "01234567-89ab-cdef-0123-456789abcdef", "message": {"id": "bom", "model": "claude-test", "usage": {"input_tokens": 12, "output_tokens": 3}}}
+{"type": "assistant", "timestamp": "2026-09-23T21:46:18.888Z", "sessionId": "01234567-89ab-cdef-0123-456789abcdef", "message": {"id": "unicode", "model": "model  😀", "usage": {"input_tokens": 12, "output_tokens": 3}}}
+{"type": "assistant", "timestamp": "2026-09-23T21:46:18.888Z", "sessionId": "01234567-89ab-cdef-0123-456789abcdef", "message": {"id": "duplicate", "model": "claude-test", "usage": {"input_tokens": 12, "output_tokens": 999, "output_tokens": 3}}}
+{"type": "assistant", "timestamp": "2026-09-23T21:46:18.888Z", "sessionId": "01234567-89ab-cdef-0123-456789abcdef", "message": {"id": "surrogate", "model": "\ud800", "usage": {"input_tokens": 12, "output_tokens": 3}}}
+{"type": "assistant", "timestamp": "2026-09-23T21:46:18.888Z", "sessionId": "01234567-89ab-cdef-0123-456789abcdef", "message": {"id": "replacement", "model": "model-�", "usage": {"input_tokens": 12, "output_tokens": 3}}}
+{"type":"assistant", invalid}
+{"type": "assistant", "timestamp": "2026-09-23T21:46:18.888Z", "sessionId": "01234567-89ab-cdef-0123-456789abcdef", "message": {"id": "no-final-lf", "model": "claude-test", "usage": {"input_tokens": 12, "output_tokens": 3}}}

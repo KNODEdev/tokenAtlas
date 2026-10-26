@@ -1,0 +1,12 @@
+{"provider": "codex", "subject": "x", "ts": "2026-09-01T00:00:00Z", "extra": "\ud83d\ude00\ud800", "used": 9007199254740993}
+
+{"journal_version": 3, "journal_entry_id": "12345678-1234-4123-8123-123456789abc", "p": {"used": 1}}
+
+{"journal_version": 2, "journal_entry_id": "bad", "canonical_probe": {}}
+
+[]
+
+null
+{broken
+{"bad":"á€X"}
+{"partial":true}

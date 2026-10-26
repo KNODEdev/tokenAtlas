@@ -1,0 +1,61 @@
+/* Analytics and Patterns (docs/design/audit-analytics-patterns-mockup.html); cards and legends come from History.css. */
+
+/* Allowance chart: the middle half as a band, dot kinds in the legend, four facts under the chart. */
+.insights-band { fill: color-mix(in oklab, var(--violet) 12%, transparent); }
+.archive-legend i.insights-band-swatch { background: color-mix(in oklab, var(--violet) 22%, transparent); }
+.archive-legend i.insights-dot { width: 8px; height: 8px; border-radius: var(--r-dot); background: var(--accent); border: 1.5px solid var(--accent); }
+.archive-legend i.insights-dot.is-hollow { background: var(--surface); }
+.archive-legend i.insights-dot.is-other { background: var(--muted); border-color: var(--muted); }
+/* Four facts as cells divided by dashed rules, like the KPI strip. */
+.insights-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin-top: var(--s-6); padding-top: var(--s-5); border-top: var(--rule); }
+.insights-facts > div { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; padding: 0 var(--s-8); }
+.insights-facts > div:first-child { padding-left: 0; }
+.insights-facts > div + div { border-left: var(--rule); }
+.insights-facts span { font-family: var(--font-sans); font-size: var(--fs-3); font-weight: var(--fw-medium); color: var(--muted); }
+.insights-facts b { font-family: var(--font-figure); font-size: var(--fs-6); font-weight: var(--fw-medium); letter-spacing: var(--ls-tight); font-variant-numeric: tabular-nums; }
+.insights-facts small { font-family: var(--font-sans); font-size: var(--fs-3); line-height: 1.5; color: var(--muted); overflow-wrap: anywhere; }
+
+/* Typical course: the chart and a column of findings, each a number with a small visual. */
+.insights-course { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: var(--s-8); align-items: start; margin-top: var(--s-4); }
+.insights-findings { display: flex; flex-direction: column; gap: var(--s-6); padding-left: var(--s-8); border-left: var(--rule); min-width: 0; }
+.insights-finding-value { font-size: var(--fs-7); margin-top: var(--s-1); }
+.insights-finding-caption { font-size: var(--fs-3); line-height: 1.5; color: var(--muted); margin-top: var(--s-3); }
+.insights-squares { display: flex; gap: var(--s-1); margin-top: var(--s-4); }
+.insights-squares > span { width: 14px; height: 14px; border-radius: var(--r-bar); }
+.insights-halo { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.archive-legend i.insights-line { width: 16px; height: 0; border-radius: 0; border-top: 2px solid var(--accent); }
+.archive-legend i.insights-line.is-thin { border-top: 1.5px dashed var(--accent); }
+.archive-legend i.insights-line.is-even { border-top: 1.5px dashed var(--muted); }
+
+/* Heatmap: day label, 24 hours, the day total as the right margin; the hour profile as the bottom row.
+   Cells are paper squares: an accent wash by intensity, sunken paper for an hour without activity. */
+.insights-heat-summary { margin: var(--s-3) 0 var(--s-5); }
+.insights-heat { display: grid; grid-template-columns: 34px repeat(24, minmax(0, 1fr)) 92px; gap: var(--s-1); align-items: center; }
+.insights-heat-axis { font-family: var(--font-figure); font-size: var(--fs-1); color: var(--muted); text-align: center; white-space: nowrap; }
+.insights-heat-axis.is-margin { text-align: left; padding-left: var(--s-3); }
+.insights-heat-day { font-family: var(--font-sans); font-size: var(--fs-2); color: var(--muted); }
+.insights-heat-cell { display: block; height: 18px; border-radius: var(--r-bar); }
+.insights-heat-cell.is-peak { outline: 1.5px solid var(--text); outline-offset: -1px; }
+.insights-heat-margin { display: flex; align-items: center; gap: var(--s-3); padding-left: var(--s-3); min-width: 0; }
+.insights-heat-margin > i { display: block; height: 8px; flex: 0 0 auto; border-radius: var(--r-bar); background: var(--muted); }
+.insights-heat-margin > em { font-style: normal; font-family: var(--font-figure); font-size: var(--fs-2); color: var(--muted); white-space: nowrap; }
+.insights-heat-profile { display: flex; align-items: flex-end; height: 28px; margin-top: var(--s-2); }
+.insights-heat-profile > i { display: block; width: 100%; min-height: 1px; border-radius: var(--r-bar); background: var(--muted); }
+
+/* Anomaly list: severity, what, how much, which window; the whole row opens the window panel. */
+.insights-anomalies { display: flex; flex-direction: column; margin-top: var(--s-5); }
+.insights-anomaly {
+  display: grid; grid-template-columns: 104px minmax(0, 1fr) 170px 110px; gap: var(--s-5); align-items: center;
+  padding: var(--s-4) var(--s-2); border: 0; border-bottom: var(--rule); background: none; color: var(--text);
+  font: inherit; font-size: var(--fs-4); text-align: left; cursor: pointer;
+}
+.insights-anomaly:hover { background: var(--raised); }
+.insights-anomaly > span:last-child { text-align: right; }
+.insights-anomaly-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.insights-anomaly .mono { font-size: var(--fs-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.insights-anomaly:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Tabs above the screen and a short note where the screen does not apply. */
+.insights-tabs { display: flex; align-items: center; gap: var(--s-6); }
+.insights-note { padding: var(--s-8); border: 1px dashed var(--line2); border-radius: var(--r-card); background: var(--sunk); color: var(--muted); font-size: var(--fs-5); line-height: 1.6; }
+.insights-note b { color: var(--text); }

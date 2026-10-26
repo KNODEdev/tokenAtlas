@@ -1,0 +1,34 @@
+.capacity-reference-controls { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-8); margin: 0 0 var(--s-4); }
+.capacity-reference-control { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-3); font-size: var(--fs-3); min-width: 0; }
+.capacity-reference-control > strong { color: var(--reference-color); font-weight: var(--fw-semibold); }
+.capacity-reference-control label { display: inline-flex; align-items: center; gap: var(--s-2); color: var(--muted); }
+.capacity-reference-control input, .capacity-reference-control .ui-dropdown { background: var(--surface); color: var(--text); border: 1px solid var(--line2); border-radius: var(--r-chip); padding: var(--s-1) var(--s-3); font: inherit; outline: none; }
+.capacity-reference-control :is(input, .ui-dropdown):focus { border-color: var(--accent); }
+.capacity-reference-control :is(input, .ui-dropdown):disabled { background: var(--sunk); color: var(--faint); }
+.capacity-reference-control input { width: 65px; }
+.capacity-reference-control .ui-dropdown { max-width: 300px; }
+.capacity-reference-line { position: absolute; top: 0; bottom: 0; width: 14px; transform: translateX(-50%); color: var(--reference-color); pointer-events: auto; touch-action: none; z-index: 2; cursor: ew-resize; }
+.capacity-reference-line::before { content: ""; position: absolute; left: 6px; width: 1px; height: 100%; background: var(--reference-color); opacity: .8; }
+.capacity-reference-line > span { position: absolute; top: calc(var(--reference-lane) * 84px); right: 7px; padding: var(--s-1) var(--s-3); border: 1px solid currentColor; border-radius: var(--r-chip); background: var(--surface); color: inherit; white-space: nowrap; font: var(--fs-3) var(--font-sans); }
+.capacity-reference-line small { display: block; font: inherit; }
+.capacity-reference-badge > strong, .capacity-reference-badge > span { display: block; line-height: 1.6; }
+.capacity-reference-badge > strong { font-weight: var(--fw-semibold); }
+.capacity-reference-badge > small { line-height: 1.5; font-size: var(--fs-2); }
+.capacity-reference-badge > .capacity-reference-date { padding-bottom: var(--s-1); color: var(--text); }
+.capacity-reference-line:focus-visible { outline: 2px solid var(--reference-color); outline-offset: 3px; }
+/* The comparison line: dashed, its badge on the far side of the pair or stacked below the first line's badge. */
+.capacity-reference-line-second::before { width: 0; background: none; border-left: 1px dashed var(--reference-color); }
+.capacity-reference-line-second > span { border-style: dashed; margin-top: calc(var(--reference-stack) * 84px); }
+.capacity-reference-line > .capacity-reference-badge-right { right: auto; left: 7px; }
+.capacity-reference-control .capacity-reference-difference { font-weight: var(--fw-semibold); white-space: nowrap; }
+.capacity-reference-difference-bracket { position: absolute; top: calc(var(--reference-lane) * 84px); margin-top: calc(var(--s-10) * 1.5); height: 0; container-type: inline-size; border-top: 1px solid currentColor; pointer-events: none; z-index: 1; }
+.capacity-reference-difference-bracket::before, .capacity-reference-difference-bracket::after { content: ""; position: absolute; top: calc(var(--s-2) * -1); height: calc(var(--s-2) * 2); border-left: 1px solid currentColor; }
+.capacity-reference-difference-bracket::before { left: 0; }
+.capacity-reference-difference-bracket::after { right: 0; }
+.capacity-reference-difference-bracket > span { position: absolute; left: 50%; bottom: var(--s-2); transform: translateX(-50%); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-chip); background: var(--surface); white-space: nowrap; font: var(--fs-2) var(--font-mono); }
+/* Between the lines the first badge row is always free; a gap narrower than the label moves the label to a free place:
+   the second badge row, or beside the pair when both badges are stacked on the left. */
+@container (max-width: 96px) {
+  .capacity-reference-difference-bracket > span { bottom: auto; top: calc(84px - var(--s-10)); }
+  .capacity-reference-difference-stacked > span { top: auto; bottom: calc(var(--s-2) * -2); left: calc(100% + var(--s-5)); transform: none; }
+}

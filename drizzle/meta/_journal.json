@@ -1,0 +1,664 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1787311648169,
+      "tag": "0000_striped_captain_marvel",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1787475638595,
+      "tag": "0001_old_wendell_rand",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787480913372,
+      "tag": "0002_slim_loners",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787509541874,
+      "tag": "0003_eminent_rhodey",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1787582499883,
+      "tag": "0004_certain_serpent_society",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1787588904011,
+      "tag": "0005_great_genesis",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1787593094753,
+      "tag": "0006_tan_hitman",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1787607980617,
+      "tag": "0007_illegal_snowbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1787608694415,
+      "tag": "0008_high_mentallo",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1787644523760,
+      "tag": "0009_unify_probe_windows",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1787952373585,
+      "tag": "0010_claude_events_subscription_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1788093825407,
+      "tag": "0011_account_observations",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788097350863,
+      "tag": "0012_probe_windows_era_unattributed",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1788180477514,
+      "tag": "0013_first_kingpin",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1788189348260,
+      "tag": "0014_safe_overlord",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1788262745262,
+      "tag": "0015_high_solo",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1788263943160,
+      "tag": "0016_loving_omega_flight",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1788343190922,
+      "tag": "0017_thin_jasper_sitwell",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1788348216892,
+      "tag": "0018_amused_miracleman",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1788512385432,
+      "tag": "0019_fix_claude_probe_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1788563608404,
+      "tag": "0020_subscription_usage_daily",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1788591000000,
+      "tag": "0021_current_read_models",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1788594194870,
+      "tag": "0022_durable_gauge_journal",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1788852000000,
+      "tag": "0023_source_identity_registry",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1788855600000,
+      "tag": "0024_immutable_probe_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1788860000000,
+      "tag": "0025_versioned_probe_bindings",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1789214400000,
+      "tag": "0026_claude_account_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1789286400000,
+      "tag": "0027_codex_pricing_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1789430400000,
+      "tag": "0028_durable_analysis",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1789516800000,
+      "tag": "0029_analysis_changes",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1789516800001,
+      "tag": "0030_grok_source_provenance",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1789516800002,
+      "tag": "0031_subscription_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1789689600000,
+      "tag": "0032_account_observation_evidence",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1789776000000,
+      "tag": "0033_usage_price_register",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1789776000001,
+      "tag": "0034_usage_price_measures",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1789776000002,
+      "tag": "0035_usage_price_nested",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1789776000003,
+      "tag": "0036_usage_price_queues",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1789776000004,
+      "tag": "0037_usage_price_unassigned",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1789776000005,
+      "tag": "0038_usage_price_buckets",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "6",
+      "when": 1789776000006,
+      "tag": "0039_usage_price_window_measures",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1789776000007,
+      "tag": "0040_account_periods",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1789776000008,
+      "tag": "0041_stage4_legacy_removal",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "6",
+      "when": 1789776000009,
+      "tag": "0042_claude_remembered_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "6",
+      "when": 1789776000010,
+      "tag": "0043_claude_limit_hits",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "6",
+      "when": 1789776000011,
+      "tag": "0044_claude_limit_text_basis",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "6",
+      "when": 1789776000012,
+      "tag": "0045_codex_price_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "6",
+      "when": 1789776000013,
+      "tag": "0046_usage_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1789776000014,
+      "tag": "0047_drop_usage_price_register",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1789776000015,
+      "tag": "0048_codex_canonical_copies",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1789776000016,
+      "tag": "0049_codex_copy_free_sums",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "6",
+      "when": 1789776000017,
+      "tag": "0050_limit_windows",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "6",
+      "when": 1789776000018,
+      "tag": "0051_window_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "6",
+      "when": 1789776000019,
+      "tag": "0052_window_usage_intervals",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "6",
+      "when": 1789776000020,
+      "tag": "0053_codex_two_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1789776000021,
+      "tag": "0054_ledger_sums",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "6",
+      "when": 1789776000022,
+      "tag": "0055_window_usage_interval_kinds",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "6",
+      "when": 1789776000023,
+      "tag": "0056_window_usage_reference",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "6",
+      "when": 1789776000024,
+      "tag": "0057_published_revisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1789776000025,
+      "tag": "0058_probe_sources",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1789776000026,
+      "tag": "0059_drop_remembered_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "6",
+      "when": 1789776000028,
+      "tag": "0060_usage_ledger_source_days",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "6",
+      "when": 1789776000029,
+      "tag": "0061_codex_ledger_file_models",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "6",
+      "when": 1789776000030,
+      "tag": "0062_codex_shared_ledger_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "6",
+      "when": 1789776000031,
+      "tag": "0063_window_answers",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "6",
+      "when": 1789776000032,
+      "tag": "0064_probe_vendor_account_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "6",
+      "when": 1789776000033,
+      "tag": "0065_model_speed",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "6",
+      "when": 1789776000034,
+      "tag": "0066_stored_activity",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "6",
+      "when": 1789776000035,
+      "tag": "0067_codex_stored_activity",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "6",
+      "when": 1789776000036,
+      "tag": "0068_usage_ledger_dim_repository",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "6",
+      "when": 1789776000037,
+      "tag": "0069_dims_by_place",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "6",
+      "when": 1789776000038,
+      "tag": "0070_usage_ledger_day_act_key",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "6",
+      "when": 1789776000039,
+      "tag": "0071_opencode_chains_by_home",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "6",
+      "when": 1789776000040,
+      "tag": "0072_claude_code_local_traffic",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "6",
+      "when": 1789776000041,
+      "tag": "0073_billing_cycles",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "6",
+      "when": 1789776000042,
+      "tag": "0074_credit_notices",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "6",
+      "when": 1789776000043,
+      "tag": "0075_window_end_estimates",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "6",
+      "when": 1789776000044,
+      "tag": "0076_window_point_values",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "6",
+      "when": 1789776000045,
+      "tag": "0077_window_end_causes",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "6",
+      "when": 1789776000046,
+      "tag": "0078_subscription_capacity",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "6",
+      "when": 1789776000047,
+      "tag": "0079_subscription_hours",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "6",
+      "when": 1789776000048,
+      "tag": "0080_project_plan",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "6",
+      "when": 1789776000049,
+      "tag": "0081_capacity_cycle_results",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "6",
+      "when": 1789776000050,
+      "tag": "0082_claude_card_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "6",
+      "when": 1789776000051,
+      "tag": "0083_fx_rates",
+      "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "6",
+      "when": 1789776000052,
+      "tag": "0084_limit_window_source_plan",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "6",
+      "when": 1789776000053,
+      "tag": "0085_activity_intervals",
+      "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "6",
+      "when": 1789776000054,
+      "tag": "0086_codex_context_prices",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "6",
+      "when": 1789776000055,
+      "tag": "0087_codex_context_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "6",
+      "when": 1789776000056,
+      "tag": "0088_codex_context_window_ranges",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "6",
+      "when": 1789776000057,
+      "tag": "0089_codex_context_final_projections",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "6",
+      "when": 1789776000058,
+      "tag": "0090_codex_context_final_scopes",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "6",
+      "when": 1789776000059,
+      "tag": "0091_codex_context_final_queues",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "6",
+      "when": 1789776000060,
+      "tag": "0092_claude_billing_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "6",
+      "when": 1789776000061,
+      "tag": "0093_window_activity",
+      "breakpoints": true
+    }
+  ]
+}

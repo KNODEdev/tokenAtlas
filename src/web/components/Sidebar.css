@@ -1,0 +1,49 @@
+/* Navigation rail: a tinted paper band beside the sheet, brand on top (docs/design/paper-atlas.md). */
+.shell-nav {
+  flex: 0 0 auto; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; min-height: 0;
+  background: var(--band); color: var(--text); border-right: 1px solid var(--pencil); transition: width .15s ease;
+}
+.shell-nav-brand { height: 52px; flex: 0 0 52px; display: flex; align-items: center; padding: 0 var(--s-5); border-bottom: 1px solid var(--pencil); overflow: hidden; }
+.shell-nav-list { padding: var(--s-5) var(--s-4); display: flex; flex-direction: column; gap: var(--s-px); }
+.shell-nav-list.is-system { padding: var(--s-2) var(--s-4); }
+.shell-nav-rule { margin: var(--s-3) var(--s-6); border-top: var(--rule); }
+.shell-nav-item {
+  display: flex; align-items: center; gap: var(--s-5); width: 100%; text-align: left; padding: var(--s-4);
+  border-radius: var(--r-control); border: 1px solid transparent; background: transparent; color: var(--muted);
+  font-family: var(--font-sans); font-size: var(--fs-6); font-weight: var(--fw-medium); line-height: normal; letter-spacing: normal; cursor: pointer;
+}
+.shell-nav-item:hover { color: var(--text); }
+.shell-nav-item[aria-current="page"] {
+  border-color: var(--accent); background: var(--accent-soft);
+  color: var(--text); font-weight: var(--fw-semibold); box-shadow: var(--lift-pressed);
+}
+.shell-nav-icon { width: 16px; text-align: center; font-family: var(--font-mono); font-size: var(--fs-5); color: var(--faint); }
+.shell-nav-item[aria-current="page"] .shell-nav-icon { color: var(--accent); }
+.shell-nav-badge { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-3); font-weight: var(--fw-regular); color: var(--faint); }
+.shell-nav.is-collapsed .shell-nav-item { justify-content: center; padding: var(--s-4) 0; }
+
+.shell-nav-foot { margin-top: auto; padding: var(--s-6); display: flex; flex-direction: column; gap: var(--s-5); border-top: var(--rule); }
+.shell-nav-status { display: flex; flex-direction: column; gap: var(--s-2); font-family: var(--font-mono); font-size: var(--fs-2); color: var(--muted); }
+.shell-nav-status > div { display: flex; justify-content: space-between; }
+.shell-nav-status strong { color: var(--text); font-weight: var(--fw-medium); }
+.shell-nav-status span + span { color: var(--text); }
+.shell-nav-live { justify-content: flex-start !important; align-items: center; gap: var(--s-3); }
+.shell-nav-dot { width: 7px; height: 7px; border-radius: var(--r-dot); background: var(--faint); }
+.shell-nav-dot.is-live { background: var(--ok); }
+.shell-nav-collapse {
+  padding: var(--s-1) var(--s-4); border: 0; background: transparent; color: var(--faint);
+  font-family: var(--font-mono); font-size: var(--fs-2); text-align: left; cursor: pointer;
+}
+.shell-nav-collapse:hover { color: var(--text); }
+
+/* Brand: map-sheet mark + Plex wordmark, as on the product page. */
+.brand { display: flex; align-items: center; gap: var(--s-4); min-width: 0; }
+.brand-mark { width: 26px; height: 26px; flex: 0 0 auto; overflow: visible; }
+.brand-mark-sheet { fill: none; stroke: var(--text); stroke-width: 2.6px; }
+.brand-mark-grid { fill: none; stroke: var(--accent-soft); stroke-width: 1.6px; }
+.brand-mark-route { fill: none; stroke: var(--accent); stroke-width: 3.2px; stroke-linecap: round; stroke-linejoin: round; }
+.brand-mark-end { fill: var(--accent); }
+.brand-name { display: flex; align-items: baseline; gap: var(--s-3); min-width: 0; white-space: nowrap; }
+.brand-word { font-family: var(--font-brand); font-size: var(--fs-7); font-weight: var(--fw-regular); letter-spacing: -0.03em; }
+.brand-word > span { color: var(--accent); font-weight: var(--fw-semibold); }
+.brand-version { font-family: var(--font-sans); font-size: var(--fs-1); color: var(--faint); }

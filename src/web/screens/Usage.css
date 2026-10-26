@@ -1,0 +1,56 @@
+.global-usage { display: flex; flex-direction: column; gap: var(--s-8); min-width: 0; }
+.usage-report:not([hidden]) { display: flex; flex-direction: column; gap: var(--s-8); min-width: 0; }
+.usage-toolbar { gap: var(--s-4) var(--s-8); }
+.usage-group { display: flex; align-items: center; gap: var(--s-3); }
+.usage-sep { width: 0; align-self: stretch; border-left: var(--rule); }
+.usage-faint { color: var(--faint); font-size: var(--fs-3); }
+.usage-muted { color: var(--muted); }
+
+/* Multi-select filter: a selector-like summary with a floating checklist. */
+.usage-filter { position: relative; }
+.usage-filter > summary { list-style: none; }
+.usage-filter > summary::-webkit-details-marker { display: none; }
+.usage-filter-value { font-size: var(--fs-5); color: var(--text); white-space: nowrap; }
+.usage-filter-options {
+  position: absolute; z-index: var(--z-sticky); top: calc(100% + var(--s-2)); left: 0; min-width: 220px; max-width: 320px; max-height: 320px; overflow: auto;
+  display: flex; flex-direction: column; gap: var(--s-4); padding: var(--s-5) var(--s-6); font-size: var(--fs-4);
+  background: var(--surface); border: 1px solid var(--pencil); border-radius: var(--r-card); box-shadow: var(--shadow);
+}
+.usage-filter-options input[type="search"] { border: 1px solid var(--line2); border-radius: var(--r-chip); padding: var(--s-2) var(--s-4); background: var(--surface); color: var(--text); font: inherit; outline: none; }
+.usage-filter-options input[type="search"]:focus { border-color: var(--accent); }
+.usage-check { display: flex; gap: var(--s-3); align-items: center; overflow-wrap: anywhere; }
+.usage-check input { accent-color: var(--accent); }
+
+.usage-tile-stack { margin-top: var(--s-4); }
+
+.usage-legend { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--s-3) var(--s-8); font-size: var(--fs-3); color: var(--muted); }
+.usage-legend > span { display: inline-flex; align-items: center; gap: var(--s-3); white-space: nowrap; }
+.usage-legend i { display: inline-block; width: 9px; height: 9px; border-radius: var(--r-bar); flex-shrink: 0; }
+.usage-bar { cursor: pointer; outline: none; }
+.usage-bar-hit { fill: transparent; }
+.usage-bar:hover .usage-bar-hit, .usage-bar:focus-visible .usage-bar-hit { fill: var(--accent-soft); }
+
+.usage-share { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: var(--s-4); align-items: center; min-width: 160px; }
+.usage-share-bar { height: 8px; border-radius: var(--r-bar); }
+.usage-share > span { text-align: right; font-family: var(--font-figure); letter-spacing: -0.02em; }
+.usage-expand { cursor: pointer; background: none; color: var(--text); border: 0; font: inherit; padding: 0; text-align: left; white-space: nowrap; }
+.usage-expand > b { font-weight: var(--fw-semibold); }
+.usage-model { padding-left: 18px; color: var(--muted); }
+.usage-empty { padding: var(--s-9); color: var(--muted); }
+.usage-note { margin-top: var(--s-4); font-size: var(--fs-3); line-height: 1.6; color: var(--faint); }
+
+/* Folded secondary sections with their key numbers in the summary line: a card of their own. */
+.usage-fold { background: var(--surface); border: 1px solid var(--line2); border-radius: var(--r-card); }
+.usage-fold > summary { list-style: none; cursor: pointer; padding: var(--s-6) var(--s-9); display: flex; gap: var(--s-6); align-items: baseline; font-size: var(--fs-5); }
+.usage-fold > summary::-webkit-details-marker { display: none; }
+.usage-fold > summary::before { content: "▸"; color: var(--muted); }
+.usage-fold[open] > summary::before { content: "▾"; }
+.usage-fold > summary > b { font-weight: var(--fw-semibold); color: var(--text); }
+.usage-fold > summary > span { font-family: var(--font-sans); font-size: var(--fs-3); color: var(--muted); }
+.usage-fold-body { padding: var(--s-4) var(--s-9) var(--s-8); border-top: var(--rule); font-size: var(--fs-4); }
+/* On a frameless page the folds stand on the paper like its other blocks: a dashed rule above, no frame. */
+.ui-tab-page .usage-fold { background: none; border: 0; border-top: var(--rule); border-radius: 0; }
+.ui-tab-page .usage-fold > summary { padding-inline: 0; }
+.ui-tab-page .usage-fold-body { padding-inline: 0; border-top: 0; }
+/* The tiles' own rule already closes them; the chart under it needs no second line. */
+.usage-report > .ui-kpi-strip + .ui-card { border-top: 0; padding-top: 0; }

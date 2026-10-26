@@ -1,0 +1,497 @@
+/* Scale tokens from docs/design/tokens-sync.css, restyled for the paper atlas
+   (docs/design/paper-atlas.md). They live here because tokens.css and index.css are
+   hash-locked by approved-layout.test.ts. */
+:root {
+  /* Titles speak Plex Sans semibold; the wordmark is Plex Sans too (Kalam retired 2026-10-09). */
+  --font-display: var(--font-sans);
+  --font-brand: var(--font-sans);
+  --fw-display: 600;
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-figure: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Former mono text is data text in Plex Sans; true read-outs use --font-figure. */
+  --font-mono: var(--font-sans);
+  --fs-1: 10px; --fs-2: 11px; --fs-3: 12px; --fs-4: 12.5px; --fs-5: 13.5px;
+  --fs-6: 15px; --fs-7: 18px; --fs-8: 24px; --fs-9: 32px; --fs-10: 52px;
+  --fs-title: 22px; --fs-card-title: 15px; --fs-section: 16px; --fs-readout: 15px;
+  --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700;
+  --ls-display: -0.035em; --ls-tight: -0.02em; --ls-figure: -0.04em; --ls-wide: 0.02em;
+  --ls-caps: 0; --ls-caps-lg: 0;
+  --s-px: 1px; --s-1: 2px; --s-2: 4px; --s-3: 6px; --s-4: 8px; --s-5: 10px;
+  --s-6: 12px; --s-7: 14px; --s-8: 16px; --s-9: 20px; --s-10: 24px;
+  --s-11: 32px; --s-12: 40px;
+  /* Pencilled corners: irregular on purpose, like the product page. */
+  --r-card: 5px 12px 6px 10px / 10px 5px 11px 5px;
+  --r-control: 4px 9px 5px 8px / 8px 4px 9px 5px;
+  --r-chip: 4px 8px 5px 7px;
+  --r-bar: 3px 5px 2px 4px;
+  --r-dot: 47% 53% 42% 58%;
+  --r-xs: var(--r-bar); --r-sm: var(--r-chip); --r-md: var(--r-chip); --r-lg: var(--r-card); --r-xl: var(--r-card);
+  --r-pill: var(--r-chip); --r-circle: 50%;
+  /* Clickable things sit on a flat pencil shadow; pressed ones sink. */
+  /* Flat by decision: an offset shadow bends into a side stripe on rounded corners (user, 2026-10-08). */
+  --lift: 0 0 0 transparent;
+  --lift-pressed: 0 0 0 transparent;
+  --rule: 1px dashed var(--line);
+  --hatch-fill: repeating-linear-gradient(115deg, transparent 0 3px, var(--hatch) 3px 4px);
+  --z-sticky: 5; --z-header: 14; --z-drawer: 20; --z-overlay: 30;
+}
+
+/* Read-outs: large figures in Plex Mono with tight tracking, as on the product page. */
+.ui-figure { font-family: var(--font-figure); font-weight: var(--fw-medium); letter-spacing: var(--ls-figure); font-variant-numeric: tabular-nums; }
+
+/* Display voice: titles and readout labels. */
+.ui-display { font-family: var(--font-display); font-weight: var(--fw-display); letter-spacing: -0.01em; }
+
+/* Tab and button labels never break inside a segment. */
+button.mono { white-space: nowrap; }
+
+/* Caption in front of a control: Period [selector]. Sentence case, no caps tracking. */
+.ui-field { display: flex; align-items: center; gap: var(--s-4); }
+.ui-field-label { font-size: var(--fs-3); color: var(--muted); font-weight: var(--fw-regular); white-space: nowrap; }
+
+.ui-toolbar { display: flex; align-items: center; gap: var(--s-4) var(--s-6); flex-wrap: wrap; }
+.ui-spacer { flex: 1 1 auto; }
+
+/* Recessed well opened by a disclosure: paper well, no frame. */
+.ui-inset {
+  display: flex; align-items: center; gap: var(--s-4) var(--s-6); flex-wrap: wrap;
+  padding: var(--s-5) var(--s-6); border-radius: var(--r-chip); background: var(--sunk);
+}
+.ui-inset[hidden] { display: none; }
+
+/* Text-only buttons: "▸ Filters", "Complete data / events". */
+.ui-disclosure, .ui-link-button {
+  border: 0; background: transparent; padding: 0; font-family: var(--font-sans); font-size: var(--fs-4);
+  font-weight: var(--fw-medium); cursor: pointer; white-space: nowrap;
+}
+.ui-disclosure { color: var(--text); }
+.ui-link-button { color: var(--text); text-decoration: underline; text-decoration-color: var(--line2); text-underline-offset: 4px; }
+.ui-link-button:hover { color: var(--accent); text-decoration-color: var(--accent); }
+/* "show all / hide all" beside an on/off legend: smaller and quieter than the entries it switches. */
+.ui-legend-all {
+  border: 0; background: transparent; padding: 0; font-family: var(--font-sans); font-size: var(--fs-2); color: var(--muted);
+  cursor: pointer; white-space: nowrap; text-decoration: underline; text-decoration-color: var(--line2); text-underline-offset: 4px;
+}
+.ui-legend-all:hover { color: var(--accent); text-decoration-color: var(--accent); }
+.ui-legend-all:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* A table row's on/off switch when the table is a chart's legend: the dot in the series colour, hollow when hidden. */
+.ui-legend-dot { border: 0; background: transparent; padding: 0 var(--s-1); font-size: var(--fs-3); line-height: 1; cursor: pointer; }
+.ui-legend-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Every checkbox is one pencilled paper box: checked fills in accent with a paper tick, mixed shows a short bar.
+   Geometry is forced because drawers size their form fields full width (AccountPeriodsSettings.css). */
+input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none; display: inline-grid; place-content: center; flex: none;
+  width: 14px !important; height: 14px !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important;
+  border: 1px solid var(--pencil); border-radius: var(--r-bar); background: var(--surface);
+  vertical-align: -2px; cursor: pointer; transition: background-color .15s, border-color .15s;
+}
+input[type="checkbox"]::before {
+  content: ""; width: 8px; height: 8px; background: var(--accent-ink); transform: scale(0); transition: transform .12s;
+  clip-path: polygon(14% 44%, 0 65%, 45% 100%, 100% 18%, 82% 2%, 42% 64%);
+}
+input[type="checkbox"]:hover:not(:disabled) { border-color: var(--accent); }
+input[type="checkbox"]:checked { border-color: var(--accent); background: var(--accent); }
+input[type="checkbox"]:checked::before { transform: scale(1); }
+input[type="checkbox"]:indeterminate { border-color: var(--accent); background: var(--accent-soft); }
+input[type="checkbox"]:indeterminate::before { height: 2px; clip-path: none; background: var(--accent); transform: scale(1); }
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="checkbox"]:disabled { opacity: .5; cursor: default; }
+/* A row of on/off filters (CheckGroup): unchecked labels recede, the all/none switch stands first behind a rule. */
+.ui-checks { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--s-3) var(--s-7); font-size: var(--fs-3); }
+.ui-checks > .ui-legend-all { padding-right: var(--s-7); border-right: var(--rule); }
+.ui-check { display: inline-flex; align-items: center; gap: var(--s-3); color: var(--muted); cursor: pointer; white-space: nowrap; }
+.ui-check:has(> input:checked) { color: var(--text); }
+.ui-check:hover { color: var(--accent); }
+
+/* Buttons: the product page's pencilled button. */
+.ui-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s-3);
+  padding: var(--s-3) var(--s-6); border: 1px solid var(--pencil); border-radius: var(--r-control);
+  background: var(--surface); color: var(--text); box-shadow: var(--lift);
+  font-family: var(--font-sans); font-size: var(--fs-4); font-weight: var(--fw-medium); line-height: 1.3;
+  cursor: pointer; white-space: nowrap; transition: background-color .15s, color .15s;
+}
+.ui-button:hover { background: var(--accent-soft); }
+.ui-button.is-primary { border-color: var(--accent); background: var(--accent-soft); font-size: var(--fs-6); font-weight: var(--fw-semibold); padding: var(--s-4) var(--s-8); }
+.ui-button.is-primary:hover { background: var(--accent); color: var(--accent-ink); }
+.ui-button[aria-pressed="true"], .ui-button[aria-expanded="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: var(--lift-pressed); }
+.ui-button:disabled { opacity: .5; cursor: default; box-shadow: none; background: var(--surface); }
+
+/* Inputs: paper field with a pencil edge. */
+.ui-input, .ui-date-input {
+  padding: var(--s-2) var(--s-4); border: 1px solid var(--line2); border-radius: var(--r-chip);
+  background: var(--surface); color: var(--text); font-family: var(--font-sans); font-size: var(--fs-4);
+  outline: none;
+}
+.ui-input:focus, .ui-date-input:focus { border-color: var(--accent); }
+.ui-input:disabled { background: var(--sunk); color: var(--faint); }
+.ui-input.is-invalid { border-color: var(--crit); }
+.ui-alert { font-size: var(--fs-4); color: var(--crit); }
+
+/* − value + */
+.ui-stepper {
+  display: flex; align-items: stretch; gap: 0;
+  border: 1px solid var(--line2); border-radius: var(--r-chip); overflow: hidden; background: var(--surface);
+}
+.ui-stepper > button, .ui-stepper > input {
+  padding: var(--s-1) var(--s-4); border: 0; background: transparent;
+  font-family: var(--font-figure); font-size: var(--fs-4);
+}
+.ui-stepper > button { color: var(--muted); cursor: pointer; }
+.ui-stepper > button:hover { color: var(--text); background: var(--accent-soft); }
+.ui-stepper > input { width: 46px; color: var(--text); text-align: center; outline: none; appearance: textfield; -moz-appearance: textfield; border-inline: var(--rule); }
+.ui-stepper > input::-webkit-inner-spin-button, .ui-stepper > input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Option groups read as tabs too (see .ui-tabs): labels on one rule, the chosen ones underlined. */
+.ui-choice { display: inline-flex; gap: var(--s-7); flex-wrap: wrap; border-bottom: 1px solid var(--line2); }
+.ui-choice > button {
+  margin-bottom: -1px; padding: var(--s-3) 0 var(--s-4); border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+  background: transparent; color: var(--muted); font-family: var(--font-sans); font-size: var(--fs-4);
+  font-weight: var(--fw-regular); cursor: pointer; white-space: nowrap; box-shadow: none;
+}
+.ui-choice > button:hover:not(:disabled) { color: var(--text); border-bottom-color: var(--line2); }
+.ui-choice > button[aria-pressed="true"] { color: var(--text); font-weight: var(--fw-medium); border-bottom-color: var(--accent); }
+.ui-choice > button:disabled { color: var(--faint); cursor: not-allowed; }
+
+/* Selector: a pencilled control with a caption in front. */
+.ui-selector {
+  display: inline-flex; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-5);
+  border: 1px solid var(--pencil); border-radius: var(--r-control); background: var(--surface);
+  box-shadow: var(--lift); cursor: pointer;
+}
+.ui-selector:hover { background: var(--accent-soft); }
+.ui-selector-label { font-size: var(--fs-3); color: var(--muted); }
+.ui-selector.is-disabled { cursor: default; box-shadow: none; background: var(--surface); }
+.ui-selector.is-disabled .ui-selector-field { color: var(--faint); }
+.ui-selector-caret { color: var(--pencil); font-size: var(--fs-2); }
+.ui-selector .ui-dropdown.ui-selector-field {
+  padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--text);
+  font-family: var(--font-sans); font-size: var(--fs-5); gap: var(--s-4);
+}
+.ui-selector.is-strong .ui-selector-field { font-weight: var(--fw-semibold); }
+/* Bare: a value in a chart's control row, beside the unit tabs; no field frame. */
+.ui-selector.is-bare { padding: var(--s-3) 0 var(--s-4); border: 0; background: transparent; box-shadow: none; }
+.ui-selector.is-bare .ui-selector-field { font-size: var(--fs-4); }
+/* The field keeps the longest option's width; the value hugs its caret at the row's right end. */
+.ui-selector.is-bare .ui-dropdown-box { justify-items: end; }
+.ui-selector.is-bare:hover .ui-selector-field { color: var(--accent); }
+
+/* Dropdown: a field whose list opens in the app's popover. The trigger takes its look from its class (ui-input by default). */
+.ui-dropdown {
+  display: inline-flex; align-items: center; justify-content: space-between; gap: var(--s-5); min-width: 0; max-width: 100%;
+  text-align: left; cursor: pointer; font: inherit; line-height: 1.4;
+}
+.ui-dropdown.ui-input { font-family: var(--font-sans); font-size: var(--fs-4); }
+.ui-dropdown:hover:not(:disabled) { border-color: var(--pencil); }
+.ui-dropdown:focus-visible, .ui-dropdown[aria-expanded="true"] { outline: none; border-color: var(--accent); }
+.ui-dropdown:disabled { cursor: default; }
+.ui-dropdown-box { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: minmax(0, max-content); }
+.ui-dropdown-box > * { grid-area: 1 / 1; }
+.ui-dropdown-sizer { visibility: hidden; height: 0; overflow: hidden; white-space: nowrap; }
+.ui-dropdown-sizer::before { content: attr(data-label); }
+.ui-dropdown-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-dropdown-value.is-empty { color: var(--muted); }
+.ui-dropdown-caret { flex: none; color: var(--pencil); font-size: var(--fs-2); }
+/* Present for form validation only; focusing it hands focus back to the trigger. */
+.ui-dropdown-required { position: absolute; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+.ui-picker-pop.ui-dropdown-pop { position: fixed; z-index: var(--z-overlay); top: auto; max-width: min(460px, calc(100vw - 16px)); }
+.ui-dropdown-pop .ui-picker-option { font-size: var(--fs-4); }
+.ui-picker-option.is-disabled { color: var(--faint); cursor: default; }
+
+/* Tabs: labels standing on one rule, the chosen one underlined in accent; no frames, no pressed paper.
+   A value switch (unit, range, order) keeps the rule under its own labels; section tabs run it across the area. */
+.ui-tabs { display: inline-flex; flex-wrap: wrap; gap: var(--s-7); padding: 0; background: transparent; border: 0; border-bottom: 1px solid var(--line2); }
+.ui-tab {
+  margin-bottom: -1px; padding: var(--s-3) 0 var(--s-4); border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+  background: transparent; box-shadow: none; color: var(--muted); font-family: var(--font-sans); font-size: var(--fs-4);
+  font-weight: var(--fw-regular); cursor: pointer; white-space: nowrap;
+}
+.ui-tab:hover:not(:disabled) { color: var(--text); border-bottom-color: var(--line2); }
+.ui-tab:is([aria-pressed="true"], [aria-selected="true"]) { color: var(--text); font-weight: var(--fw-medium); border-bottom-color: var(--accent); }
+.ui-tab-badge { color: var(--faint); font-weight: var(--fw-regular); margin-left: 5px; }
+.ui-tab:disabled { color: var(--faint); cursor: not-allowed; }
+.ui-tab[data-group-start] { position: relative; }
+.ui-tab[data-group-start]::before {
+  content: ""; position: absolute; left: calc(var(--s-8) / -2); top: 30%; bottom: 30%; border-left: 1px solid var(--line2); pointer-events: none;
+}
+.ui-tabs[data-variant="sections"] { display: flex; flex: 1 1 auto; gap: var(--s-9); }
+.ui-tabs[data-variant="sections"] .ui-tab { padding: var(--s-4) 0 var(--s-5); }
+/* Tabs that switch a page (user, 2026-10-14) stand on the double pencil rule, larger, the chosen one bolder on a
+   thicker accent line; value switches keep the single rule. The faint second line is askew like the product page's. */
+.ui-tabs:is([role="tablist"], [data-variant="sections"]) { position: relative; gap: var(--s-10); border-bottom-color: var(--pencil); }
+.ui-tabs:is([role="tablist"], [data-variant="sections"])::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -4px;
+  border-bottom: 1px solid var(--line); transform: rotate(-.12deg); pointer-events: none;
+}
+.ui-tabs:is([role="tablist"], [data-variant="sections"]) .ui-tab { font-size: var(--fs-6); border-bottom-width: 3px; }
+.ui-tabs:is([role="tablist"], [data-variant="sections"]) .ui-tab:is([aria-pressed="true"], [aria-selected="true"]) { font-weight: var(--fw-semibold); }
+/* Tabs under page tabs (user, 2026-10-17) belong to the tab chosen above: the second level keeps the value switch's
+   single rule and smaller labels, so only the first level stands on the double rule. A later sibling of the block
+   holding the page tabs is that tab's page. */
+:is(:has(> .ui-tabs[data-variant="sections"]), :has(> * > .ui-tabs[data-variant="sections"])) ~ * .ui-tabs:is([role="tablist"], [data-variant="sections"]) {
+  gap: var(--s-8); border-bottom-color: var(--line2);
+}
+:is(:has(> .ui-tabs[data-variant="sections"]), :has(> * > .ui-tabs[data-variant="sections"])) ~ * .ui-tabs:is([role="tablist"], [data-variant="sections"])::after { content: none; }
+:is(:has(> .ui-tabs[data-variant="sections"]), :has(> * > .ui-tabs[data-variant="sections"])) ~ * .ui-tabs:is([role="tablist"], [data-variant="sections"]) .ui-tab {
+  padding: var(--s-3) 0 var(--s-4); font-size: var(--fs-4); border-bottom-width: 2px;
+}
+:is(:has(> .ui-tabs[data-variant="sections"]), :has(> * > .ui-tabs[data-variant="sections"])) ~ * .ui-tabs:is([role="tablist"], [data-variant="sections"]) .ui-tab:is([aria-pressed="true"], [aria-selected="true"]) {
+  font-weight: var(--fw-medium);
+}
+/* A section tab's page: the tabs' rule already frames it (paper-atlas: no nested frames), so a card on it, like a card
+   inside a card, drops its frame and aligns with the tab labels. Blocks are divided by dashed rules instead. */
+.ui-tab-page { display: flex; flex-direction: column; gap: var(--s-8); min-width: 0; }
+:is([role="tabpanel"], .ui-tab-page, [data-screen="settings"], [data-screen="overview"]) .ui-card, .ui-card .ui-card {
+  border: 0; border-radius: 0; background: transparent; padding-inline: 0; padding-bottom: 0;
+  border-top: var(--rule); padding-top: var(--s-8);
+}
+/* The first block stands on the tabs' rule, and a section's card sits under its own title: no rule above either. */
+:is([role="tabpanel"], .ui-tab-page) > .ui-card:first-child,
+:is(.ui-tabs[data-variant="sections"], :has(.ui-tabs[data-variant="sections"])) + .ui-card,
+.ui-card :has(.ui-tabs[data-variant="sections"]) + .ui-card,
+.overview-section-content > .ui-card:first-child,
+[data-screen="overview"] .ui-kpi-strip + .ui-card { border-top: 0; padding-top: 0; }
+.ui-card[data-frame="none"] { border: 0; border-radius: 0; background: transparent; padding-inline: 0; padding-top: 0; }
+[role="tabpanel"] .overview-section + .overview-section { border-top: var(--rule); padding-top: var(--s-8); }
+
+/* Pills and tags: small pencilled chips in a status ink. */
+.ui-pill {
+  display: inline-flex; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-4);
+  border: 1px solid var(--line2); border-radius: var(--r-chip); background: var(--surface); color: var(--text);
+  font-family: var(--font-sans); font-size: var(--fs-3); font-weight: var(--fw-medium); line-height: 1.4; white-space: nowrap;
+}
+.ui-pill.is-neutral { color: var(--muted); }
+.ui-pill-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: var(--r-dot); background: var(--pill-tone, currentColor); }
+.ui-tag {
+  display: inline-flex; padding: 0 var(--s-3); border: 1px dashed var(--line2); border-radius: var(--r-chip);
+  color: var(--muted); font-family: var(--font-sans); font-size: var(--fs-2); line-height: 1.6; white-space: nowrap;
+}
+
+/* Meter: a hatched fill in a recessed paper track. */
+.ui-bar { background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r-bar); overflow: hidden; }
+.ui-bar-fill { height: 100%; transition: width .3s ease; }
+
+/* Tables: a solid rule under the head, dashed rules between rows. */
+.ui-table-wrap { overflow-x: auto; }
+.ui-table { width: 100%; border-collapse: collapse; font-size: var(--fs-4); }
+.ui-table.is-fixed { table-layout: fixed; }
+.ui-th {
+  padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--line2);
+  color: var(--muted); font-family: var(--font-sans); font-size: var(--fs-3); font-weight: var(--fw-regular);
+  white-space: nowrap;
+}
+.ui-td { padding: var(--s-4) var(--s-5); border-bottom: var(--rule); white-space: nowrap; }
+.ui-td.is-num { font-family: var(--font-figure); letter-spacing: -0.02em; }
+.ui-table tr:last-child > .ui-td { border-bottom: 0; }
+
+/* Empty and error states: a dashed sheet, never a coloured slab. */
+.ui-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-3);
+  padding: var(--s-11) var(--s-9); text-align: center; border: 1px dashed var(--line2); border-radius: var(--r-card);
+}
+.ui-empty-title { font-family: var(--font-display); font-weight: var(--fw-display); font-size: var(--fs-section); color: var(--text); }
+.ui-empty-detail { font-size: var(--fs-4); color: var(--muted); max-width: 460px; line-height: 1.55; }
+/* Inside a card there is no second frame: an empty state is a recessed well with a quiet title. */
+.ui-card .ui-empty { border: 0; background: var(--sunk); border-radius: var(--r-chip); padding: var(--s-9) var(--s-8); }
+.ui-card .ui-empty-title { font-family: var(--font-sans); font-size: var(--fs-5); font-weight: var(--fw-semibold); }
+.ui-error {
+  display: flex; align-items: center; gap: var(--s-6); padding: var(--s-7) var(--s-8);
+  border: 1px dashed var(--crit); border-radius: var(--r-card); background: var(--crit-soft);
+}
+.ui-error-mark { color: var(--crit); font-size: var(--fs-6); }
+.ui-error-title { font-size: var(--fs-5); font-weight: var(--fw-semibold); color: var(--crit); }
+.ui-error-detail { font-size: var(--fs-3); color: var(--muted); word-break: break-word; }
+
+/* "?" explanation dot; the explanation opens on hover or focus. */
+.ui-help { display: inline-flex; align-items: center; vertical-align: middle; }
+.ui-help-dot {
+  width: 16px; height: 16px; flex: 0 0 16px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--pencil); border-radius: var(--r-dot); background: transparent; color: var(--muted);
+  font-family: var(--font-sans); font-size: var(--fs-2); line-height: 1; cursor: help;
+}
+.ui-help-dot:hover, .ui-help-dot[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+.ui-help-pop {
+  position: fixed; z-index: 400; width: min(352px, calc(100vw - 16px)); box-sizing: border-box;
+  padding: var(--s-6) var(--s-7); background: var(--surface); border: 1px solid var(--pencil); border-radius: var(--r-card);
+  box-shadow: var(--lift), var(--shadow); font-family: var(--font-sans); font-size: var(--fs-4); font-weight: var(--fw-regular);
+  line-height: 1.6; letter-spacing: normal; text-transform: none; color: var(--muted); white-space: pre-line; text-align: left;
+  pointer-events: none;
+}
+.ui-help-pop[hidden] { display: none; }
+.ui-help-block { display: block; }
+.ui-help-block + .ui-help-block { margin-top: var(--s-3); }
+.ui-help-title { display: block; color: var(--text); font-weight: var(--fw-semibold); margin-bottom: var(--s-2); }
+
+/* Loading inside a panel: one quiet status line over a placeholder shaped like the coming content. */
+.ui-loading-status { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2) var(--s-4); min-height: 18px; }
+.ui-loading-spinner {
+  width: 12px; height: 12px; flex: 0 0 12px; border-radius: var(--r-circle); box-sizing: border-box;
+  border: 1.5px solid var(--line2); border-top-color: var(--accent); animation: ta-spin .9s linear infinite;
+}
+.ui-loading-label { font-size: var(--fs-4); color: var(--muted); }
+.ui-loading-elapsed { font-size: var(--fs-3); color: var(--faint); }
+.ui-loading-hint { flex-basis: 100%; padding-left: 20px; font-size: var(--fs-3); color: var(--faint); }
+.ui-skel { display: block; border-radius: var(--r-bar); background: color-mix(in oklab, var(--line) 70%, var(--surface)); animation: ta-pulse 1.8s ease-in-out infinite; }
+.ui-skel-block { display: flex; flex-direction: column; gap: var(--s-6); flex: 1 1 auto; min-height: 0; }
+.ui-skel-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+.ui-skel-kpi { display: flex; flex-direction: column; padding: var(--s-6) var(--s-8); }
+.ui-skel-kpi + .ui-skel-kpi { border-left: var(--rule); }
+.ui-skel-chart {
+  flex: none; flex-direction: row; align-items: flex-end; gap: var(--s-3);
+  padding: 0 0 var(--s-1); border-bottom: 1px solid var(--line2);
+  background: repeating-linear-gradient(to top, transparent 0 calc(25% - 1px), var(--line) calc(25% - 1px) 25%);
+}
+.ui-skel-chart > .ui-skel { flex: 1 1 0; border-radius: var(--r-bar); }
+.ui-skel-table { gap: 0; }
+.ui-skel-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1.4fr; gap: var(--s-8); align-items: center; height: 34px; border-bottom: var(--rule); }
+.ui-skel-row > .ui-skel { height: 9px; }
+.ui-skel-row.is-head { height: 28px; border-bottom: 1px solid var(--line2); }
+.ui-skel-row.is-head > .ui-skel { height: 6px; opacity: .7; }
+.ui-skel-lines { gap: var(--s-4); }
+.ui-skel-lines > .ui-skel { height: 9px; }
+@media (prefers-reduced-motion: reduce) {
+  .ui-loading-spinner { animation: none; border-color: var(--accent); }
+  .ui-skel { animation: none; }
+}
+
+/* Series colours of the Capacity measures, as inks on paper. They differ from the plan colours
+   (ok / accent / violet / grey), so a bar is never read as a plan. */
+:root, [data-theme="dark"] { --measure-api: #8bb6e8; --measure-credits: #ee9f74; --measure-tokens: #86cfa5; }
+[data-theme="light"] { --measure-api: #2f6aa8; --measure-credits: #b8562a; --measure-tokens: #2d7a57; }
+
+/* Picker: a grouped list in the app's own popover (subscription choice). */
+.ui-picker { position: relative; display: inline-flex; }
+.ui-picker-trigger { font: inherit; color: var(--text); text-align: left; }
+.ui-picker-value { font-size: var(--fs-5); font-weight: var(--fw-semibold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
+.ui-picker-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: var(--r-dot); }
+.ui-picker-tag {
+  padding: 0 var(--s-3); border: 1px solid var(--line2); border-radius: var(--r-chip);
+  font-size: var(--fs-2); font-weight: var(--fw-regular); color: var(--muted); white-space: nowrap;
+}
+.ui-picker-pop {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: var(--z-drawer); min-width: 100%; width: max-content; max-width: 460px;
+  padding: var(--s-3); background: var(--surface); border: 1px solid var(--pencil); border-radius: var(--r-card);
+  box-shadow: var(--lift), var(--shadow);
+}
+.ui-picker-search { width: 100%; margin-bottom: var(--s-3); }
+.ui-picker-list { list-style: none; margin: 0; padding: 0; max-height: min(60vh, 520px); overflow-y: auto; }
+.ui-picker-group {
+  display: flex; align-items: center; gap: var(--s-3); padding: var(--s-4) var(--s-4) var(--s-2);
+  font-size: var(--fs-3); font-weight: var(--fw-semibold); color: var(--muted);
+}
+.ui-picker-group:not(:first-child) { margin-top: var(--s-2); border-top: var(--rule); }
+.ui-picker-count { margin-left: auto; font-weight: var(--fw-regular); color: var(--faint); }
+.ui-picker-sub { padding: var(--s-2) var(--s-4) var(--s-1) calc(var(--s-4) + 14px); font-size: var(--fs-2); color: var(--faint); }
+.ui-picker-option {
+  display: flex; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-4) var(--s-3) calc(var(--s-4) + 14px);
+  border-radius: var(--r-chip); font-size: var(--fs-5); color: var(--text); cursor: pointer;
+}
+.ui-picker-option.is-root { padding-left: var(--s-4); }
+.ui-picker-option.is-active { background: var(--raised); }
+.ui-picker-option[aria-selected="true"] { background: var(--accent-soft); font-weight: var(--fw-semibold); }
+.ui-picker-option.is-muted { color: var(--muted); }
+.ui-picker-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-picker-check { width: 12px; color: var(--accent); }
+.ui-picker-empty { padding: var(--s-5) var(--s-4); color: var(--muted); font-size: var(--fs-4); }
+
+/* Workspace (paper-atlas §7, user 2026-10-12): a list on the paper and the chosen item on a lighter frameless sheet that
+   the selected row joins. Each column scrolls on its own; the height comes from useFillHeight. */
+.ui-workspace { display: grid; grid-template-columns: 288px minmax(0, 1fr); align-items: stretch; min-height: 0; }
+.ui-workspace-rail { min-height: 0; padding: 0 var(--s-2) var(--s-8) 0; overflow-y: auto; overscroll-behavior: contain; }
+.ui-workspace-sheet { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 var(--s-10) var(--s-10); background: var(--surface); border-radius: var(--r-card); }
+.ui-rail-group { margin-top: var(--s-9); }
+.ui-rail-heading { display: flex; align-items: center; gap: var(--s-3); margin: 0 0 var(--s-3) var(--s-6); color: var(--text); font-size: var(--fs-3); font-weight: var(--fw-semibold); }
+.ui-rail-heading > i { width: 7px; height: 7px; border-radius: var(--r-dot); }
+.ui-rail-heading > span { color: var(--faint); font-weight: var(--fw-regular); }
+/* A rail row: name and a flag on the first line, a meta line and an optional strip on the second. */
+.ui-rail-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 3px var(--s-5); width: 100%; text-align: left;
+  border: 0; border-top: var(--rule); border-radius: 0; padding: var(--s-5) var(--s-6); background: none; color: var(--text); cursor: pointer; font: inherit; }
+.ui-rail-group > :first-child + * > .ui-rail-item, .ui-rail-group > .ui-rail-heading + .ui-rail-item { border-top: 0; }
+.ui-rail-item > strong { min-width: 0; font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-rail-item > span { min-width: 0; color: var(--muted); font-size: var(--fs-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ui-rail-item b { color: var(--text); font-weight: var(--fw-semibold); }
+.ui-rail-item.is-quiet :is(strong, span, b) { color: var(--faint); font-weight: var(--fw-regular); }
+.ui-rail-item:hover:not(:disabled) { background: var(--raised); }
+/* The picked row is a tab of the sheet: it crosses the rail's gutter, takes the sheet's fill and is outlined against the page. */
+.ui-rail-item[aria-pressed="true"], .ui-rail-item[aria-pressed="true"]:hover { background: var(--band); border-radius: var(--r-chip) 0 0 var(--r-chip);
+  width: calc(100% + var(--s-2)); margin-right: calc(-1 * var(--s-2)); box-shadow: inset 1px 1px 0 var(--line2), inset 0 -1px 0 var(--line2); }
+.ui-rail-item[aria-pressed="true"] > strong { font-weight: var(--fw-semibold); }
+.ui-rail-item:disabled { cursor: default; opacity: .5; }
+.ui-rail-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ui-rail-flag { color: var(--warn); }
+.ui-rail-flag::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: var(--s-2); border-radius: var(--r-dot); background: currentColor; vertical-align: 1px; }
+.ui-rail-flag.is-crit { color: var(--crit); }
+.ui-rail-flag.is-ok { color: var(--ok); }
+/* The sheet's head: a provider eyebrow over the item's name, its action on the right. */
+.ui-sheet-head { display: flex; justify-content: space-between; gap: var(--s-9); align-items: flex-start; padding-top: var(--s-5); }
+.ui-sheet-head h3 { margin: 2px 0 0; font-size: var(--fs-section); font-weight: var(--fw-semibold); }
+.ui-sheet-head > button, .ui-sheet-head > .ui-toolbar { flex: none; }
+.ui-sheet-eyebrow { color: var(--muted); font-size: var(--fs-3); font-weight: var(--fw-medium); }
+
+/* Facts: labelled values in one row between dashed rules. */
+.ui-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin: var(--s-8) 0 0; border-top: var(--rule); border-bottom: var(--rule); }
+.ui-fact { min-width: 0; margin: 0; padding: var(--s-6) var(--s-8); }
+.ui-fact:first-child { padding-left: 0; }
+.ui-fact + .ui-fact { border-left: var(--rule); }
+.ui-fact dt { color: var(--muted); font-size: var(--fs-3); font-weight: var(--fw-medium); }
+.ui-fact dd { margin: 0; }
+.ui-fact .ui-fact-value { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-5); margin-top: 3px; font-size: var(--fs-6); }
+.ui-fact-value strong { font-weight: var(--fw-semibold); }
+.ui-fact .ui-fact-note { margin-top: 2px; color: var(--muted); font-size: var(--fs-3); overflow-wrap: anywhere; }
+.ui-fact.is-warn .ui-fact-value { color: var(--warn); }
+.ui-fact.is-crit .ui-fact-value { color: var(--crit); }
+
+/* Detail tabs: one switcher with labelled groups instead of stacked folds; one panel is always open. */
+.ui-detail-tabs { margin-top: var(--s-10); }
+.ui-detail-tabs > .ui-tabs { align-items: flex-end; gap: var(--s-7); }
+.ui-detail-group { padding-bottom: var(--s-5); margin-right: calc(-1 * var(--s-5)); color: var(--faint); font-size: var(--fs-3); white-space: nowrap; }
+.ui-detail-group.is-split { margin-left: var(--s-4); padding-left: var(--s-9); border-left: 1px solid var(--line2); }
+.ui-detail-tabs > [role="tabpanel"] { padding-top: var(--s-6); min-width: 0; }
+/* A page's content without a rail stands on the same lighter sheet as a workspace's chosen item. */
+.ui-sheet { min-width: 0; padding: var(--s-6) var(--s-10) var(--s-10); background: var(--surface); border-radius: var(--r-card); }
+.ui-sheet > .ui-detail-tabs:first-child { margin-top: 0; }
+
+/* A value that is not there (no rate, no estimate): faint ink, said in words rather than a bare dash. */
+.ui-missing { color: var(--faint); }
+
+/* Open rows: a row whose detail opens in a side drawer (`.ui-detail-drawer`). The row button carries the label and a
+   faint `›`; the whole row is the target. Hover is --raised, the opened row keeps --accent-soft (paper-atlas §7). */
+.ui-open-row { cursor: pointer; }
+.ui-open-row:hover > :is(.ui-td, td) { background: var(--raised); }
+.ui-open-row.is-selected > :is(.ui-td, td) { background: var(--accent-soft); }
+/* The button adds no frame or wash of its own, so it can wrap a chip as well as plain text. */
+.ui-open-row-button {
+  padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-weight: var(--fw-medium); cursor: pointer; white-space: nowrap;
+}
+.ui-open-row-button > [aria-hidden="true"] { color: var(--faint); }
+.ui-open-row:hover .ui-open-row-button, .ui-open-row-button:focus-visible,
+.ui-open-row:hover .ui-open-row-button > [aria-hidden="true"], .ui-open-row-button:focus-visible > [aria-hidden="true"] { color: var(--accent); }
+.ui-open-row-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Detail drawer (`.ui-detail-drawer`, opened from `.ui-open-row`): facts on top, then sections divided by dashed rules.
+   Every row-detail drawer reads the same way, whatever it shows (paper-atlas §7). */
+.codex-columns-drawer.ui-detail-drawer { width: min(860px, 100vw); }
+/* The scroll shading of wide tables must match the sheet behind them. */
+.ui-detail-drawer { --shade: var(--surface); }
+.ui-detail-drawer .codex-columns-drawer__body { min-width: 0; }
+.ui-detail-drawer .ui-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 0; }
+.ui-detail-drawer .ui-fact:nth-child(4n + 1) { padding-left: 0; border-left: 0; }
+.ui-detail-drawer .ui-fact:nth-child(n + 5) { border-top: var(--rule); }
+.ui-detail-drawer .ui-fact-value { overflow-wrap: anywhere; }
+/* Consecutive facts join into one block: one rule between them, none doubled. */
+.ui-detail-drawer .ui-facts + .ui-facts { border-top: 0; }
+.ui-detail-drawer .codex-columns-drawer__body > section { min-width: 0; padding: var(--s-9) 0; border-top: var(--rule); }
+.ui-detail-drawer .codex-columns-drawer__body > .ui-facts + section { border-top: 0; }
+.ui-detail-drawer .codex-columns-drawer__body > section:last-child { padding-bottom: 0; }
+/* Model details may place their sections inside a tab panel. */
+.ui-detail-drawer .codex-columns-drawer__body > [role="tabpanel"] > section { min-width: 0; padding: var(--s-9) 0; }
+.ui-detail-drawer [role="tabpanel"] > section + section { border-top: var(--rule); }
+/* A section inside a section (the evidence disclosures) keeps the rule, with less air. */
+.ui-detail-drawer section section { padding-top: var(--s-6); border-top: var(--rule); }
+.ui-detail-drawer :is(section > h3, section > h4) {
+  margin: 0 0 var(--s-4); font-size: var(--fs-5); font-weight: var(--fw-semibold); color: var(--text); white-space: normal;
+}
+/* Tables line up with the headings and fit the drawer's width before they scroll. */
+.ui-detail-drawer .ui-table :is(th, td):first-child { padding-left: 0; }
+.ui-detail-drawer .ui-table :is(th, td):last-child { padding-right: 0; }

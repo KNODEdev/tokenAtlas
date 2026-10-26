@@ -1,0 +1,494 @@
+{
+  "_comment": [
+    "Shared provider reset announcements used as evidence for classifying window ends; not proof of receipt by an account.",
+    "Codex tracker times may be post or propagation times. Approximate entries only support probable matches."
+  ],
+  "verified_at": "2026-10-11",
+  "resets": [
+    {
+      "id": "codex-2026-10-11T04:01-reset",
+      "provider": "codex",
+      "at": "2026-10-11T04:01:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2109132167112782291"
+    },
+    {
+      "id": "codex-2026-10-08T03:44-banked",
+      "provider": "codex",
+      "at": "2026-10-08T03:44:00.000Z",
+      "kind": "banked",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2108040921044639779"
+    },
+    {
+      "id": "codex-2026-10-07T03:35-reset",
+      "provider": "codex",
+      "at": "2026-10-07T03:35:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2107676072871600470"
+    },
+    {
+      "id": "codex-2026-10-02T21:18-reset",
+      "provider": "codex",
+      "at": "2026-10-02T21:18:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2106131810921136451"
+    },
+    {
+      "id": "codex-2026-09-29T19:00-banked",
+      "provider": "codex",
+      "at": "2026-09-29T19:00:00.000Z",
+      "kind": "banked",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2105120226027450685"
+    },
+    {
+      "id": "codex-2026-09-26T18:17-reset",
+      "provider": "codex",
+      "at": "2026-09-26T18:17:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2103911959544610829"
+    },
+    {
+      "id": "codex-2026-09-22T18:23-banked",
+      "provider": "codex",
+      "at": "2026-09-22T18:23:00.000Z",
+      "kind": "banked",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2102463847714247142"
+    },
+    {
+      "id": "codex-2026-09-12T08:09-reset",
+      "provider": "codex",
+      "at": "2026-09-12T08:09:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2098685367058612394"
+    },
+    {
+      "id": "codex-2026-09-08T01:56-reset",
+      "provider": "codex",
+      "at": "2026-09-08T01:56:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2097174560412246215"
+    },
+    {
+      "id": "codex-2026-09-05T00:39-banked",
+      "provider": "codex",
+      "at": "2026-09-05T00:39:00.000Z",
+      "kind": "banked",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2096035437299237298"
+    },
+    {
+      "id": "codex-2026-09-03T23:12-banked",
+      "provider": "codex",
+      "at": "2026-09-03T23:12:00.000Z",
+      "kind": "banked",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2095651088502591861"
+    },
+    {
+      "id": "codex-2026-08-31T02:29-reset",
+      "provider": "codex",
+      "at": "2026-08-31T02:29:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2094251180121854309"
+    },
+    {
+      "id": "codex-2026-08-29T20:43-reset",
+      "provider": "codex",
+      "at": "2026-08-29T20:43:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2093801758665715784"
+    },
+    {
+      "id": "codex-2026-08-27T16:35-reset",
+      "provider": "codex",
+      "at": "2026-08-27T16:35:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2093014447833116908"
+    },
+    {
+      "id": "codex-2026-08-25T14:30-reset",
+      "provider": "codex",
+      "at": "2026-08-25T14:30:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2092311059197808936"
+    },
+    {
+      "id": "codex-2026-08-24T00:46-reset",
+      "provider": "codex",
+      "at": "2026-08-24T00:46:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2091688655828246890"
+    },
+    {
+      "id": "codex-2026-08-21T11:43-banked",
+      "provider": "codex",
+      "at": "2026-08-21T11:43:00.000Z",
+      "kind": "banked",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2090766694897619318"
+    },
+    {
+      "id": "codex-2026-08-13T01:01-reset",
+      "provider": "codex",
+      "at": "2026-08-13T01:01:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2087706104814023111"
+    },
+    {
+      "id": "codex-2026-08-11T00:27-reset",
+      "provider": "codex",
+      "at": "2026-08-11T00:27:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2086972802457063486"
+    },
+    {
+      "id": "codex-2026-08-08T20:29-reset",
+      "provider": "codex",
+      "at": "2026-08-08T20:29:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2086188036493344823"
+    },
+    {
+      "id": "codex-2026-08-01T03:32-reset",
+      "provider": "codex",
+      "at": "2026-08-01T03:32:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2083395449814229287"
+    },
+    {
+      "id": "codex-2026-07-29T04:09-reset",
+      "provider": "codex",
+      "at": "2026-07-29T04:09:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2082317452755751098"
+    },
+    {
+      "id": "codex-2026-07-28T03:09-reset",
+      "provider": "codex",
+      "at": "2026-07-28T03:09:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2081940052154933696"
+    },
+    {
+      "id": "codex-2026-07-25T19:17-reset",
+      "provider": "codex",
+      "at": "2026-07-25T19:17:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2081096447718723984"
+    },
+    {
+      "id": "codex-2026-07-21T16:47-reset",
+      "provider": "codex",
+      "at": "2026-07-21T16:47:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2079609157934886975"
+    },
+    {
+      "id": "codex-2026-07-18T03:28-reset",
+      "provider": "codex",
+      "at": "2026-07-18T03:28:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2078320950488297917"
+    },
+    {
+      "id": "codex-2026-07-16T04:14-reset",
+      "provider": "codex",
+      "at": "2026-07-16T04:14:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2077607697487188198"
+    },
+    {
+      "id": "codex-2026-07-14T19:34-reset",
+      "provider": "codex",
+      "at": "2026-07-14T19:34:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2077114635308986427"
+    },
+    {
+      "id": "codex-2026-07-13T18:29-banked",
+      "provider": "codex",
+      "at": "2026-07-13T18:29:00.000Z",
+      "kind": "banked",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2076735790567338203"
+    },
+    {
+      "id": "codex-2026-07-12T21:28-banked",
+      "provider": "codex",
+      "at": "2026-07-12T21:28:00.000Z",
+      "kind": "banked",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2076418567143408112"
+    },
+    {
+      "id": "codex-2026-07-11T05:54-reset",
+      "provider": "codex",
+      "at": "2026-07-11T05:54:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2075820987833274448"
+    },
+    {
+      "id": "codex-2026-07-10T17:59-reset",
+      "provider": "codex",
+      "at": "2026-07-10T17:59:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2075641131002700120"
+    },
+    {
+      "id": "codex-2026-07-09T21:24-reset",
+      "provider": "codex",
+      "at": "2026-07-09T21:24:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2075330198887940337"
+    },
+    {
+      "id": "codex-2026-06-29T23:39-banked",
+      "provider": "codex",
+      "at": "2026-06-29T23:39:00.000Z",
+      "kind": "banked",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2071740419030053227"
+    },
+    {
+      "id": "codex-2026-06-28T23:54-reset",
+      "provider": "codex",
+      "at": "2026-06-28T23:54:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2071381664853319742"
+    },
+    {
+      "id": "codex-2026-06-26T23:39-reset",
+      "provider": "codex",
+      "at": "2026-06-26T23:39:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2070653282440405046"
+    },
+    {
+      "id": "codex-2026-06-18T00:10-reset",
+      "provider": "codex",
+      "at": "2026-06-18T00:10:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2067399435009622521"
+    },
+    {
+      "id": "codex-2026-06-18T00:10-banked",
+      "provider": "codex",
+      "at": "2026-06-18T00:10:00.000Z",
+      "kind": "banked",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2067399435009622521"
+    },
+    {
+      "id": "codex-2026-06-04T00:25-reset",
+      "provider": "codex",
+      "at": "2026-06-04T00:25:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2062329981548802523"
+    },
+    {
+      "id": "codex-2026-05-31T15:25-reset",
+      "provider": "codex",
+      "at": "2026-05-31T15:25:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2061106703446450392"
+    },
+    {
+      "id": "codex-2026-05-23T20:14-reset",
+      "provider": "codex",
+      "at": "2026-05-23T20:14:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2058280452851638313"
+    },
+    {
+      "id": "codex-2026-05-16T17:51-reset",
+      "provider": "codex",
+      "at": "2026-05-16T17:51:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2055707616605835333"
+    },
+    {
+      "id": "codex-2026-04-28T05:28-reset",
+      "provider": "codex",
+      "at": "2026-04-28T05:28:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2048997818673537399"
+    },
+    {
+      "id": "codex-2026-04-20T23:15-reset",
+      "provider": "codex",
+      "at": "2026-04-20T23:15:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2046367145588916687"
+    },
+    {
+      "id": "codex-2026-04-17T00:58-reset",
+      "provider": "codex",
+      "at": "2026-04-17T00:58:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2044943514832871564"
+    },
+    {
+      "id": "codex-2026-04-09T17:51-reset",
+      "provider": "codex",
+      "at": "2026-04-09T17:51:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2042299371602264319"
+    },
+    {
+      "id": "codex-2026-04-07T23:13-reset",
+      "provider": "codex",
+      "at": "2026-04-07T23:13:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2041655710346572085"
+    },
+    {
+      "id": "codex-2026-04-01T07:48-reset",
+      "provider": "codex",
+      "at": "2026-04-01T07:48:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2039248564967424483"
+    },
+    {
+      "id": "codex-2026-03-27T01:52-reset",
+      "provider": "codex",
+      "at": "2026-03-27T01:52:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2037346989244096581"
+    },
+    {
+      "id": "codex-2026-03-11T05:38-reset",
+      "provider": "codex",
+      "at": "2026-03-11T05:38:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2031605592352313567"
+    },
+    {
+      "id": "codex-2026-03-10T03:51-reset",
+      "provider": "codex",
+      "at": "2026-03-10T03:51:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2031216405266481489"
+    },
+    {
+      "id": "codex-2026-03-08T02:42-reset",
+      "provider": "codex",
+      "at": "2026-03-08T02:42:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2030474136024400173"
+    },
+    {
+      "id": "codex-2026-03-04T21:30-reset",
+      "provider": "codex",
+      "at": "2026-03-04T21:30:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2029308599835738218"
+    },
+    {
+      "id": "codex-2026-03-03T01:50-reset",
+      "provider": "codex",
+      "at": "2026-03-03T01:50:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://codex-resets.com/ https://x.com/thsottiaux/status/2028649088594436225"
+    },
+    {
+      "id": "codex-2026-08-10-reset-second",
+      "provider": "codex",
+      "at": "2026-08-10T22:00:00.000Z",
+      "kind": "reset",
+      "approximate": true,
+      "source": "https://community.openai.com/t/codex-rate-limits-reset-for-all-paid-plans-on-august-9-and-again-on-monday/1389643",
+      "note": "second reset late on Monday evening; time approximate"
+    },
+    {
+      "id": "claude-2026-05-15-reset",
+      "provider": "claude",
+      "at": "2026-05-15T14:00:00.000Z",
+      "kind": "reset",
+      "approximate": true,
+      "source": "https://x.com/ClaudeDevs/status/2055347539923308703",
+      "note": "about 14:00, time zone uncertain"
+    },
+    {
+      "id": "claude-2026-06-20-reset",
+      "provider": "claude",
+      "at": "2026-06-20T12:00:00.000Z",
+      "kind": "reset",
+      "approximate": true,
+      "source": "https://x.com/ClaudeDevs/status/2068122937308426676",
+      "note": "date approximate"
+    },
+    {
+      "id": "claude-2026-07-01-reset",
+      "provider": "claude",
+      "at": "2026-07-01T12:00:00.000Z",
+      "kind": "reset",
+      "approximate": true,
+      "source": "https://x.com/ClaudeDevs/status/2072429181565288665",
+      "note": "date only"
+    },
+    {
+      "id": "claude-2026-07-09-reset",
+      "provider": "claude",
+      "at": "2026-07-09T12:00:00.000Z",
+      "kind": "reset",
+      "approximate": true,
+      "source": "https://www.implicator.ai/anthropic-resets-claude-limits-for-third-week-without-explaining-why/",
+      "note": "secondary source, date only"
+    },
+    {
+      "id": "claude-2026-07-16-reset",
+      "provider": "claude",
+      "at": "2026-07-16T03:58:00.000Z",
+      "kind": "reset",
+      "approximate": false,
+      "source": "https://x.com/ClaudeDevs/status/2077603834453770467"
+    }
+  ]
+}

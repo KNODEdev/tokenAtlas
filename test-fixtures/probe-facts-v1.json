@@ -1,0 +1,12 @@
+{
+  "ts": "2026-09-01T12:00:00.000Z",
+  "subject": "codex1",
+  "reading": {
+    "kind": "primary", "group": "codex", "scope": null, "plan": "plus",
+    "reportedPercentSide": "used", "usedPercent": 42, "remainingPercent": null,
+    "allowance": null, "used": null, "remaining": null, "vendorPercent": 42,
+    "windowMinutes": 300, "resetsAt": "2026-09-01T17:00:00.000Z",
+    "rateLimitReached": false, "resetCredits": null, "profile": null, "ok": true,
+    "error": null, "extra": { "home": "fixture/a" }
+  }
+}

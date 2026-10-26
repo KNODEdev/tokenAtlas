@@ -1,0 +1,68 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap");
+/* Paper atlas (docs/design/paper-atlas.md): the product page's paper, ink and pencil palette. */
+:root,
+[data-theme="dark"] {
+  --bg: #18252b; --surface: #203038; --raised: #2a3b42; --sunk: #1c2b31; --band: #1e3036;
+  --line: #34494f; --line2: #4f666d; --pencil: #99b6be;
+  --text: #edf0e8; --muted: #b3c7c9; --faint: #8399a0;
+  --accent: #85d1e5; --accent-soft: #294a56; --accent-ink: #18252b; --violet: #bdb3df;
+  --ok: #93cbab; --ok-soft: rgba(147, 203, 171, 0.12);
+  --warn: #e2b866; --warn-soft: rgba(226, 184, 102, 0.13);
+  --crit: #f08f6b; --crit-soft: rgba(240, 143, 107, 0.13);
+  --claude: #e3a47c; --codex: #85d1e5; --gemini: #9ccfa8; --grok: #b7c3c5; --glm: #d0a3cc;
+  --hatch: rgba(24, 37, 43, 0.32);
+  --paper-grain: rgb(220 235 228 / .03);
+  --shadow: 0 18px 44px rgba(4, 12, 15, 0.5);
+  color-scheme: dark;
+}
+[data-theme="light"] {
+  --bg: #f6f8f8; --surface: #ffffff; --raised: #eef2f2; --sunk: #f1f4f4; --band: #eaf0f0;
+  --line: #d9e1e1; --line2: #b4c2c3; --pencil: #66808a;
+  --text: #22333b; --muted: #4c5f65; --faint: #6c7e7f;
+  --accent: #136d88; --accent-soft: #d6e9ef; --accent-ink: #ffffff; --violet: #71669d;
+  --ok: #3b7a5f; --ok-soft: rgba(59, 122, 95, 0.10);
+  --warn: #9a6a12; --warn-soft: rgba(154, 106, 18, 0.11);
+  --crit: #ab3d17; --crit-soft: rgba(171, 61, 23, 0.09);
+  --claude: #b8693a; --codex: #136d88; --gemini: #4a8763; --grok: #77868a; --glm: #94598f;
+  --hatch: rgba(255, 255, 255, 0.42);
+  --paper-grain: rgb(48 66 71 / .045);
+  --shadow: 0 18px 44px rgba(41, 58, 67, 0.16);
+  color-scheme: light;
+}
+html, body, #root { margin: 0; padding: 0; min-height: 100%; }
+body {
+  background-color: var(--bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23738486' opacity='.065' filter='url(%23n)' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
+  color: var(--text);
+  font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+*, *::before, *::after { box-sizing: border-box; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--text); }
+::selection { background: var(--accent); color: var(--accent-ink); }
+/* Data text: words and small figures in Plex Sans with tabular digits (read-outs use .ui-figure). */
+.mono {
+  font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.hoverline:hover { border-color: var(--pencil) !important; }
+.hovertext:hover { color: var(--text) !important; }
+* { scrollbar-width: thin; scrollbar-color: var(--line2) transparent; }
+*:hover { scrollbar-color: var(--pencil) transparent; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; border: none; box-shadow: none; }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+::-webkit-scrollbar-thumb {
+  background-color: var(--line2);
+  border: 2.5px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+*:hover::-webkit-scrollbar-thumb { background-color: var(--pencil); }
+::-webkit-scrollbar-thumb:hover { background-color: var(--muted); }
+::-webkit-scrollbar-corner { background: transparent; }
+@keyframes ta-spin { to { transform: rotate(360deg); } }
+@keyframes ta-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+.skeleton { background: var(--raised); border-radius: 3px 5px 2px 4px; animation: ta-pulse 1.5s ease-in-out infinite; }

@@ -1,0 +1,387 @@
+{
+  "_comment": [
+    "Shared vendor announcements shipped with tokenAtlas. This repository file is separate from private CONFIG_ROOT settings.",
+    "Announcements do not prove an individual account entitlement or reset redemption."
+  ],
+  "verified_at": "2026-10-22",
+  "promotions": [
+    {
+      "id": "codex-plus-limits-20251107",
+      "announced": "2025-11-07",
+      "until": null,
+      "kind": "allowance",
+      "factor": 1.5,
+      "plans": [
+        "Plus",
+        "Business",
+        "Edu"
+      ],
+      "source": "https://community.openai.com/t/codex-updates-mini-model-higher-limits-priority-processing/1365540",
+      "title": {
+        "en": "Plus, Business and Edu: 50% higher limits",
+        "pl": "Plus, Business i Edu: limity większe o 50%"
+      },
+      "detail": {
+        "en": "The community summary reports a 50% limit increase from efficiency improvements. It does not establish an end date or a separate weekly multiplier. Confirm the original terms and account eligibility before applying a draft; Pro is not listed.",
+        "pl": "Podsumowanie na forum opisuje zwiększenie limitów o 50% dzięki poprawie wydajności. Nie ustala końca okresu ani osobnego mnożnika tygodniowego. Przed zastosowaniem szkicu potwierdź pierwotne warunki i uprawnienie konta; Pro nie jest wymieniony."
+      }
+    },
+    {
+      "id": "codex-holiday-discount-2025",
+      "announced": "2026-01-13",
+      "until": null,
+      "kind": "discount",
+      "factor": null,
+      "plans": [
+        "Codex"
+      ],
+      "source": "https://community.openai.com/t/codex-credits-dissappearing/1366891/34",
+      "title": {
+        "en": "December–January: 50% token discount",
+        "pl": "Grudzień–styczeń: naliczanie tokenów tańsze o 50%"
+      },
+      "detail": {
+        "en": "OpenAI Support retrospectively confirmed a 50% token discount from mid-December 2025 until January 2, 2026: limits and credit balances lasted twice as long. January 13 is the confirmation date, not the start. Exact start, end instant and eligible plans are not specified; this record does not change API prices or historical valuations.",
+        "pl": "OpenAI Support potwierdziło po fakcie rabat 50% na naliczanie tokenów od połowy grudnia 2025 do 2 stycznia 2026: limity i kredyty wystarczały na dwa razy więcej. 13 stycznia to data potwierdzenia, nie początek. Nie podano dokładnego początku, chwili zakończenia ani objętych planów; wpis nie zmienia cen API ani historycznych wycen."
+      }
+    },
+    {
+      "id": "codex-app-launch-2026",
+      "announced": "2026-02-02",
+      "until": null,
+      "kind": "allowance",
+      "factor": 2,
+      "plans": [
+        "Plus",
+        "Pro",
+        "Business",
+        "Enterprise",
+        "Edu"
+      ],
+      "source": "https://learn.chatgpt.com/docs/changelog#introducing-the-codex-app",
+      "title": {
+        "en": "Codex app launch: double rate limits",
+        "pl": "Premiera aplikacji Codex: podwójne limity"
+      },
+      "detail": {
+        "en": "The announcement confirms 2× limits across app, CLI, IDE and cloud, but does not establish an end date or a separate weekly multiplier. Confirm dates and the affected meter before applying it.",
+        "pl": "Ogłoszenie potwierdza limity 2× w aplikacji, CLI, IDE i chmurze, ale nie ustala końca promocji ani osobnego mnożnika tygodniowego. Przed zastosowaniem potwierdź daty i objęty promocją licznik."
+      }
+    },
+    {
+      "id": "codex-pro-100-launch-2026",
+      "announced": "2026-04-09",
+      "until": "2026-05-31",
+      "kind": "allowance",
+      "factor": 2,
+      "plans": [
+        "Pro $100 / 5×"
+      ],
+      "plan_id": "codex-pro-5x",
+      "window_kind": "weekly",
+      "source": "https://community.openai.com/t/introducing-new-100-month-pro-tier/1378752",
+      "title": {
+        "en": "Pro $100: 10× Plus usage instead of 5×",
+        "pl": "Pro 100 USD: 10× użycia Plus zamiast 5×"
+      },
+      "detail": {
+        "en": "Launch promotion, April 9–May 31 inclusive: twice the standard Pro $100 Codex allowance. Applied only to the matching historical 5× plan. Pro $200 is a separate tier; this does not make it 40×.",
+        "pl": "Promocja premierowa, 9 kwietnia–31 maja włącznie: podwójny standardowy limit Codex Pro 100 USD. Dotyczy wyłącznie historycznego planu 5×. Pro 200 USD to osobny wariant; nie oznacza to dla niego 40×."
+      }
+    },
+    {
+      "id": "codex-reset-launch-2026",
+      "announced": "2026-06-11",
+      "until": null,
+      "kind": "reset",
+      "factor": null,
+      "plans": [
+        "Plus",
+        "Pro"
+      ],
+      "source": "https://learn.chatgpt.com/docs/changelog#usage-resets-and-browser-developer-mode-26-609",
+      "title": {
+        "en": "Usage resets: one free reset at launch",
+        "pl": "Uruchomienie resetów: jeden darmowy reset"
+      },
+      "detail": {
+        "en": "A reset can start another cycle. It does not double the capacity of each cycle. The announcement does not prove that this account redeemed a reset.",
+        "pl": "Reset może rozpocząć kolejny cykl. Nie podwaja pojemności każdego cyklu. Ogłoszenie nie potwierdza wykorzystania resetu przez to konto."
+      }
+    },
+    {
+      "id": "codex-referrals-june-2026",
+      "announced": "2026-06-11",
+      "until": "2026-06-24",
+      "kind": "reset",
+      "factor": null,
+      "plans": [
+        "Plus",
+        "Pro"
+      ],
+      "source": "https://learn.chatgpt.com/docs/pricing#invite-friends-and-coworkers",
+      "title": {
+        "en": "Referral rewards: banked resets",
+        "pl": "Nagrody za zaproszenia: dodatkowe resety"
+      },
+      "detail": {
+        "en": "Eligible Plus/Pro users could invite up to three friends; a qualifying first message granted a reset to both people, usable for 30 days. Business rewards are separate workspace credits. No per-cycle capacity multiplier.",
+        "pl": "Uprawnieni użytkownicy Plus/Pro mogli zaprosić do trzech znajomych; kwalifikująca się pierwsza wiadomość dawała obu osobom reset ważny 30 dni. Business otrzymywał osobne kredyty obszaru roboczego. Bez mnożnika pojemności cyklu."
+      }
+    },
+    {
+      "id": "codex-double-reset-20260618",
+      "announced": "2026-06-18",
+      "until": null,
+      "kind": "reset",
+      "factor": null,
+      "plans": [
+        "Codex"
+      ],
+      "source": "https://community.openai.com/t/flexible-rate-limit-resets-for-codex-and-a-method-to-get-a-reset/1383470/29",
+      "title": {
+        "en": "One automatic reset and one banked reset",
+        "pl": "Reset automatyczny i dodatkowy reset do wykorzystania później"
+      },
+      "detail": {
+        "en": "The reproduced announcement grants an immediate full reset and another saved reset. Plan eligibility and individual delivery must be checked against the account; neither changes per-cycle capacity.",
+        "pl": "Przytoczone ogłoszenie przyznaje natychmiastowy pełny reset oraz drugi zapisany reset. Objęte plany i otrzymanie korzyści należy sprawdzić na koncie; żaden z resetów nie zwiększa pojemności pojedynczego cyklu."
+      }
+    },
+    {
+      "id": "codex-reset-20260629",
+      "announced": "2026-06-29",
+      "until": null,
+      "kind": "reset",
+      "factor": null,
+      "plans": [
+        "Codex"
+      ],
+      "source": "https://community.openai.com/t/why-is-gpt-5-4-mini-showing-up-in-my-codex-usage/1385210/8",
+      "title": {
+        "en": "Usage investigation: automatic and banked resets",
+        "pl": "Weryfikacja zużycia: reset automatyczny i zapisany"
+      },
+      "detail": {
+        "en": "The announcement promises a full reset in the next hour and an additional banked reset over the next 24 hours after investigating unexpected usage drain. This is a delivery window, not a confirmed expiry or an allowance multiplier. Account receipt is not established by the announcement.",
+        "pl": "Po sprawdzeniu zgłoszeń zbyt szybkiego zużycia zapowiedziano pełny reset w kolejnej godzinie i dodatkowy zapisany reset w ciągu 24 godzin. To czas dostarczenia, nie potwierdzony termin ważności ani mnożnik limitu. Ogłoszenie nie dowodzi otrzymania resetu przez konto."
+      }
+    },
+    {
+      "id": "codex-sol-launch-resets-20260710",
+      "announced": "2026-07-10",
+      "until": null,
+      "kind": "reset",
+      "factor": null,
+      "plans": [
+        "ChatGPT Work",
+        "Codex"
+      ],
+      "source": "https://community.openai.com/t/introducing-gpt-5-6-series-sol-terra-and-luna-coming-july-9-10am-pt/1384931/57",
+      "title": {
+        "en": "GPT-5.6 Sol launch: two usage resets",
+        "pl": "Premiera GPT-5.6 Sol: dwa resety zużycia"
+      },
+      "detail": {
+        "en": "The launch announcement promises two resets across Work and Codex over the next 24 hours. It does not increase weekly capacity by 50% or 2× and does not establish exact reset times for a particular account.",
+        "pl": "Ogłoszenie premierowe zapowiada dwa resety Work i Codex w ciągu 24 godzin. Nie zwiększa pojemności tygodniowej o 50% ani 2× i nie ustala dokładnych chwil resetów konkretnego konta."
+      }
+    },
+    {
+      "id": "codex-5h-lift-20260712",
+      "announced": "2026-07-12",
+      "until": null,
+      "kind": "window",
+      "factor": null,
+      "plans": [
+        "Plus",
+        "Pro",
+        "Business"
+      ],
+      "window_kind": "5h",
+      "source": "https://community.openai.com/t/has-the-5-hour-usage-session-been-removed-from-codex-cli/1387701",
+      "title": {
+        "en": "Five-hour limit temporarily lifted",
+        "pl": "Czasowe zniesienie limitu 5-godzinnego"
+      },
+      "detail": {
+        "en": "OpenAI Support confirms the temporary suspension announced July 12 for Plus, Pro and Business. Weekly limits still apply. Restoration was announced for July 30 and later postponed; the actual end is unconfirmed. This is a window policy, not a weekly capacity multiplier.",
+        "pl": "OpenAI Support potwierdza czasowe zniesienie limitu zapowiedziane 12 lipca dla Plus, Pro i Business. Limit tygodniowy nadal obowiązuje. Przywrócenie zapowiedziano na 30 lipca, następnie odłożono; faktyczny koniec jest nieustalony. To zasada okna, nie mnożnik tygodniowej pojemności."
+      }
+    },
+    {
+      "id": "codex-sol-reset-20260729",
+      "announced": "2026-07-29",
+      "until": null,
+      "kind": "reset",
+      "factor": null,
+      "plans": [
+        "ChatGPT Work",
+        "Codex"
+      ],
+      "source": "https://community.openai.com/t/has-the-5-hour-usage-session-been-removed-from-codex-cli/1387701/4",
+      "title": {
+        "en": "Work and Codex: global usage reset",
+        "pl": "Work i Codex: globalny reset zużycia"
+      },
+      "detail": {
+        "en": "The reproduced announcement reports a reset for all Work and Codex users alongside a Sol usage update. No numeric increase in weekly allowance is specified. Recorded account readings establish cycle boundaries; the announcement alone does not.",
+        "pl": "Przytoczone ogłoszenie informuje o resecie dla wszystkich użytkowników Work i Codex wraz z aktualizacją dotyczącą zużycia Sol. Nie podano liczbowego zwiększenia limitu tygodniowego. Granice cykli ustalają zapisane odczyty konta, nie samo ogłoszenie."
+      }
+    },
+    {
+      "id": "codex-august-resets-2026",
+      "announced": "2026-08-08",
+      "until": null,
+      "kind": "reset",
+      "factor": null,
+      "plans": [
+        "Paid Work / Codex plans"
+      ],
+      "source": "https://community.openai.com/t/codex-rate-limits-reset-for-all-paid-plans-on-august-9-and-again-on-monday/1389643",
+      "title": {
+        "en": "August: additional global resets",
+        "pl": "Sierpień: dodatkowe globalne resety"
+      },
+      "detail": {
+        "en": "Reproduced announcements describe a reset on August 8, another promised for August 10, and a further reset on August 13 after reaching 15 million active users. Verify delivery and exact times using account readings. Resets replenish usage rather than multiply each cycle's allowance.",
+        "pl": "Przytoczone ogłoszenia opisują reset 8 sierpnia, kolejny zapowiedziany na 10 sierpnia oraz reset 13 sierpnia po osiągnięciu 15 mln aktywnych użytkowników. Otrzymanie i dokładne chwile należy sprawdzić w odczytach konta. Resety odnawiają zużycie, nie mnożą limitu każdego cyklu."
+      }
+    },
+    {
+      "id": "sol-api-price-2026",
+      "announced": "2026-08-21",
+      "until": null,
+      "kind": "price",
+      "factor": null,
+      "plans": [
+        "API"
+      ],
+      "source": "https://developers.openai.com/api/docs/changelog#august-2026",
+      "title": {
+        "en": "GPT-5.6 Sol: promotional API prices",
+        "pl": "GPT-5.6 Sol: promocyjne ceny API"
+      },
+      "detail": {
+        "en": "USD 4/M input and USD 20/M output, promised at least through November 21. This affects API valuation, not subscription capacity. It is not an allowance multiplier; November 21 is not a confirmed end date.",
+        "pl": "4 USD/M wejścia i 20 USD/M wyjścia, zapowiedziane co najmniej do 21 listopada. Zmienia wycenę API, nie pojemność abonamentu. To nie mnożnik limitu; 21 listopada nie jest potwierdzoną datą końca."
+      }
+    },
+    {
+      "id": "codex-astra-banked-resets-2026",
+      "announced": "2026-09-03",
+      "until": "2026-09-04",
+      "kind": "reset",
+      "factor": null,
+      "plans": [
+        "Plus",
+        "Pro",
+        "Business"
+      ],
+      "source": "https://help.openai.com/en/articles/20001498-how-banked-codex-resets-work",
+      "title": {
+        "en": "GPT-6 Astra launch: banked resets",
+        "pl": "Premiera GPT-6 Astra: resety do wykorzystania później"
+      },
+      "detail": {
+        "en": "Eligible existing Plus, Pro and Business users received one banked reset on each of September 3 and 4. New-account cutoffs were September 3 at 10 PM PT and September 4 at 8 PM PT. Eligibility and expiry vary; these dates are grant dates, not reset-use dates. A full banked reset refreshes five-hour and weekly usage and changes the weekly reset date.",
+        "pl": "Uprawnieni dotychczasowi użytkownicy Plus, Pro i Business otrzymali po jednym zapisanym resecie 3 i 4 września. Dla nowych kont granice to 3 września o 22:00 PT i 4 września o 20:00 PT. Uprawnienia i ważność zależą od oferty; daty dotyczą przyznania, nie użycia resetu. Pełny zapisany reset odnawia limit 5h i tygodniowy oraz zmienia termin kolejnego resetu tygodniowego."
+      }
+    },
+    {
+      "id": "codex-astra-global-reset-20260907",
+      "announced": "2026-09-07",
+      "until": null,
+      "kind": "reset",
+      "factor": null,
+      "plans": [
+        "Plus",
+        "Pro",
+        "Business"
+      ],
+      "source": "https://help.openai.com/en/articles/20001498-how-banked-codex-resets-work",
+      "title": {
+        "en": "Astra rollout: automatic global reset",
+        "pl": "Wdrożenie Astra: automatyczny globalny reset"
+      },
+      "detail": {
+        "en": "OpenAI confirms a global reset applied immediately to eligible Plus, Pro and Business accounts on September 7. It could not be saved for later and did not create a banked reset or permanently raise plan capacity.",
+        "pl": "OpenAI potwierdza globalny reset zastosowany od razu na uprawnionych kontach Plus, Pro i Business 7 września. Nie można go było zachować na później; nie tworzył zapisanego resetu ani trwałego zwiększenia pojemności planu."
+      }
+    },
+    {
+      "id": "codex-pro-200-usage-cut-20260929",
+      "announced": "2026-09-29",
+      "announced_at": "2026-09-29T06:41:17Z",
+      "until": null,
+      "kind": "policy",
+      "factor": null,
+      "plans": ["Pro $200 / 20× → 10×"],
+      "source": "https://x.com/thsottiaux/status/2104823812042940713",
+      "official_sources": [
+        {
+          "url": "https://x.com/thsottiaux/status/2104823812042940713",
+          "label": { "en": "Tibo · initial announcement · September 29, 06:41 UTC", "pl": "Tibo · pierwsza zapowiedź · 29 września, 06:41 UTC" }
+        },
+        {
+          "url": "https://x.com/thsottiaux/status/2104951965184925941",
+          "label": { "en": "Tibo · 20× → 10× clarification · September 29, 15:10 UTC", "pl": "Tibo · doprecyzowanie 20× → 10× · 29 września, 15:10 UTC" }
+        },
+        {
+          "url": "https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers",
+          "label": { "en": "OpenAI Help Center · previous allowance through October 29 and eligibility", "pl": "OpenAI Help Center · poprzedni limit do 29 października i warunki uprawnienia" }
+        }
+      ],
+      "title": {
+        "en": "Pro $200: 20× → 10× usage announced",
+        "pl": "Pro 200 USD: zapowiedź zmiany limitu 20× → 10×"
+      },
+      "detail": {
+        "en": "September 29, 2026 · 06:41:17 UTC. Tibo announced that reopened Pro $200 subscriptions would include half the old plan's API-dollar allowance. He committed to keeping no five-hour limit and argued that more efficient models, lower API prices and additional subscription features would offset the reduction. Initial post: https://x.com/thsottiaux/status/2104823812042940713\n\nSeptember 29 · 15:10:31 UTC. He clarified the relative tiers: Plus 1×, Pro $100 5×, Pro $200 10×, alongside a higher baseline. His wording for existing subscribers was: “If you have an existing plan you will keep the 20X multiplier for a bit”. He also promised additional credits. This post gave neither a transition deadline nor a credit amount. Clarification: https://x.com/thsottiaux/status/2104951965184925941\n\nLater official terms, checked October 21: eligible Pro $200 subscribers keep the previous allowance through October 29, 2026 inclusive, while their subscription is active; the lower allowance follows from October 30. Eligibility requires an active Pro $200 subscription at any point from September 22 through September 29 at 10 a.m. Pacific Time. The Help Center does not specify an exact switchover hour. https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers\n\nThe event dates the announcement, not an observed transition on this account. It applies no capacity multiplier.",
+        "pl": "29 września 2026 · 06:41:17 UTC. Tibo zapowiedział, że ponownie otwierany Pro 200 USD obejmie połowę limitu starego planu w przeliczeniu na dolary API. Zadeklarował utrzymanie braku limitu pięciogodzinnego. Uzasadniał zmianę sprawniejszymi modelami, obniżkami cen API i dodatkowymi funkcjami abonamentu. Pierwszy post: https://x.com/thsottiaux/status/2104823812042940713\n\n29 września · 15:10:31 UTC. Doprecyzował proporcje: Plus 1×, Pro 100 USD 5×, Pro 200 USD 10×, przy jednoczesnym podniesieniu bazowego limitu. Napisał, że obecni abonenci czasowo zachowają 20×. Obiecał też dodatkowe kredyty. W tym poście nie podał terminu zmiany ani liczby kredytów. Doprecyzowanie: https://x.com/thsottiaux/status/2104951965184925941\n\nPóźniejsze oficjalne warunki, sprawdzone 21 października: uprawnieni abonenci Pro 200 USD zachowują poprzedni limit do 29 października 2026 włącznie, o ile subskrypcja jest aktywna; niższy limit ma obowiązywać od 30 października. Uprawnienie obejmuje konta z aktywnym Pro 200 USD w dowolnym momencie od 22 września do 29 września, godz. 10:00 czasu pacyficznego. Help Center nie podaje dokładnej godziny przełączenia. https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers\n\nEvent oznacza datę ogłoszenia, nie potwierdzonej zmiany na wybranym koncie. Nie stosuje automatycznego mnożnika pojemności."
+      }
+    },
+    {
+      "id": "codex-context-cache-20261016",
+      "announced": "2026-10-16",
+      "announced_at": "2026-10-16T23:55:11Z",
+      "until": null,
+      "kind": "policy",
+      "factor": null,
+      "plans": [
+        "Codex",
+        "ChatGPT Work"
+      ],
+      "source": "https://x.com/thsottiaux/status/2111244596131111253",
+      "title": {
+        "en": "Context reuse and cache: more effective usage announced",
+        "pl": "Kontekst i cache: zapowiedź większego efektywnego użycia"
+      },
+      "detail": {
+        "en": "Challenge day 12 (October 16, Los Angeles). Tibo announced context reuse across subagents, longer cache retention and improved request routing to increase cache hits and effective usage. No numeric allowance increase, eligible plan list or per-account effective time was supplied. This announcement does not prove an increase for a particular account and does not change recorded usage, API prices or capacity factors.",
+        "pl": "Dzień 12 wyzwania (16 października, Los Angeles). Tibo ogłosił współdzielenie kontekstu między subagentami, dłuższe utrzymanie cache i lepszy routing, aby zwiększyć trafienia w cache i efektywne użycie. Nie podano liczbowego wzrostu limitu, listy objętych planów ani chwili wdrożenia dla konta. Ogłoszenie nie dowodzi wzrostu na konkretnym koncie i nie zmienia zapisanych odczytów, cen API ani mnożników pojemności."
+      }
+    },
+    {
+      "id": "codex-cache-retention-20261020",
+      "announced": "2026-10-21",
+      "announced_at": "2026-10-21T01:10:02Z",
+      "until": null,
+      "kind": "policy",
+      "factor": null,
+      "plans": [
+        "API",
+        "Signed-in Codex / ChatGPT Work"
+      ],
+      "source": "https://x.com/thsottiaux/status/2112712984644784534",
+      "title": {
+        "en": "Cache: 12h in API, indefinite in signed-in Codex / Work",
+        "pl": "Cache: 12h w API, bezterminowo w zalogowanym Codex / Work"
+      },
+      "detail": {
+        "en": "Challenge day 16 (October 20, Los Angeles; October 21 UTC). Tibo announced 12-hour API caching and indefinite cache retention for signed-in Codex and Work users, including guaranteed cache hits when resuming older conversations without a return penalty. This is the provider declaration, not an independently measured guarantee. No numeric allowance multiplier or API price change is specified; account measurements and historical calculations remain unchanged.",
+        "pl": "Dzień 16 wyzwania (20 października, Los Angeles; 21 października UTC). Tibo ogłosił 12-godzinny cache w API i bezterminowe utrzymanie cache dla zalogowanych użytkowników Codex i Work, z gwarantowanym trafieniem po wznowieniu starszej rozmowy bez kary za powrót. To deklaracja dostawcy, nie niezależnie zmierzona gwarancja. Nie podano mnożnika limitu ani zmiany cen API; pomiary konta i historyczne obliczenia pozostają bez zmian."
+      }
+    }
+  ]
+}

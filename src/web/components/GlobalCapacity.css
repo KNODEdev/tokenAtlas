@@ -1,0 +1,48 @@
+/* Global capacity card — layout from docs/design/tokenAtlas.dc.html; groups divided by dashed rules. */
+.global-capacity { min-width: 0; }
+.global-capacity-head { padding: var(--s-8) var(--s-9) var(--s-5); border-bottom: var(--rule); }
+.global-capacity-head h2 { margin: 0; font-family: var(--font-display); font-weight: var(--fw-display); font-synthesis: none; font-size: var(--fs-card-title); line-height: 1.2; letter-spacing: -0.01em; }
+.global-capacity-head p { margin: var(--s-1) 0 0; font-family: var(--font-sans); font-size: var(--fs-3); color: var(--muted); }
+.global-capacity-controls { padding: var(--s-5) var(--s-9); gap: var(--s-3) var(--s-6); border-bottom: var(--rule); }
+.global-capacity-status { margin: var(--s-4) var(--s-9) 0; font-size: var(--fs-3); color: var(--muted); }
+
+/* The comparison: the timeline chart and the cycle list of the chosen subscriptions. */
+.global-capacity-body { padding: 0 var(--s-9) var(--s-8); }
+.global-capacity-body > .ui-empty, .global-capacity-body > :first-child:not(.capacity-section) { margin-top: var(--s-6); }
+
+.global-capacity-foot { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-4); padding: var(--s-5) var(--s-9) var(--s-8); border-top: var(--rule); }
+.global-capacity-unavailable { margin: 0; font-size: var(--fs-3); color: var(--muted); line-height: 1.7; }
+.global-capacity-unavailable summary { cursor: pointer; color: var(--text); font-size: var(--fs-4); }
+.global-capacity-unavailable p { margin: var(--s-1) 0 0; }
+.global-capacity-unavailable p strong { color: var(--text); font-weight: var(--fw-semibold); }
+.global-capacity :is(button, summary, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* Drawer: subscriptions open into their cycles; plan in its tier colour (×1 green, ×5 blue, ×20 violet, as in the charts). */
+.codex-columns-drawer.capacity-compare-drawer { width: min(780px, 100vw); }
+.capacity-choice-legend { margin: 0; gap: var(--s-2) var(--s-6); }
+.capacity-choice-legend .capacity-tier-chip + .capacity-tier-chip { margin-left: var(--s-2); }
+.capacity-choice-list .speed-drawer-sub { padding: 0; }
+/* A subscription is a row that opens its cycles, not a checkbox. */
+.capacity-choice-sub { display: flex; align-items: center; gap: var(--s-4); width: 100%; padding: var(--s-4) var(--s-2); border: 0; border-radius: var(--r-chip);
+  background: none; color: var(--text); font: inherit; font-size: var(--fs-4); text-align: left; cursor: pointer; }
+.capacity-choice-sub:hover:not(:disabled) { background: var(--raised); }
+.capacity-choice-sub:disabled { cursor: default; color: var(--muted); }
+.capacity-choice-caret { flex: none; width: var(--s-5); color: var(--muted); font-size: var(--fs-3); }
+.capacity-choice-picked { font-weight: var(--fw-medium); color: var(--accent); }
+.capacity-choice-table { width: calc(100% - var(--s-9)); margin: 0 0 var(--s-6) var(--s-9); border-collapse: collapse; font-size: var(--fs-4); }
+.capacity-choice-table th { padding: var(--s-3) var(--s-4); text-align: left; font-size: var(--fs-3); font-weight: var(--fw-regular); color: var(--muted); border-bottom: 1px solid var(--line2); white-space: nowrap; }
+.capacity-choice-table td { padding: var(--s-3) var(--s-4); border-bottom: var(--rule); white-space: nowrap; }
+.capacity-choice-table th:first-child, .capacity-choice-table td:first-child { width: 1px; padding-left: var(--s-2); }
+.capacity-choice-table tbody tr { cursor: pointer; }
+.capacity-choice-table tbody tr:hover { background: var(--raised); }
+/* The switch marks a chosen cycle; a cycle without a usable estimate uses faint ink. */
+.capacity-choice-table tr.is-weak td:not(:first-child) { color: var(--faint); }
+.capacity-choice-table tr.is-weak b { font-weight: var(--fw-regular); }
+.capacity-choice-table .is-num { text-align: right; font-family: var(--font-figure); }
+/* A quiet chip; the tier colour (as in the charts) is carried by the text only. */
+.capacity-tier-chip { display: inline-block; padding: 0 var(--s-3); border: 1px solid var(--line2); border-radius: var(--r-chip); background: var(--surface); color: var(--muted);
+  font-family: var(--font-figure); font-size: var(--fs-3); font-weight: var(--fw-medium); white-space: nowrap; }
+.capacity-tier-chip.is-tier-1 { color: var(--ok); }
+.capacity-tier-chip.is-tier-5 { color: var(--accent); }
+.capacity-tier-chip.is-tier-20 { color: var(--violet); }
+

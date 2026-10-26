@@ -1,0 +1,30 @@
+.capacity-promotion-account { display: inline-flex; align-items: center; gap: var(--s-4); margin-top: var(--s-6); font-size: var(--fs-3); color: var(--muted); }
+/* Dropdowns take the same field look from ui-input. */
+.capacity-promotion-row input:not([type="checkbox"]) {
+  box-sizing: border-box; min-width: 0; padding: var(--s-2) var(--s-4); border: 1px solid var(--line2); border-radius: var(--r-chip);
+  background: var(--surface); color: var(--text); font-family: var(--font-sans); font-size: var(--fs-4); outline: none;
+}
+.capacity-promotion-row input:focus { border-color: var(--accent); }
+.capacity-promotion-editor { font-size: var(--fs-4); line-height: 1.5; margin-top: var(--s-5); }
+.capacity-promotion-editor p { margin: var(--s-4) 0; color: var(--muted); }
+.capacity-promotion-editor fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.capacity-promotion-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: var(--s-4) var(--s-6); padding: var(--s-6) 0; border-top: var(--rule); }
+.capacity-promotion-row > strong { grid-column: 1 / -1; font-size: var(--fs-5); font-weight: var(--fw-semibold); color: var(--text); }
+.capacity-promotion-row label { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; font-size: var(--fs-3); color: var(--muted); }
+.capacity-promotion-row input:not([type="checkbox"]), .capacity-promotion-row .ui-dropdown { width: 100%; }
+.capacity-promotion-row .capacity-promotion-check { flex-direction: row; align-items: center; color: var(--text); }
+.capacity-promotion-row input[type="checkbox"] { accent-color: var(--accent); }
+.capacity-promotion-wide { grid-column: span 2; }
+.capacity-promotion-actions { display: flex; flex-wrap: wrap; gap: var(--s-4); margin: var(--s-5) 0; }
+/* The announcement list (CodexPromotionHistory) offers each source as a draft. */
+.capacity-promotion-source button {
+  border: 1px solid var(--pencil); border-radius: var(--r-control); padding: var(--s-3) var(--s-6); background: var(--surface); color: var(--text);
+  box-shadow: var(--lift); font-family: var(--font-sans); font-size: var(--fs-4); font-weight: var(--fw-medium); cursor: pointer;
+}
+.capacity-promotion-source button:hover { background: var(--accent-soft); }
+.capacity-promotion-editor button:disabled { cursor: default; opacity: .5; box-shadow: none; }
+.capacity-promotion-editor button.ui-dropdown:disabled { opacity: 1; }
+.capacity-promotion-editor :is(input, button):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.capacity-promotion-source { border-top: var(--rule); padding: var(--s-5) 0; }
+.capacity-promotion-source > strong { font-weight: var(--fw-semibold); }
+@media (max-width: 420px) { .capacity-promotion-wide { grid-column: 1 / -1; } }

@@ -1,0 +1,201 @@
+/* Capacity: tiles, the cycle chart and one row per cycle (docs/design/audit-usage-capacity-mockup.html). */
+.capacity-report { font-size: var(--fs-4); line-height: 1.5; margin: var(--s-5) 0 0; }
+.capacity-section { margin-top: var(--s-9); }
+.capacity-report h3 { font-size: var(--fs-5); font-weight: var(--fw-semibold); margin: 0; white-space: nowrap; }
+.capacity-report p { margin: var(--s-4) 0; }
+.capacity-report .capacity-note { color: var(--muted); font-size: var(--fs-4); }
+.capacity-report th { text-align: left; font-size: var(--fs-3); font-weight: var(--fw-regular); color: var(--muted); padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--line2); }
+
+.capacity-section-head { display: flex; align-items: baseline; gap: var(--s-6); flex-wrap: wrap; margin-bottom: var(--s-3); }
+.capacity-section-sub { font-family: var(--font-mono); font-size: var(--fs-3); color: var(--faint); }
+/* Chart legend: every mark and colour the chart draws. */
+.capacity-legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-8); margin: 0 0 var(--s-3); font-family: var(--font-mono); font-size: var(--fs-3); color: var(--muted); }
+.capacity-legend > span { display: inline-flex; gap: var(--s-3); align-items: center; white-space: nowrap; }
+.capacity-legend > span[title] { cursor: help; }
+.capacity-legend i { display: inline-block; flex: none; width: 16px; height: 3px; border-radius: var(--r-bar); }
+.capacity-legend i.is-unknown { height: 9px; border: 1px dashed var(--muted); border-radius: var(--r-bar); background: repeating-linear-gradient(45deg, color-mix(in oklab, var(--muted) 45%, transparent) 0 1.5px, transparent 1.5px 4px); }
+.capacity-legend i.is-tentative { height: 0; border-radius: 0; border-top: 3px dashed var(--muted); }
+.capacity-legend i.is-median { height: 0; border-radius: 0; border-top: 2px dashed var(--text); }
+.capacity-legend i.is-event { width: 0; height: 12px; border-radius: 0; border-left: 1.5px dashed; }
+.capacity-legend i.is-context { height: 9px; }
+/* Under the chart, below the date axis. */
+.capacity-legend.is-below { margin: var(--s-4) 0 0; }
+/* The scale choice closes the heading row on the right. */
+.capacity-chart-head { align-items: center; }
+.capacity-chart { position: relative; }
+.capacity-marker { cursor: help; outline: none; }
+.capacity-marker:focus-visible > line:last-of-type { stroke-width: 2; }
+/* The event card: the help popover's paper, placed at the hovered line. */
+.capacity-event-card {
+  position: absolute; z-index: 5; width: max-content; max-width: 330px; box-sizing: border-box; display: grid; gap: var(--s-4);
+  padding: var(--s-5) var(--s-6); background: var(--surface); border: 1px solid var(--pencil); border-radius: var(--r-card);
+  box-shadow: var(--lift), var(--shadow); font-family: var(--font-sans); font-size: var(--fs-3); line-height: 1.45; color: var(--text); pointer-events: none;
+}
+.capacity-event-card > div { display: grid; gap: var(--s-1); }
+.capacity-event-card > div > span { font-weight: var(--fw-semibold); }
+.capacity-event-card small { font-size: var(--fs-2); color: var(--muted); }
+/* One view of the report at a time under the tiles, chosen in the screen's tab row (user, 2026-10-21): every view
+   keeps the same distance from the tiles. */
+.capacity-tab-panel { margin-top: var(--s-9); }
+.capacity-tab-panel > * > .capacity-section:first-child, .capacity-tab-panel > .capacity-detail { margin-top: 0; }
+
+/* Tile visuals inside the shared Track: rounding band, median mark, the estimate as a dot. */
+.capacity-band { position: absolute; top: 1px; bottom: 1px; border-radius: var(--r-bar); background: color-mix(in oklab, var(--accent) 28%, transparent); }
+.capacity-median-tick { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--text); }
+.capacity-dot { position: absolute; top: 50%; width: 11px; height: 11px; border-radius: var(--r-dot); background: var(--accent); border: 2px solid var(--surface); transform: translate(-50%, -50%); }
+.capacity-strip { position: relative; height: 22px; margin-top: var(--s-4); border-bottom: 1px solid var(--line); }
+.capacity-strip-dot { position: absolute; bottom: 4px; width: 8px; height: 8px; border-radius: var(--r-dot); transform: translateX(-50%); background: var(--violet); opacity: .75; }
+.capacity-strip-median { position: absolute; top: 0; bottom: -4px; width: 2px; background: var(--text); }
+
+/* One row per cycle, newest first. */
+/* Columns: period (two lines), plan, meter, one line per chosen measure, deviations. The minimums sum to
+   about 800px, under the ~810px card body at a 1400px viewport with both rails; the measures take most
+   of any extra width, so the bars grow and the deviations wrap instead of clipping. */
+/* The reference-line overlay repeats both templates so its lines sit exactly over the bar column. */
+.capacity-rows { --capacity-row-columns: 96px 90px 72px minmax(416px, 1fr) minmax(88px, 0.28fr); --capacity-measure-columns: 64px 80px 84px 66px minmax(32px, 1fr) 38px; position: relative; }
+/* Compared cycles: a wider column names the subscription above its plan, and there is no median column. */
+.capacity-rows-compared { --capacity-row-columns: 96px 180px 72px minmax(400px, 1fr) minmax(88px, 0.28fr); --capacity-measure-columns: 64px 80px 84px 66px minmax(32px, 1fr); }
+.capacity-subject { display: inline-flex; align-items: center; gap: var(--s-2); max-width: 100%; font-family: var(--font-mono); font-size: var(--fs-3); color: var(--text); }
+.capacity-subject > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.capacity-reference-overlay { position: absolute; inset: 0; pointer-events: none; display: grid; grid-template-columns: var(--capacity-row-columns); column-gap: var(--s-6); }
+.capacity-reference-overlay > div { grid-column: 4; display: grid; grid-template-columns: var(--capacity-measure-columns); column-gap: var(--s-5); }
+.capacity-reference-overlay > div > div { position: relative; grid-column: 5; }
+.capacity-row[data-reference] > .capacity-cell { background: color-mix(in oklab, var(--accent) 8%, var(--surface)); }
+.capacity-row { display: grid; grid-template-columns: var(--capacity-row-columns); column-gap: var(--s-6); font-size: var(--fs-4); }
+.capacity-row > .capacity-cell { padding: var(--s-3) 0; border-bottom: var(--rule); display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: var(--s-1); min-width: 0; }
+.capacity-row:not(.capacity-row-head) { cursor: pointer; }
+.capacity-row:not(.capacity-row-head):hover > .capacity-cell { background: color-mix(in oklab, var(--accent) 6%, var(--surface)); }
+.capacity-row[aria-current] > .capacity-cell { background: color-mix(in oklab, var(--accent) 10%, var(--surface)); }
+.capacity-row-head > span { display: grid; align-content: end; padding: var(--s-2) 0; border-bottom: 1px solid var(--line2); font-family: var(--font-sans); font-size: var(--fs-3); line-height: 1.3; color: var(--muted); }
+.capacity-row-head > .capacity-measure-line > span { padding: 0; border: 0; }
+.capacity-right { text-align: right; justify-self: end; }
+.capacity-muted { color: var(--muted); }
+.capacity-faint { color: var(--faint); }
+.capacity-heading-date { display: flex; flex-direction: column; padding: 0; border: 0; background: transparent; font-size: var(--fs-3); line-height: 1.45; color: var(--text); cursor: pointer; text-align: left; white-space: nowrap; }
+.capacity-plan-name { font-family: var(--font-mono); font-size: var(--fs-4); font-weight: var(--fw-semibold); overflow-wrap: anywhere; }
+.capacity-plan-promo { color: var(--text); cursor: help; }
+.capacity-median-plan { display: block; font-family: var(--font-mono); font-size: var(--fs-2); white-space: nowrap; }
+/* No dated plan period covers the cycle: a hatched "?" box, the same hatch as its chart segment. */
+.capacity-plan-unknown { display: inline-flex; align-items: flex-start; gap: var(--s-2); font-family: var(--font-mono); font-size: var(--fs-2); line-height: 1.3; color: var(--muted); cursor: help; }
+.capacity-plan-unknown > i {
+  flex: 0 0 13px; height: 13px; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: var(--fs-1); font-weight: var(--fw-bold);
+  border: 1px dashed var(--muted); border-radius: var(--r-xs); color: var(--text);
+  background: repeating-linear-gradient(45deg, color-mix(in oklab, var(--muted) 30%, transparent) 0 1.5px, transparent 1.5px 4px);
+}
+
+/* Measure lines: name | used in cycle | capacity at 100% | per 1% | bar with the median mark | vs median.
+   The fixed columns keep successive bars left-aligned so cycles and measures compare by eye; they fit
+   "≥ 1557 USD" in bold mono, and the bar gives up width first. */
+.capacity-row > .capacity-measures { align-items: stretch; gap: var(--s-2); }
+.capacity-measure-line { display: grid; grid-template-columns: var(--capacity-measure-columns); column-gap: var(--s-5); align-items: center; min-width: 0; min-height: 20px; }
+.capacity-measure-line > * { min-width: 0; white-space: nowrap; }
+.capacity-row-head .capacity-measure-line > span { white-space: normal; }
+.capacity-measure-name { display: inline-flex; align-items: center; gap: var(--s-2); font-family: var(--font-sans); font-size: var(--fs-3); color: var(--muted); }
+.capacity-measure-line b.mono { font-weight: var(--fw-semibold); }
+.capacity-measure-line .capacity-faint { font-size: var(--fs-3); }
+/* A missing estimate states its reason across the capacity, per-1% and bar columns. */
+.capacity-measure-missing { grid-column: 3 / 6; justify-self: start; white-space: normal !important; color: var(--muted); font-size: var(--fs-3); line-height: 1.35; }
+.capacity-used-wider { text-decoration: underline dotted var(--faint); text-underline-offset: 3px; cursor: help; }
+.capacity-swatch { display: inline-block; flex: none; width: 9px; height: 9px; border-radius: var(--r-bar); }
+.capacity-measure-toggles { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-6); font-family: var(--font-mono); font-size: var(--fs-3); color: var(--muted); }
+.capacity-measure-toggles > span:first-child { font-size: var(--fs-3); color: var(--muted); }
+/* A single on/off beside a chart reads like a CheckGroup entry (ui.css .ui-check). */
+.capacity-measure-toggle { display: inline-flex; align-items: center; gap: var(--s-3); color: var(--muted); cursor: pointer; white-space: nowrap; }
+.capacity-measure-toggle:has(> input:checked) { color: var(--text); }
+.capacity-measure-toggle:hover { color: var(--accent); }
+.capacity-measure-toggle:has(> input:disabled) { color: var(--faint); cursor: default; }
+.capacity-measure-choice { display: inline-flex; align-items: center; gap: var(--s-2); }
+.capacity-legend-item { display: inline-flex; align-items: center; gap: var(--s-3); white-space: nowrap; cursor: help; }
+.capacity-legend-tick { display: inline-block; width: 2px; height: 12px; background: var(--text); }
+.capacity-row-head .capacity-legend-tick { height: 9px; vertical-align: -1px; }
+.capacity-meter-value { white-space: nowrap; font-size: var(--fs-3); }
+.capacity-meter-pp { font-size: var(--fs-2); }
+.capacity-meter-bar { position: relative; box-sizing: border-box; width: 100%; height: 5px; margin-top: var(--s-2); border: 1px solid var(--line); border-radius: var(--r-bar); background: var(--sunk); }
+.capacity-meter-bar > span { position: absolute; top: 0; bottom: 0; border-radius: inherit; background: var(--muted); }
+.capacity-bar { position: relative; display: block; box-sizing: border-box; width: 100%; height: 8px; border: 1px solid var(--line); border-radius: var(--r-bar); background: var(--sunk); }
+.capacity-bar-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: inherit; }
+/* Context uplift: dense stripes of the bar's own colour over the track, so it reads apart from the solid base. */
+.capacity-context-hatch { background: var(--sunk) repeating-linear-gradient(115deg, var(--bar) 0 2px, transparent 2px 4px); }
+.capacity-bar > .capacity-median-tick { top: -3px; bottom: -3px; }
+.capacity-row > .capacity-flags { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 0 var(--s-4); }
+.capacity-flag { font-family: var(--font-mono); font-size: var(--fs-2); color: var(--muted); overflow-wrap: anywhere; }
+.capacity-flag[data-warn] { color: var(--warn); }
+.capacity-unavailable { color: var(--muted); font-size: var(--fs-3); }
+/* A dated event between cycles: the chart's dashed marker line, laid across the list in the marker's ink. */
+.capacity-event { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0; border-bottom: var(--rule); font-family: var(--font-mono); font-size: var(--fs-2); line-height: 1.3; cursor: help; }
+.capacity-event > span { white-space: nowrap; }
+.capacity-event-rule { flex: 1 1 auto; min-width: var(--s-6); border-top: 1px dashed currentColor; }
+
+/* Token types: one row per cycle, a bar and its value per type, each column on its own scale. */
+.capacity-token-note { margin: 0 0 var(--s-3); }
+.capacity-token-grid { display: grid; }
+.capacity-token-row { display: grid; grid-template-columns: var(--token-template); column-gap: var(--s-6); align-items: center; padding: var(--s-2) 0; border-bottom: var(--rule); }
+.capacity-token-row:not(.capacity-token-head):hover { background: color-mix(in oklab, var(--accent) 6%, var(--surface)); }
+.capacity-token-head { align-items: end; border-bottom: 1px solid var(--line2); font-family: var(--font-sans); font-size: var(--fs-3); line-height: 1.3; color: var(--muted); }
+.capacity-token-head > span { display: flex; flex-direction: column; gap: var(--s-1); cursor: help; }
+.capacity-token-head b { font-weight: var(--fw-medium); color: var(--muted); }
+.capacity-token-head i { display: inline-block; width: 9px; height: 9px; margin-right: var(--s-2); border-radius: var(--r-bar); vertical-align: -1px; }
+.capacity-token-swatches { display: inline-flex; gap: 2px; margin-right: var(--s-2); vertical-align: -1px; }
+.capacity-token-swatches > i { margin-right: 0 !important; }
+.capacity-token-cycle { display: flex; flex-direction: column; font-size: var(--fs-3); line-height: 1.45; white-space: nowrap; }
+.capacity-token-cell { display: grid; grid-template-columns: minmax(0, 1fr) 46px 44px; gap: var(--s-3); align-items: center; min-width: 0; }
+.capacity-token-share { font-size: var(--fs-3); color: var(--muted); text-align: right; white-space: nowrap; }
+.capacity-token-track { display: block; box-sizing: border-box; height: 8px; border: 1px solid var(--line); border-radius: var(--r-bar); background: var(--sunk); overflow: hidden; }
+/* Stacked parts are separated by a hairline of the card surface. */
+.capacity-token-fill { display: flex; gap: 1px; height: 100%; border-radius: inherit; overflow: hidden; }
+.capacity-token-fill > span { flex-basis: 0; min-width: 1px; height: 100%; }
+.capacity-token-value { font-size: var(--fs-3); text-align: right; white-space: nowrap; }
+.capacity-token-empty { grid-column: 2 / -2; }
+.capacity-token-row > .capacity-right { font-size: var(--fs-3); }
+
+.capacity-cycle-details { min-width: 0; margin-top: var(--s-4); padding: var(--s-4) 0; border-top: var(--rule); overflow-x: auto; }
+
+/* Disclosures below the list: "▸ Compare two cycles", "▸ Estimate uncertainty", "▸ Historical promotions and sources". */
+.capacity-detail { margin-top: var(--s-4); }
+.capacity-section + .capacity-detail { margin-top: var(--s-7); border-top: var(--rule); padding-top: var(--s-5); }
+.capacity-detail > summary { list-style: none; cursor: pointer; font-family: var(--font-mono); font-size: var(--fs-4); color: var(--text); white-space: nowrap; }
+.capacity-detail > summary::-webkit-details-marker { display: none; }
+.capacity-detail > summary::before { content: "▸ "; }
+.capacity-detail[open] > summary::before { content: "▾ "; }
+.capacity-detail[open] > summary { margin-bottom: var(--s-4); }
+.capacity-detail p { font-size: var(--fs-3); color: var(--muted); line-height: 1.55; max-width: 900px; }
+.capacity-detail li { margin: var(--s-5) 0; }
+.capacity-pair { display: flex; gap: var(--s-6); flex-wrap: wrap; margin: var(--s-4) 0; }
+.capacity-pair label { display: flex; align-items: center; gap: var(--s-3); font-family: var(--font-sans); font-size: var(--fs-3); color: var(--muted); }
+.capacity-report :is(button, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* Comparison: the two cycles in one row, "before → after" tiles, then one dumbbell per model. */
+.capacity-compare-head { display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap; margin-bottom: var(--s-7); color: var(--muted); }
+.capacity-compare-arrow { color: var(--faint); font-weight: var(--fw-regular); }
+/* The earlier value: a hollow ring beside the later value's filled dot (.capacity-dot). */
+.capacity-compare-before { position: absolute; top: 50%; width: 11px; height: 11px; box-sizing: border-box; border-radius: var(--r-dot); border: 2px solid var(--muted); background: var(--surface); transform: translate(-50%, -50%); }
+.capacity-legend i.is-legend { position: static; width: 11px; height: 11px; transform: none; }
+.capacity-comparison .capacity-section { margin-top: var(--s-9); }
+.capacity-dumbbells { display: grid; }
+.capacity-dumbbell { display: grid; grid-template-columns: minmax(120px, 0.22fr) minmax(0, 1fr) 140px; column-gap: var(--s-6); align-items: center; padding: var(--s-3) 0; border-bottom: var(--rule); font-size: var(--fs-3); }
+.capacity-dumbbell-track { position: relative; height: 14px; border-bottom: 1px solid var(--line); }
+.capacity-dumbbell-link { position: absolute; top: 50%; height: 2px; background: var(--line2); transform: translateY(-50%); }
+
+/* Methodology: the calculation as five steps with the worked example, uncertainty bands, the announcement axis. */
+.capacity-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-3); margin: var(--s-5) 0 0; padding: 0; list-style: none; counter-reset: step; }
+.capacity-steps > li { position: relative; display: grid; gap: var(--s-1); margin: 0; padding: var(--s-4) var(--s-5); border-top: 2px solid var(--line2); font-size: var(--fs-3); color: var(--muted); }
+.capacity-steps > li > b { font-family: var(--font-figure); font-size: var(--fs-6); font-weight: var(--fw-medium); color: var(--text); }
+.capacity-steps > li:last-child { border-top-color: var(--accent); }
+.capacity-steps > li > span { display: inline-flex; align-items: center; gap: var(--s-2); }
+.capacity-bands { display: grid; margin-top: var(--s-3); }
+.capacity-band-row { display: grid; grid-template-columns: 110px minmax(0, 1fr) 200px; column-gap: var(--s-6); align-items: center; padding: var(--s-3) 0; border-bottom: var(--rule); font-size: var(--fs-3); }
+.capacity-band-row > .capacity-band-track { position: relative; height: 12px; box-sizing: border-box; border: 1px solid var(--line); border-radius: var(--r-bar); background: var(--sunk); }
+.capacity-legend i.is-kind { width: 9px; height: 9px; }
+.capacity-promotion-timeline { margin-top: var(--s-3); }
+.capacity-promotion-axis { position: relative; height: calc(var(--s-8) + var(--lanes) * 14px + var(--s-3)); border-bottom: 1px solid var(--line2); }
+.capacity-promotion-month { position: absolute; bottom: 0; height: var(--s-4); border-left: 1px solid var(--line2); }
+.capacity-promotion-month > small { position: absolute; top: calc(100% + var(--s-2)); left: 0; transform: translateX(-50%); font-family: var(--font-mono); font-size: var(--fs-2); color: var(--faint); white-space: nowrap; }
+.capacity-promotion-point { position: absolute; width: 10px; height: 10px; border-radius: var(--r-dot); transform: translateX(-50%); cursor: pointer; }
+.capacity-promotion-point.is-period { height: 8px; border-radius: var(--r-bar); transform: none; min-width: 10px; }
+.capacity-promotion-point:hover, .capacity-promotion-point:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+.capacity-promotion-timeline + * { margin-top: var(--s-9); }
+.capacity-promotion-timeline .capacity-legend.is-below { margin-top: var(--s-8); }
+
+.capacity-milestones { font-size: var(--fs-3); color: var(--muted); margin: var(--s-4) 0 var(--s-7); }
+.capacity-milestones > div { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-9); margin-top: var(--s-2); color: var(--text); }
+.capacity-milestones b { display: inline-block; min-width: 15px; }

@@ -1,0 +1,33 @@
+/* Details panel: state on the left, events to act on in the right column (wide enough for one-line items). It reaches down to the
+   bottom of the window (header and strip take about 140px); each column scrolls on its own beyond that. */
+.status-details-columns { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(440px, 1fr); padding: 0; }
+.status-details-state,
+.status-details-events { height: calc(100vh - 140px); overflow-y: auto; align-content: start; display: grid; }
+.status-details-state { padding: var(--s-4) var(--s-9) var(--s-6); gap: var(--s-5); }
+.status-details-events { padding: var(--s-6) var(--s-8) var(--s-6); gap: var(--s-6); border-left: var(--rule); }
+.status-details-events h3 { margin: 0; font-size: var(--fs-5); font-weight: var(--fw-semibold); color: var(--text); }
+.status-details-events > * + * + * { padding-top: var(--s-6); border-top: var(--rule); }
+.status-details-empty { margin: 0; font-size: var(--fs-3); color: var(--muted); }
+
+/* One event group: a head row with its action on the right, then its lines. */
+.status-event { display: grid; gap: var(--s-4); font-size: var(--fs-4); }
+.status-event-head { display: flex; justify-content: space-between; align-items: center; gap: var(--s-4); min-height: 28px; }
+.status-event-head > strong { font-weight: var(--fw-semibold); }
+.status-event-head .is-warn { color: var(--warn); }
+.status-event-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--s-2); }
+.status-event-count { margin-left: var(--s-3); color: var(--muted); font-weight: var(--fw-regular); }
+.status-event-meta { color: var(--muted); font-size: var(--fs-3); line-height: 1.5; }
+.status-event-item { display: grid; gap: var(--s-1); }
+/* Items of one group are separated by a rule so wrapped lines never read as the next item. */
+.status-event-item + .status-event-item { padding-top: var(--s-4); border-top: 1px solid var(--line); }
+.status-event-item-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-4); }
+.status-event-item-head > strong { font-weight: var(--fw-semibold); }
+.status-event-item-head > strong.is-warn { color: var(--warn); }
+.status-event-item-head > strong.is-ok { color: var(--ok); }
+.status-event-item-head > .status-event-meta { white-space: nowrap; }
+.status-event-item > .status-event-actions { margin-top: var(--s-2); }
+.status-event-dot { display: inline-block; width: 6px; height: 6px; margin-right: var(--s-2); border-radius: var(--r-dot); }
+.status-event-rows { display: grid; gap: var(--s-2); margin: 0; padding: 0; list-style: none; }
+.status-event-rows > li { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-4); }
+.status-event-rows > li > :first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status-event-rows > li > :last-child { flex: 0 0 auto; }

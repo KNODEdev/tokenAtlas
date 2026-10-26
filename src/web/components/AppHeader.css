@@ -1,0 +1,111 @@
+/* Top bar — docs/design/tokenAtlas.dc.html: starts after the navigation bar, search on the left. */
+.shell-header {
+  position: sticky; top: 0; z-index: var(--z-header); flex: 0 0 auto; height: 52px; display: flex; align-items: center;
+  gap: var(--s-6); padding: 0 var(--s-6) 0 var(--s-7); background: var(--bg); border-bottom: 1px solid var(--pencil);
+}
+.shell-header.is-compact { gap: var(--s-3); padding: 0 var(--s-5); }
+.shell-header-menu {
+  padding: var(--s-3) var(--s-4); border-radius: var(--r-control); border: 1px solid var(--pencil); background: var(--surface); box-shadow: var(--lift);
+  color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-5); line-height: 1; cursor: pointer; flex: 0 0 auto;
+}
+.shell-search {
+  margin-right: auto; display: flex; align-items: center; gap: var(--s-4); width: 268px; height: 30px; padding: 0 var(--s-5);
+  border: 1px solid var(--line2); border-radius: var(--r-control); background: var(--surface); color: var(--muted);
+  font-family: var(--font-mono); font-size: var(--fs-3); text-align: left; cursor: pointer; flex: 0 1 auto;
+}
+.shell-search:hover { border-color: var(--pencil); color: var(--text); }
+.shell-header.is-compact .shell-search { width: 40px; margin-left: auto; margin-right: 0; }
+.shell-search-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shell-search-key { font-size: var(--fs-1); border: 1px solid var(--line2); border-radius: var(--r-chip); padding: 0 var(--s-2); }
+
+.shell-lang { display: inline-flex; gap: var(--s-1); flex: 0 0 auto; }
+.shell-lang-option {
+  padding: var(--s-2) var(--s-4); border: 1px solid transparent; border-radius: var(--r-chip); background: transparent;
+  color: var(--muted); font-family: var(--font-sans); font-size: var(--fs-3); font-weight: var(--fw-regular); line-height: 1; cursor: pointer;
+}
+.shell-lang-option:hover { color: var(--text); }
+.shell-lang-option.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--text); font-weight: var(--fw-semibold); box-shadow: var(--lift-pressed); }
+
+.shell-control-icon { width: var(--s-8); height: var(--s-8); flex: 0 0 auto; }
+.shell-theme { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.shell-privacy {
+  display: inline-flex; align-items: center; gap: var(--s-3);
+  flex: 0 0 auto; height: 28px; padding: 0 var(--s-5); border: 1px solid var(--pencil); border-radius: var(--r-control);
+  background: var(--surface); color: var(--text); font-family: var(--font-sans); font-size: var(--fs-4); font-weight: var(--fw-medium);
+  white-space: nowrap; cursor: pointer; box-shadow: var(--lift);
+}
+.shell-privacy:hover { background: var(--accent-soft); }
+.shell-privacy[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: var(--lift-pressed); }
+
+/* OpenAI context-in-price preview: a switch for the whole app; on, it glows in the accent so it cannot be missed. */
+.shell-context {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: var(--s-3); height: 28px; padding: 0 var(--s-5);
+  border: 1px solid var(--pencil); border-radius: var(--r-control); background: var(--surface); color: var(--muted);
+  font-family: var(--font-sans); font-size: var(--fs-4); font-weight: var(--fw-medium); white-space: nowrap; cursor: pointer; box-shadow: var(--lift);
+}
+.shell-context:hover:not(:disabled) { background: var(--accent-soft); color: var(--text); }
+.shell-context-track { position: relative; width: 26px; height: 14px; box-sizing: border-box; border: 1px solid var(--line2); border-radius: var(--r-pill); background: var(--sunk); }
+.shell-context-track > span { position: absolute; top: 1px; left: 1px; width: 10px; height: 10px; border-radius: var(--r-dot); background: var(--muted); transition: left .12s ease; }
+.shell-context[data-on] {
+  border-color: var(--accent); background: var(--accent); color: var(--accent-ink); font-weight: var(--fw-semibold);
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 14px var(--accent);
+}
+.shell-context[data-on] .shell-context-track { border-color: var(--accent-ink); background: var(--accent-ink); }
+.shell-context[data-on] .shell-context-track > span { left: 13px; background: var(--accent); }
+/* On, but this screen does not apply the preview: same switch position and accent identity, but outlined (dashed), unfilled, no glow, muted label. */
+.shell-context[data-on][data-unsupported] {
+  border-style: dashed; border-color: var(--accent); background: var(--surface); color: var(--muted); font-weight: var(--fw-medium);
+  box-shadow: var(--lift);
+}
+.shell-context[data-on][data-unsupported] .shell-context-track { border-style: dashed; border-color: var(--accent); background: transparent; }
+.shell-context[data-on][data-unsupported] .shell-context-track > span { background: var(--accent); }
+
+.shell-user { position: relative; flex: 0 0 auto; }
+.shell-user-button {
+  display: flex; align-items: center; gap: var(--s-4); padding: var(--s-1) var(--s-3) var(--s-1) var(--s-1);
+  border: 1px solid var(--pencil); border-radius: var(--r-control); background: var(--surface); color: var(--text);
+  font: inherit; text-align: left; cursor: pointer; box-shadow: var(--lift);
+}
+.shell-user-button:hover, .shell-user-button[aria-expanded="true"] { background: var(--accent-soft); }
+.shell-user-initials {
+  width: 26px; height: 26px; flex: 0 0 26px; border-radius: var(--r-dot); background: var(--accent-soft); border: 1px solid var(--accent);
+  display: flex; align-items: center; justify-content: center; font-size: var(--fs-2); font-weight: var(--fw-semibold); color: var(--accent);
+}
+.shell-user-name { line-height: 1.2; }
+.shell-user-name > span { display: block; font-size: var(--fs-3); font-weight: var(--fw-medium); }
+.shell-user-name > span + span { font-family: var(--font-mono); font-size: var(--fs-1); font-weight: var(--fw-regular); color: var(--faint); }
+.shell-caret { color: var(--faint); font-size: var(--fs-2); }
+.shell-user-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; width: 248px; z-index: var(--z-drawer); overflow: hidden; text-align: left;
+  background: var(--surface); border: 1px solid var(--pencil); border-radius: var(--r-card); box-shadow: var(--lift), var(--shadow);
+}
+.shell-user-menu-head { padding: var(--s-5) var(--s-6); border-bottom: var(--rule); }
+.shell-user-menu-head > div:first-child { font-size: var(--fs-4); font-weight: var(--fw-semibold); }
+.shell-user-menu-head > div + div { font-family: var(--font-mono); font-size: var(--fs-2); color: var(--muted); margin-top: var(--s-px); }
+.shell-user-menu-list { padding: var(--s-2); display: flex; flex-direction: column; gap: var(--s-px); }
+.shell-menu-item {
+  display: flex; align-items: center; gap: var(--s-4); width: 100%; padding: var(--s-3) var(--s-4); border: none; border-radius: var(--r-sm);
+  background: transparent; color: var(--text); font-family: var(--font-sans); font-size: var(--fs-4); text-align: left; cursor: pointer;
+}
+.shell-menu-item:hover { background: var(--accent-soft); }
+.shell-menu-icon { width: 14px; text-align: center; font-family: var(--font-mono); font-size: var(--fs-3); color: var(--faint); }
+.shell-menu-label { flex: 1; min-width: 0; }
+.shell-menu-hint { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--faint); }
+
+/* Shell frame: navigation bar full height, everything else in a column beside it. */
+.shell { display: flex; min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--font-sans); font-size: var(--fs-5); line-height: 1.45; letter-spacing: normal; }
+.shell-column { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* Screen title bar under the top bar. */
+.screen-head {
+  position: sticky; z-index: var(--z-sticky); background: var(--bg); border-bottom: var(--rule);
+  box-sizing: border-box; padding: var(--s-3) var(--s-9); display: flex; align-items: center;
+  justify-content: space-between; gap: var(--s-4) var(--s-8); flex-wrap: wrap;
+}
+/* Title and subtitle share one line, so the pinned head stays one row tall (user, 2026-10-21). */
+.screen-head-title { min-width: 0; display: flex; align-items: baseline; gap: var(--s-2) var(--s-6); flex-wrap: wrap; }
+.screen-head-title h1 { margin: 0; font-family: var(--font-display); font-size: var(--fs-title); font-weight: var(--fw-display); font-synthesis: none; line-height: 1.1; letter-spacing: var(--ls-display); }
+.screen-head-title > div { font-size: var(--fs-4); color: var(--muted); }
+.screen-head-controls { display: flex; align-items: center; gap: var(--s-4) var(--s-5); flex-wrap: wrap; }
+/* Every report control stays mounted; a long project name ellipsizes so the row keeps one line. */
+.screen-head-project { max-width: calc(var(--s-10) * 7); }

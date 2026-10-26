@@ -1,0 +1,63 @@
+/* Drawer of one cycle: a paper sheet with a pencil edge; sections divided by dashed rules. */
+.capacity-cycle-drawer {
+  position: fixed; inset: 0 0 0 auto; margin: 0; padding: 0;
+  width: min(1120px, 100vw); max-width: 100vw; height: 100dvh; max-height: 100dvh;
+  background: var(--surface); color: var(--text); border: 1px solid var(--pencil); border-right: 0; border-radius: var(--r-card);
+  box-shadow: var(--shadow); font-family: var(--font-sans); font-size: var(--fs-4);
+}
+.capacity-cycle-drawer::backdrop { background: color-mix(in oklab, var(--bg) 72%, transparent); }
+.capacity-cycle-drawer-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-8); padding: var(--s-9) var(--s-10); border-bottom: 1px solid var(--pencil); }
+.capacity-cycle-drawer-header h2 { margin: 0; font-family: var(--font-display); font-weight: var(--fw-display); font-synthesis: none; font-size: var(--fs-card-title); line-height: 1.2; letter-spacing: -0.01em; }
+.capacity-cycle-drawer-header p { margin: var(--s-2) 0 0; font-size: var(--fs-3); color: var(--muted); overflow-wrap: anywhere; }
+.capacity-cycle-drawer-body { padding: var(--s-9) var(--s-10); }
+/* Bare controls of the drawer and of the evidence inside it; classed primitives keep their own look. */
+.capacity-cycle-drawer button:not([class]) {
+  border: 1px solid var(--pencil); border-radius: var(--r-control); padding: var(--s-3) var(--s-6);
+  background: var(--surface); color: var(--text); box-shadow: var(--lift);
+  font-family: var(--font-sans); font-size: var(--fs-4); font-weight: var(--fw-medium); cursor: pointer; white-space: nowrap;
+}
+.capacity-cycle-drawer button:not([class]):hover { background: var(--accent-soft); }
+/* A dropdown given no look of its own is bare too. */
+.capacity-cycle-drawer .ui-dropdown:not(.ui-input, .ui-selector-field), .capacity-cycle-drawer input:not([class]) {
+  border: 1px solid var(--line2); border-radius: var(--r-chip); padding: var(--s-3) var(--s-5);
+  background: var(--surface); color: var(--text); font: inherit; outline: none;
+}
+.capacity-cycle-drawer .ui-dropdown:not(.ui-input, .ui-selector-field):focus, .capacity-cycle-drawer input:not([class]):focus { border-color: var(--accent); }
+.capacity-cycle-drawer :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.capacity-cycle-controls, .capacity-cycle-dates { display: flex; flex-wrap: wrap; gap: var(--s-6); align-items: flex-end; }
+.capacity-cycle-controls label, .capacity-cycle-dates label { display: flex; flex-direction: column; gap: var(--s-2); font-size: var(--fs-3); font-weight: var(--fw-medium); color: var(--muted); }
+.capacity-cycle-controls > span { color: var(--muted); padding-bottom: var(--s-3); }
+.capacity-cycle-chart { margin: var(--s-10) 0 var(--s-5); }
+.capacity-cycle-chart figcaption { display: flex; justify-content: space-between; gap: var(--s-7); font-size: var(--fs-3); font-weight: var(--fw-medium); color: var(--accent); }
+.capacity-cycle-chart figcaption span:last-child { color: var(--warn); }
+.capacity-cycle-chart svg, .capacity-cycle-brush svg { display: block; width: 100%; overflow: visible; }
+.capacity-cycle-chart text, .capacity-cycle-brush text { font-family: var(--font-figure); font-size: var(--fs-2); fill: var(--muted); }
+.capacity-cycle-chart p, .capacity-cycle-brush p { color: var(--muted); font-size: var(--fs-3); line-height: 1.6; }
+.capacity-cycle-brush { padding: var(--s-6) 0; border-top: var(--rule); }
+.capacity-cycle-brush svg { touch-action: none; user-select: none; cursor: crosshair; }
+.capacity-cycle-brush [role="slider"] { cursor: ew-resize; }
+.capacity-cycle-dates { margin-top: var(--s-4); }
+.capacity-cycle-dates p { flex-basis: 100%; color: var(--warn); }
+.capacity-cycle-selection-label { color: var(--muted); margin: var(--s-9) 0 var(--s-5); font-variant-numeric: tabular-nums; }
+/* Read-outs of the selection: cells divided by dashed rules, no inner frames. */
+.capacity-cycle-results { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 0; border-block: 1px solid var(--line); }
+.capacity-cycle-results > div { padding: var(--s-5) var(--s-7) var(--s-6); }
+.capacity-cycle-results > div + div { border-left: var(--rule); }
+.capacity-cycle-results dt { color: var(--muted); font-size: var(--fs-3); font-weight: var(--fw-medium); line-height: 1.3; }
+.capacity-cycle-results dd { font-size: var(--fs-7); margin: var(--s-3) 0 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.capacity-cycle-matched, .capacity-cycle-note, .capacity-cycle-notice { line-height: 1.6; margin-top: var(--s-6); }
+.capacity-cycle-matched { color: var(--muted); }
+.capacity-cycle-matched strong { color: var(--text); font-weight: var(--fw-medium); }
+.capacity-cycle-notice { color: var(--warn); }
+.capacity-cycle-note { color: var(--muted); font-size: var(--fs-3); }
+/* Figures of the whole cycle, then the section tabs; one panel below them. */
+.capacity-cycle-tabs { margin: var(--s-9) 0 var(--s-8); }
+.capacity-cycle-panel > [hidden] { display: none; }
+.capacity-cycle-evidence > .capacity-cycle-details > :first-child { margin-top: 0; }
+@media (max-width: 700px) {
+  .capacity-cycle-drawer-header, .capacity-cycle-drawer-body { padding: var(--s-8); }
+  .capacity-cycle-results { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .capacity-cycle-chart svg { min-height: 180px; }
+  .capacity-cycle-brush svg { min-height: 80px; }
+  .capacity-cycle-dates label { flex: 1; min-width: 210px; }
+}

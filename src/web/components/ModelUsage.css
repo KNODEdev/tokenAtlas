@@ -1,0 +1,20 @@
+/* Models view (docs/design/audit-models-events-projects-mockup.html); heads, legends and folds come from History.css and Usage.css. */
+.models { display: flex; flex-direction: column; gap: var(--s-7); margin-top: var(--s-7); min-width: 0; }
+.models-tile-stack { margin-top: var(--s-4); }
+.models-muted { color: var(--faint); font-style: italic; }
+/* Section headings inside the analysis card are text, not titles: the card's views carry the title voice. */
+.models .archive-head b { font-family: var(--font-sans); font-size: var(--fs-5); font-weight: var(--fw-semibold); color: var(--text); }
+
+/* One bar per model: its length is the model's tokens, its segments the recorded modes. */
+.models-chart .archive-head { margin-bottom: var(--s-3); }
+.models-bar { display: flex; gap: 1px; height: 8px; border-radius: var(--r-bar); overflow: hidden; }
+.models-bar > span { display: block; min-width: 1px; }
+
+.models-contexts { display: flex; flex-direction: column; gap: var(--s-4); padding-top: var(--s-6); border-top: var(--rule); }
+.models-context-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2) var(--s-8); font-size: var(--fs-3); color: var(--muted); }
+.models-context-list > span { display: flex; align-items: baseline; gap: var(--s-3); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.models-context-list i { display: inline-block; width: 8px; height: 8px; border-radius: var(--r-bar); flex-shrink: 0; }
+.models-context-list code { font-family: var(--font-figure); font-size: var(--fs-2); color: var(--faint); overflow: hidden; text-overflow: ellipsis; }
+.models-context-list b { margin-left: auto; font-family: var(--font-figure); font-weight: var(--fw-medium); letter-spacing: var(--ls-tight); color: var(--text); }
+
+.models-pages { margin-top: var(--s-4); font-size: var(--fs-3); color: var(--muted); }

@@ -1,0 +1,25 @@
+{
+  "_comment": "Context tiers by rate vendor and model, merged into rate-cards.json by code that prices them (src/server/rate-cards-file.ts). A model may have a tier or not; `long_context` rates apply to a request whose prompt input, cache reads and writes included, is strictly above `above_input_tokens`. Fields of a rate-cards.json entry for the same model win; `\"long_context\": null` there removes the tier.",
+  "vendors": {
+    "anthropic": {
+      "claude-haiku-5-5": {
+        "note": "Official price (platform.claude.com/docs/en/models/haiku-5-5/overview), verified 2026-10-13: above 100,000 prompt tokens every category costs 5x.",
+        "in_uncached": 0.1,
+        "in_cache_read": 0.01,
+        "in_cache_write_5m": 0.125,
+        "in_cache_write_1h": 0.2,
+        "out_total": 0.5,
+        "long_context": {
+          "above_input_tokens": 100000,
+          "rates": {
+            "in_uncached": 0.5,
+            "in_cache_read": 0.05,
+            "in_cache_write_5m": 0.625,
+            "in_cache_write_1h": 1.0,
+            "out_total": 2.5
+          }
+        }
+      }
+    }
+  }
+}

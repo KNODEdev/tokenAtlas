@@ -1,0 +1,55 @@
+/* Capacity → Measurements: toolbar of shared controls, a compact aligned table; a row opens its detail in a drawer. */
+.measurements { display: flex; flex-direction: column; gap: var(--s-5); margin-top: var(--s-5); font-size: var(--fs-4); }
+.measurements h3 { font-size: var(--fs-5); font-weight: var(--fw-semibold); margin: 0; white-space: nowrap; }
+.measurements .capacity-section-head { margin: 0; }
+.measurements-toolbar { gap: var(--s-4) var(--s-8); }
+.measurements-scroll { overflow-x: auto; }
+.measurements-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--fs-4); }
+.measurements-table th {
+  padding: var(--s-3); border-bottom: 1px solid var(--line2); vertical-align: bottom; text-align: left;
+  font-family: var(--font-sans); font-size: var(--fs-3); font-weight: var(--fw-regular); line-height: 1.3;
+  color: var(--muted); overflow-wrap: break-word; hyphens: none;
+}
+.measurements-table td { padding: var(--s-3); border-bottom: var(--rule); vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.measurements-table .is-number { text-align: right; }
+.measurements-table td.mono { font-size: var(--fs-3); }
+/* Numeric columns speak in the figure voice, as in .ui-td.is-num. */
+.measurements-table td.mono.is-number { font-family: var(--font-figure); letter-spacing: var(--ls-tight); }
+.measurements-table td.measurements-evidence { white-space: normal; line-height: 1.9; }
+.measurements-evidence .ui-pill { display: inline-block; margin-right: var(--s-2); line-height: 1.4; font-family: var(--font-sans); font-size: var(--fs-2) !important; }
+.measurements-when { display: flex; flex-direction: column; line-height: 1.4; }
+.measurements-when > span { color: var(--faint); }
+/* The actions column stays in view while wide column sets scroll. */
+.measurements-actions, .measurements-actions-head { position: sticky; right: 0; background: var(--surface); text-align: right; box-shadow: -1px 0 var(--line); }
+.measurements-details::after { content: " ›"; color: var(--faint); }
+.measurements-panel-row > td { padding: var(--s-5) 0 var(--s-7); white-space: normal; overflow: visible; background: transparent !important; }
+/* API value per 1%: a short bar on one scale for the listed cycles, beside the number. */
+.measurements-bar-cell { display: inline-flex; align-items: center; gap: var(--s-4); width: 100%; justify-content: flex-end; }
+.measurements-bar { flex: 1 1 auto; max-width: 72px; height: 6px; box-sizing: border-box; border: 1px solid var(--line); border-radius: var(--r-bar); background: var(--sunk); overflow: hidden; }
+.measurements-bar > span { display: block; height: 100%; background: var(--measure-api); }
+.measurements :is(button, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Row actions: one family of small ghost buttons, stacked to the right when the column is narrow. */
+.measurements-table td.measurements-actions { white-space: normal; overflow: visible; }
+.measurements-actions-inner { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--s-2); }
+.measurements-action {
+  padding: var(--s-1) var(--s-4); border: 1px solid var(--line2); border-radius: var(--r-control); background: var(--surface);
+  color: var(--text); font-family: var(--font-sans); font-size: var(--fs-3); line-height: 1.5; cursor: pointer; white-space: nowrap;
+}
+/* Row buttons carry no pencil shadow; open = the pressed look without the lift. */
+.measurements-action:hover { border-color: var(--pencil); background: var(--accent-soft); }
+.measurements-action[aria-expanded="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.measurements-action.is-danger { color: var(--crit); border-color: color-mix(in oklab, var(--crit) 35%, transparent); }
+.measurements-action.is-danger:hover { background: var(--crit-soft); border-color: color-mix(in oklab, var(--crit) 55%, transparent); color: var(--crit); }
+.measurements-actions .manual-confirm { flex-wrap: wrap; justify-content: flex-end; gap: var(--s-2) var(--s-3); line-height: 1.4; }
+
+/* Wide sub-tables in the evidence scroll; their edges shade while more is hidden. No inner frame.
+   --shade is the colour of the surface behind them (the detail drawer sets it to --surface). */
+.evidence div:has(> table) {
+  border-radius: var(--r-chip);
+  background:
+    linear-gradient(to right, var(--shade, var(--sunk)) 40%, transparent) left / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--shade, var(--sunk)) 40%, transparent) right / 28px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, color-mix(in oklab, var(--text) 22%, transparent), transparent) left / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, color-mix(in oklab, var(--text) 22%, transparent), transparent) right / 12px 100% no-repeat scroll;
+}

@@ -1,0 +1,124 @@
+{
+  "_comment": [
+    "WZORZEC v2. Skopiuj do katalogu konfiguracji wybranego w Ustawieniach.",
+    "subscriptions zawiera tylko metadane kont. sources zawiera tylko fizyczne zrodla.",
+    "Przypisanie zrodla do konta i planu jest datowanym okresem w Ustawieniach -> Okresy kont.",
+    "Okresy deklarowane sa zapisywane oddzielnie w account-periods.json.",
+    "Zmiana okresu nie przestemplowuje zdarzen ani nie wycenia ponownie historii.",
+    "Sciezki przyjmuja ${ARCHIVE}, ${USERPROFILE}, ${MACHINE}, ${LOGIN}, ${PROFILE} i ~.",
+    "account to historyczna wskazowka e-mail do wyswietlania, nie regula przypisania zrodla.",
+    "Jedno zrodlo moze kolejno nalezec do roznych kont. Kilka zrodel moze nalezec do jednego konta.",
+    "Zrodlo bez okresu pozostaje zarchiwizowane, a nieprzypisane dane nie sa domyslnie przypisywane do konta.",
+    "Dla istniejacego pliku przygotuj kandydata scripts/prepare-accounts-v2.ts; runtime nie czyta v1."
+  ],
+  "version": 2,
+  "subscriptions": [
+    {
+      "id": "codex1",
+      "vendor": "codex",
+      "account": "ja@example.com"
+    },
+    {
+      "id": "codex2",
+      "vendor": "codex",
+      "account": "ja2@example.com"
+    },
+    {
+      "id": "claude-main",
+      "vendor": "claude",
+      "account": "claude@example.com"
+    },
+    {
+      "id": "grok",
+      "vendor": "grok",
+      "account": "grok@example.com"
+    },
+    {
+      "id": "agy1",
+      "vendor": "gemini",
+      "account": "agy1@example.com"
+    },
+    {
+      "id": "agy2",
+      "vendor": "gemini",
+      "account": "agy2@example.com"
+    },
+    {
+      "id": "agy3",
+      "vendor": "gemini",
+      "account": "agy3@example.com"
+    },
+    {
+      "id": "agy4",
+      "vendor": "gemini",
+      "account": "agy4@example.com"
+    },
+    {
+      "id": "agy5",
+      "vendor": "gemini",
+      "account": "agy5@example.com"
+    },
+    {
+      "id": "agy6",
+      "vendor": "gemini",
+      "account": "agy6@example.com"
+    }
+  ],
+  "sources": [
+    {
+      "vendor": "codex",
+      "machine": "MOJ-PC",
+      "login": "ja",
+      "home": "${ARCHIVE}/codex/${PROFILE}",
+      "source_home": "~/.codex"
+    },
+    {
+      "vendor": "claude",
+      "machine": "MOJ-PC",
+      "login": "ja",
+      "home": "${ARCHIVE}/claude/MOJ-PC"
+    },
+    {
+      "vendor": "grok",
+      "machine": "MOJ-PC",
+      "login": "ja",
+      "home": "${ARCHIVE}/grok/MOJ-PC-ja"
+    },
+    {
+      "vendor": "gemini",
+      "machine": "MOJ-PC",
+      "login": "agy1",
+      "home": "${ARCHIVE}/gemini/MOJ-PC-agy1"
+    },
+    {
+      "vendor": "gemini",
+      "machine": "MOJ-PC",
+      "login": "agy2",
+      "home": "${ARCHIVE}/gemini/MOJ-PC-agy2"
+    },
+    {
+      "vendor": "gemini",
+      "machine": "MOJ-PC",
+      "login": "agy3",
+      "home": "${ARCHIVE}/gemini/MOJ-PC-agy3"
+    },
+    {
+      "vendor": "gemini",
+      "machine": "MOJ-PC",
+      "login": "agy4",
+      "home": "${ARCHIVE}/gemini/MOJ-PC-agy4"
+    },
+    {
+      "vendor": "gemini",
+      "machine": "MOJ-PC",
+      "login": "agy5",
+      "home": "${ARCHIVE}/gemini/MOJ-PC-agy5"
+    },
+    {
+      "vendor": "gemini",
+      "machine": "MOJ-PC",
+      "login": "agy6",
+      "home": "${ARCHIVE}/gemini/MOJ-PC-agy6"
+    }
+  ]
+}

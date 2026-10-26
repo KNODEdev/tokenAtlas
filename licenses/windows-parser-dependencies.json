@@ -1,0 +1,697 @@
+{
+  "target": "x86_64-pc-windows-msvc",
+  "source": "Actual release compiler-artifact messages; includes build dependencies for conservative notice preservation.",
+  "packages": [
+    {
+      "ecosystem": "cargo",
+      "name": "ahash",
+      "version": "0.8.12",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75",
+      "source": "https://crates.io/crates/ahash/0.8.12",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "aho-corasick",
+      "version": "1.1.4",
+      "license": "Unlicense OR MIT",
+      "checksum": "ddd31a130427c27518df266943a5308ed92d4b226cc639f5a8f1002816174301",
+      "source": "https://crates.io/crates/aho-corasick/1.1.4",
+      "notice_status": "included",
+      "notice_files": [
+        "COPYING",
+        "LICENSE-MIT",
+        "UNLICENSE"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "autocfg",
+      "version": "1.5.1",
+      "license": "Apache-2.0 OR MIT",
+      "checksum": "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53",
+      "source": "https://crates.io/crates/autocfg/1.5.1",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "bitflags",
+      "version": "2.11.1",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "c4512299f36f043ab09a583e57bceb5a5aab7a73db1805848e8fef3c9e8c78b3",
+      "source": "https://crates.io/crates/bitflags/2.11.1",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "block-buffer",
+      "version": "0.10.4",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71",
+      "source": "https://crates.io/crates/block-buffer/0.10.4",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "cc",
+      "version": "1.5.1",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "f360145194ee8e21db5ee7f3fcd4fe52210864c75c985dae33218202c8bbe040",
+      "source": "https://crates.io/crates/cc/1.5.1",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "cfg-if",
+      "version": "1.0.4",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801",
+      "source": "https://crates.io/crates/cfg-if/1.0.4",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "chrono-tz",
+      "version": "0.10.4",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "a6139a8597ed92cf816dfb33f5dd6cf0bb93a6adc938f11039f371bc5bcd26c3",
+      "source": "https://crates.io/crates/chrono-tz/0.10.4",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE",
+        "tz/LICENSE"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "chrono",
+      "version": "0.4.44",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "c673075a2e0e5f4a1dde27ce9dee1ea4558c7ffe648f576438a20ca1d2acc4b0",
+      "source": "https://crates.io/crates/chrono/0.4.44",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "cpufeatures",
+      "version": "0.2.17",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280",
+      "source": "https://crates.io/crates/cpufeatures/0.2.17",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "crypto-common",
+      "version": "0.1.7",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a",
+      "source": "https://crates.io/crates/crypto-common/0.1.7",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "digest",
+      "version": "0.10.7",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292",
+      "source": "https://crates.io/crates/digest/0.10.7",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "fallible-iterator",
+      "version": "0.3.0",
+      "license": "MIT/Apache-2.0",
+      "checksum": "2acce4a10f12dc2fb14a218589d4f1f62ef011b2d0cc4b3cb1bba8e94da14649",
+      "source": "https://crates.io/crates/fallible-iterator/0.3.0",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "fallible-streaming-iterator",
+      "version": "0.1.9",
+      "license": "MIT/Apache-2.0",
+      "checksum": "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a",
+      "source": "https://crates.io/crates/fallible-streaming-iterator/0.1.9",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "find-msvc-tools",
+      "version": "0.1.14",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "aedcfb3409746eddb02b9e19ebda1c3394f759a152e48ee875a0844d1b955484",
+      "source": "https://crates.io/crates/find-msvc-tools/0.1.14",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "generic-array",
+      "version": "0.14.7",
+      "license": "MIT",
+      "checksum": "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a",
+      "source": "https://crates.io/crates/generic-array/0.14.7",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "getrandom",
+      "version": "0.4.3",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099",
+      "source": "https://crates.io/crates/getrandom/0.4.3",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "hashbrown",
+      "version": "0.14.5",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1",
+      "source": "https://crates.io/crates/hashbrown/0.14.5",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "hashlink",
+      "version": "0.9.1",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "6ba4ff7128dee98c7dc9794b6a411377e1404dba1c97deb8d1a55297bd25d8af",
+      "source": "https://crates.io/crates/hashlink/0.9.1",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "itoa",
+      "version": "1.0.18",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682",
+      "source": "https://crates.io/crates/itoa/1.0.18",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "jobserver",
+      "version": "0.1.35",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "1c00acbd29eabad4a2392fa0e921c874934dbbf4194312ad20f04a0ed67a3cb3",
+      "source": "https://crates.io/crates/jobserver/0.1.35",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "libmimalloc-sys",
+      "version": "0.1.49",
+      "license": "MIT",
+      "checksum": "6a45a52f43e1c16f667ccfe4dd8c85b7f7c204fd5e3bf46c5b0db9a5c3c0b8e9",
+      "source": "https://crates.io/crates/libmimalloc-sys/0.1.49",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE.txt",
+        "c_src/mimalloc/v2/LICENSE",
+        "c_src/mimalloc/v3/LICENSE"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "libsqlite3-sys",
+      "version": "0.30.1",
+      "license": "MIT",
+      "checksum": "2e99fb7a497b1e3339bc746195567ed8d3e24945ecd636e3619d20b9de9e9149",
+      "source": "https://crates.io/crates/libsqlite3-sys/0.30.1",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE",
+        "sqlcipher/LICENSE"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "memchr",
+      "version": "2.8.1",
+      "license": "Unlicense OR MIT",
+      "checksum": "6b947ae49db0d222b1dbc6b113ce7248a3fc3a6ca21b696717bfc000ba4484d8",
+      "source": "https://crates.io/crates/memchr/2.8.1",
+      "notice_status": "included",
+      "notice_files": [
+        "COPYING",
+        "LICENSE-MIT",
+        "UNLICENSE"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "mimalloc",
+      "version": "0.1.52",
+      "license": "MIT",
+      "checksum": "2d4139bb28d14ad1facf21d5eb8825051b326e172d216b39f6d31df53cc97862",
+      "source": "https://crates.io/crates/mimalloc/0.1.52",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "num-bigint",
+      "version": "0.4.6",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9",
+      "source": "https://crates.io/crates/num-bigint/0.4.6",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "num-integer",
+      "version": "0.1.46",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "7969661fd2958a5cb096e56c8e1ad0444ac2bbcd0061bd28660485a44879858f",
+      "source": "https://crates.io/crates/num-integer/0.1.46",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "num-traits",
+      "version": "0.2.19",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841",
+      "source": "https://crates.io/crates/num-traits/0.2.19",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "once_cell",
+      "version": "1.21.4",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50",
+      "source": "https://crates.io/crates/once_cell/1.21.4",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "phf",
+      "version": "0.12.1",
+      "license": "MIT",
+      "checksum": "913273894cec178f401a31ec4b656318d95473527be05c0752cc41cdc32be8b7",
+      "source": "https://crates.io/crates/phf/0.12.1",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "phf_shared",
+      "version": "0.12.1",
+      "license": "MIT",
+      "checksum": "06005508882fb681fd97892ecff4b7fd0fee13ef1aa569f8695dae7ab9099981",
+      "source": "https://crates.io/crates/phf_shared/0.12.1",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "pkg-config",
+      "version": "0.3.33",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e",
+      "source": "https://crates.io/crates/pkg-config/0.3.33",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "regex-automata",
+      "version": "0.4.14",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "6e1dd4122fc1595e8162618945476892eefca7b88c52820e74af6262213cae8f",
+      "source": "https://crates.io/crates/regex-automata/0.4.14",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "regex-syntax",
+      "version": "0.8.10",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a",
+      "source": "https://crates.io/crates/regex-syntax/0.8.10",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT",
+        "src/unicode_tables/LICENSE-UNICODE"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "regex",
+      "version": "1.12.3",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "e10754a14b9137dd7b1e3e5b0493cc9171fdd105e0ab477f51b72e7f3ac0e276",
+      "source": "https://crates.io/crates/regex/1.12.3",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "rusqlite",
+      "version": "0.32.1",
+      "license": "MIT",
+      "checksum": "7753b721174eb8ff87a9a0e799e2d7bc3749323e773db92e0984debb00019d6e",
+      "source": "https://crates.io/crates/rusqlite/0.32.1",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "ryu",
+      "version": "1.0.23",
+      "license": "Apache-2.0 OR BSL-1.0",
+      "checksum": "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f",
+      "source": "https://crates.io/crates/ryu/1.0.23",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-BOOST"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "serde",
+      "version": "1.0.228",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e",
+      "source": "https://crates.io/crates/serde/1.0.228",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "serde_core",
+      "version": "1.0.228",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "41d385c7d4ca58e59fc732af25c3983b67ac852c1a25000afe1175de458b67ad",
+      "source": "https://crates.io/crates/serde_core/1.0.228",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "serde_json",
+      "version": "1.0.150",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9",
+      "source": "https://crates.io/crates/serde_json/1.0.150",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "sha2",
+      "version": "0.10.9",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283",
+      "source": "https://crates.io/crates/sha2/0.10.9",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "shlex",
+      "version": "2.0.1",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba",
+      "source": "https://crates.io/crates/shlex/2.0.1",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "siphasher",
+      "version": "1.0.4",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256",
+      "source": "https://crates.io/crates/siphasher/1.0.4",
+      "notice_status": "included",
+      "notice_files": [
+        "COPYING",
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "smallvec",
+      "version": "1.15.1",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03",
+      "source": "https://crates.io/crates/smallvec/1.15.1",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "typenum",
+      "version": "1.20.1",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20",
+      "source": "https://crates.io/crates/typenum/1.20.1",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE",
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "vcpkg",
+      "version": "0.2.15",
+      "license": "MIT/Apache-2.0",
+      "checksum": "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426",
+      "source": "https://crates.io/crates/vcpkg/0.2.15",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "version_check",
+      "version": "0.9.5",
+      "license": "MIT/Apache-2.0",
+      "checksum": "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a",
+      "source": "https://crates.io/crates/version_check/0.9.5",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "windows-link",
+      "version": "0.2.1",
+      "license": "MIT OR Apache-2.0",
+      "checksum": "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5",
+      "source": "https://crates.io/crates/windows-link/0.2.1",
+      "notice_status": "included",
+      "notice_files": [
+        "license-apache-2.0",
+        "license-mit"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "zerocopy",
+      "version": "0.8.50",
+      "license": "BSD-2-Clause OR Apache-2.0 OR MIT",
+      "checksum": "3b065d4f0e55f82fae73202e189638116a87c55ab6b8e6c2721e13dd9d854ad1",
+      "source": "https://crates.io/crates/zerocopy/0.8.50",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-APACHE",
+        "LICENSE-BSD",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "zmij",
+      "version": "1.0.21",
+      "license": "MIT",
+      "checksum": "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa",
+      "source": "https://crates.io/crates/zmij/1.0.21",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "zstd-safe",
+      "version": "7.3.0",
+      "license": "BSD-3-Clause",
+      "checksum": "64d80649ab6db9d9f6f9c80a40becd948eda4714a0a5ac8c4d157a32231c7882",
+      "source": "https://crates.io/crates/zstd-safe/7.3.0",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "zstd-sys",
+      "version": "2.1.1+zstd.1.5.7",
+      "license": "BSD-3-Clause",
+      "checksum": "aeec9eaf2dffbbd09201e23bd0ffcbaa33bb8e9266a10734fd7ed90a85eca078",
+      "source": "https://crates.io/crates/zstd-sys/2.1.1+zstd.1.5.7",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE",
+        "LICENSE.BSD-3-Clause",
+        "zstd/COPYING",
+        "zstd/LICENSE"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "zstd",
+      "version": "0.13.3",
+      "license": "MIT",
+      "checksum": "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a",
+      "source": "https://crates.io/crates/zstd/0.13.3",
+      "notice_status": "included",
+      "notice_files": [
+        "LICENSE"
+      ]
+    }
+  ],
+  "source_hash": "019adcdfd6892555d9dae7b56fb9a03f201c5b4331e9b06b1004d563e7fc89ce",
+  "binary_sha256": "01d7cb04b6df3b72b060c26deea8ef066d2ad7860a413e205dcb41227bffd441"
+}

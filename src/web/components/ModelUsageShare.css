@@ -1,0 +1,43 @@
+/* Usage by model (Capacity → By model): cycle bars and the chosen cycle's stacked areas above the capacity table. */
+.mus { display: flex; flex-direction: column; gap: var(--s-8); padding-bottom: var(--s-8); border-bottom: var(--rule); min-width: 0; }
+.mus-head { display: flex; align-items: baseline; gap: var(--s-6); margin-bottom: var(--s-4); }
+.mus-title { font-family: var(--font-display); font-weight: var(--fw-display); font-size: var(--fs-section); }
+.mus-meta { color: var(--muted); font-size: var(--fs-3); }
+.mus-cycle { border-top: var(--rule); padding-top: var(--s-8); }
+
+.mus-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3) var(--s-8); font-size: var(--fs-3); }
+.mus-legend button {
+  display: inline-flex; align-items: center; gap: var(--s-3); padding: 0; border: 0; background: transparent;
+  color: var(--text); font: inherit; cursor: pointer;
+}
+.mus-legend button[aria-pressed="false"] { color: var(--faint); text-decoration: line-through; }
+.mus-rest { display: inline-flex; align-items: center; gap: var(--s-3); color: var(--muted); }
+.mus-swatch { display: inline-block; width: 10px; height: 10px; flex: 0 0 10px; border-radius: var(--r-dot); margin-right: var(--s-2); }
+
+.mus-svg { display: block; overflow: visible; }
+.mus-tick { font-family: var(--font-figure); font-size: var(--fs-2); fill: var(--muted); }
+.mus-note { font-family: var(--font-sans); font-size: var(--fs-2); fill: var(--muted); }
+.mus-total { font-family: var(--font-figure); font-size: var(--fs-3); fill: var(--text); }
+.mus-grid { stroke: var(--line); stroke-dasharray: 3 3; }
+.mus-axis { stroke: var(--line2); }
+.mus-column { cursor: pointer; outline: none; }
+.mus-column-hit { fill: transparent; }
+.mus-column:hover .mus-column-hit { fill: var(--raised); }
+.mus-column.is-on .mus-column-hit { fill: var(--accent-soft); }
+.mus-column:focus-visible .mus-column-hit { stroke: var(--accent); }
+.mus-segment { stroke: var(--surface); stroke-width: 1; }
+.mus-area { fill-opacity: .85; stroke: none; }
+.mus-edge { fill: none; stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
+.mus-now { stroke: var(--text); stroke-dasharray: 2 3; }
+.mus-cross { stroke: var(--pencil); pointer-events: none; }
+
+.mus-areas { position: relative; }
+.mus-tip {
+  position: absolute; top: var(--s-4); z-index: 5; min-width: 220px; pointer-events: none;
+  padding: var(--s-5) var(--s-6); background: var(--surface); border: 1px solid var(--pencil); border-radius: var(--r-card);
+  box-shadow: var(--shadow); font-size: var(--fs-4); line-height: 1.55;
+}
+.mus-tip b { font-weight: var(--fw-semibold); }
+.mus-tip-row { display: flex; justify-content: space-between; gap: var(--s-6); }
+.mus-tip-row > span:last-child { font-family: var(--font-figure); }
+.mus-tip-row.is-muted { color: var(--muted); }

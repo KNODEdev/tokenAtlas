@@ -1,0 +1,163 @@
+@import "./tokens.css";
+@import "tailwindcss";
+
+:where(button, summary, [role="button"]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sync-activity > summary {
+  list-style: none;
+}
+
+.sync-activity > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sync-activity-chevron {
+  transition: transform 160ms ease-out;
+  transform-origin: center;
+}
+
+.sync-activity[open] .sync-activity-chevron {
+  transform: rotate(180deg);
+}
+
+@media (max-width: 640px) {
+  .sync-activity-chevron {
+    font-size: 0 !important;
+  }
+
+  .sync-activity-chevron::after {
+    content: "▾";
+    color: var(--faint);
+    font-size: 10px;
+  }
+
+  .sync-activity-details {
+    left: 6px !important;
+    right: 6px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync-activity *,
+  .skeleton {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+
+/* Paper atlas primitives (docs/design/paper-atlas.md). The one framed block: no nesting, no shadow. */
+.ui-card {
+  background: var(--surface);
+  border: 1px solid var(--line2);
+  border-radius: var(--r-card);
+  padding: var(--s-8) var(--s-9);
+  min-width: 0;
+}
+/* Readout label: a quiet caption above a figure, as on the product page. */
+.ui-eyebrow {
+  font-size: var(--fs-3);
+  font-weight: var(--fw-medium);
+  line-height: 1.3;
+  color: var(--muted);
+}
+.ui-card-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--s-6);
+}
+.ui-card-title-content {
+  min-width: 0;
+}
+.ui-card-title-text {
+  font-family: var(--font-display);
+  font-weight: var(--fw-display);
+  font-synthesis: none;
+  font-size: var(--fs-card-title);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.ui-card-subtitle {
+  font-size: var(--fs-3);
+  color: var(--muted);
+  margin-top: var(--s-1);
+}
+/* KPI strip: an open row between dashed rules like Facts (user 2026-10-15), so it never reads as a row of boxes;
+   the first figure lines up with the content's edge. */
+.ui-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(var(--kpi-columns), minmax(0, 1fr));
+  gap: 0;
+  border-block: var(--rule);
+}
+.ui-kpi-cell {
+  padding: var(--s-5) var(--s-7) var(--s-6);
+}
+.ui-kpi-cell:first-child {
+  padding-left: 0;
+}
+.ui-kpi-cell + .ui-kpi-cell {
+  border-left: var(--rule);
+}
+.ui-kpi-label {
+  font-size: var(--fs-3);
+  font-weight: var(--fw-medium);
+  line-height: 1.3;
+  color: var(--muted);
+}
+.ui-kpi-value {
+  font-size: var(--fs-8);
+  line-height: 1.25;
+  margin-top: var(--s-1);
+  color: var(--text);
+}
+.ui-kpi-note {
+  font-size: var(--fs-3);
+  color: var(--muted);
+}
+.ui-kpi-comparison {
+  position: absolute;
+  right: var(--s-4);
+  bottom: var(--s-2);
+  font-size: var(--fs-2);
+  color: var(--muted);
+}
+.ui-kpi-absent .ui-kpi-value, .ui-kpi-absent .ui-kpi-note {
+  color: var(--faint);
+}
+.ui-kpi-pad {
+  background: transparent;
+}
+.overview-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+}
+.overview-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-6);
+  flex-wrap: wrap;
+  /* No rule of its own: the tabs' double rule is the one strong line on the page (user, 2026-10-14). */
+}
+.overview-section-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-display);
+  font-synthesis: none;
+  font-size: var(--fs-section);
+}
+.overview-section-subtitle {
+  font-size: var(--fs-3);
+  color: var(--muted);
+}
+.overview-section-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-8);
+}

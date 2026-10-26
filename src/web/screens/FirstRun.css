@@ -1,0 +1,121 @@
+/* The view before the application (docs/design/paper-atlas.md): bare paper, one compact centred card. */
+.first-run {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-10);
+}
+.first-run-panel {
+  width: min(100%, 940px);
+  padding: var(--s-10);
+}
+.first-run-top { display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); }
+.first-run-loading { padding: var(--s-9) 0; }
+.first-run-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-6);
+  margin-top: var(--s-8);
+}
+.first-run-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-display);
+  font-size: var(--fs-section);
+}
+.first-run-machine { margin-left: auto; font-size: var(--fs-2); color: var(--faint); }
+.first-run-lead { margin: var(--s-1) 0 0; font-size: var(--fs-3); color: var(--muted); }
+.first-run-reason {
+  margin: var(--s-6) 0 0;
+  padding: var(--s-4) var(--s-6);
+  border-radius: var(--r-chip);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--fs-3);
+  line-height: 1.5;
+}
+
+/* One line per folder: what | what it holds | location | change; rows split by the dashed rule. */
+.first-run-rows { margin-top: var(--s-6); border-top: var(--rule); }
+.first-run-row {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) minmax(0, 1.2fr) 76px;
+  align-items: center;
+  column-gap: var(--s-8);
+  padding: var(--s-3) 0;
+  border-bottom: var(--rule);
+  min-height: 40px;
+}
+.first-run-row.is-head { min-height: 0; padding: var(--s-2) 0; font-size: var(--fs-2); color: var(--faint); }
+.first-run-group {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  padding: var(--s-7) 0 var(--s-3);
+  border-bottom: var(--rule);
+}
+/* A group after other rows starts well apart, so shared and local read as two blocks. */
+.first-run-row:not(.is-head) + .first-run-group { margin-top: var(--s-11); }
+.first-run-group-title { font-size: var(--fs-5); font-weight: var(--fw-semibold); }
+.first-run-group-hint { flex-basis: 100%; font-size: var(--fs-2); color: var(--muted); }
+.first-run-label {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  font-size: var(--fs-4);
+  font-weight: var(--fw-semibold);
+}
+.first-run-path { font-size: var(--fs-3); overflow-wrap: anywhere; line-height: 1.4; }
+.first-run-path .is-replaced { color: var(--faint); text-decoration: line-through; }
+.first-run-path .is-next { display: block; color: var(--accent); }
+.first-run-explain { font-size: var(--fs-2); line-height: 1.4; color: var(--muted); }
+.first-run-change { justify-self: end; }
+/* The row being edited becomes a recessed well (paper-atlas: a well uses --sunk, no frame). */
+.first-run-row.is-editing {
+  margin: 0 calc(var(--s-5) * -1);
+  padding-left: var(--s-5);
+  padding-right: var(--s-5);
+  border-radius: var(--r-chip);
+  background: var(--sunk);
+}
+.first-run-editor {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-4) var(--s-8);
+  padding: var(--s-4) 0 var(--s-3);
+}
+.first-run-editor-field { flex: 1 1 420px; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); min-width: 0; }
+.first-run-editor-field .ui-input:first-child { flex: 1 1 240px; min-width: 0; }
+.first-run-editor-actions { margin-left: auto; display: flex; align-items: center; gap: var(--s-6); }
+.first-run-editor-actions .ui-button.is-primary { font-size: var(--fs-4); padding: var(--s-2) var(--s-7); }
+.first-run-error { grid-column: 2 / -1; font-size: var(--fs-3); color: var(--warn); }
+
+.first-run-advanced { margin-top: var(--s-6); }
+.first-run-section { margin-top: var(--s-6); padding-top: var(--s-6); border-top: var(--rule); }
+.first-run-section-title {
+  margin-bottom: var(--s-3);
+  font-family: var(--font-display);
+  font-weight: var(--fw-display);
+  font-size: var(--fs-card-title);
+}
+.first-run-notes {
+  margin: var(--s-3) 0 0;
+  padding-left: var(--s-9);
+  font-size: var(--fs-3);
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.first-run-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--s-6);
+  margin-top: var(--s-7);
+}
+.first-run-foot-note { margin-right: auto; font-size: var(--fs-2); color: var(--faint); }

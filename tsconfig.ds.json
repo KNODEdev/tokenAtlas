@@ -1,0 +1,15 @@
+{
+  // Declaration-only build of the design-system surface. The compiled JS is
+  // never produced here — design-sync bundles the TSX directly with esbuild;
+  // these .d.ts files are the API contract the design agent codes against.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "declarationDir": "dist/types",
+    "types": []
+  },
+  "include": ["src/web/components/index.ts", "src/web/vite-env.d.ts"]
+}

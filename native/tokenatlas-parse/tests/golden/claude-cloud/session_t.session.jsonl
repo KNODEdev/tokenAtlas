@@ -1,0 +1,2 @@
+{"schema":1,"session":{"id":"session_t"},"context":{},"places":[{"repository":"https://github.com/o/Old","remote":"/home/user/Repo","local":"H:/old"}]}
+{"schema":1,"session":{"id":"session_t"},"context":{},"places":[{"repository":"https://github.com/o/Repo","remote":"/home/user/Repo","local":"H:/repos/Repo"},{"repository":"https://github.com/o/Other","remote":"/home/user/Other","local":null}],"owner":{"account_key":"claude:00000000-0000-4000-8000-000000000001:00000000-0000-4000-8000-0000000000aa"}}

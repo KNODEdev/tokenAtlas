@@ -1,0 +1,103 @@
+/* Subscription rail: flat rows on the paper sheet, divided by dashed rules (docs/design/paper-atlas.md). */
+.subs-rail {
+  flex: 0 0 auto; background: var(--bg); border-right: 1px solid var(--line2); position: sticky;
+  overflow-y: auto; display: flex; flex-direction: column;
+}
+
+.rail-icon-button { margin-left: auto; padding: var(--s-1); border: 0; background: transparent; color: var(--muted); cursor: pointer; line-height: 0; }
+.rail-icon-button:hover { color: var(--text); }
+.ui-dropdown.rail-filter { width: 100%; padding: 0; border: 0; background: transparent; font-family: var(--font-sans); font-size: var(--fs-3); color: var(--muted); cursor: pointer; }
+/* The filter reads as a line of the rail's caption, without a field's caret. */
+.rail-filter .ui-dropdown-caret { display: none; }
+
+.rail-group { display: flex; flex-direction: column; }
+.rail-group-head {
+  display: flex; align-items: baseline; gap: var(--s-4); width: 100%; padding: var(--s-5) var(--s-6) var(--s-3);
+  border: 0; background: transparent; font-family: var(--font-sans); font-size: var(--fs-2); text-align: left; cursor: pointer;
+}
+.rail-group-label { font-size: var(--fs-3); font-weight: var(--fw-semibold); color: var(--muted); }
+.rail-group-sub { color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-group-sub.is-warn { color: var(--warn); }
+.rail-group-sub.is-crit { color: var(--crit); }
+.rail-group-head > .rail-group-sub:last-child { margin-left: auto; }
+
+/* One subscription row */
+.sub-card {
+  display: block; width: 100%; min-width: 0; text-align: left; background: transparent; border: 0; border-top: var(--rule);
+  padding: var(--s-6) var(--s-7); cursor: pointer; font-family: var(--font-sans); color: var(--text); line-height: 1.45;
+}
+.sub-card:hover { background: var(--raised); }
+/* The rails' selection is a neutral band (user 2026-10-10): a sea-blue wash this large read as a second colour. */
+.sub-card[aria-pressed="true"] { background: var(--band); }
+.sub-card.is-inactive { color: var(--muted); }
+.sub-card-row { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+.sub-card-row.is-value { align-items: baseline; gap: var(--s-4); margin-top: var(--s-3); }
+.sub-card-row.is-meta { justify-content: space-between; gap: var(--s-5); margin-top: var(--s-3); font-size: var(--fs-3); color: var(--faint); }
+.sub-card-row.is-meta > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-card-row.is-meta > :first-child { flex: 0 0 auto; }
+.sub-card-row.is-usage { justify-content: space-between; gap: var(--s-5); margin-top: var(--s-4); font-size: var(--fs-3); color: var(--muted); }
+.sub-card-row.is-usage > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-card-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: var(--r-dot); }
+.sub-card-name { font-size: var(--fs-5); font-weight: var(--fw-semibold); line-height: 1.3; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-card-plan { font-size: var(--fs-2); padding: 0 var(--s-3); border-radius: var(--r-chip); border: 1px solid var(--line2); color: var(--muted); white-space: nowrap; }
+.sub-card-aside { margin-left: auto; font-size: var(--fs-2); color: var(--faint); white-space: nowrap; }
+.sub-card-account { margin-top: var(--s-1); font-size: var(--fs-3); color: var(--muted); overflow-wrap: anywhere; }
+.sub-card-pct { font-family: var(--font-figure); font-size: var(--fs-9); font-weight: var(--fw-medium); letter-spacing: var(--ls-figure); line-height: 1; white-space: nowrap; }
+.sub-card-pct.is-spent { color: var(--crit); }
+.sub-card-pct.is-stale { color: var(--muted); }
+.sub-card-pct.is-money { font-size: var(--fs-7); color: var(--text); }
+.sub-card-estimate { font-family: var(--font-figure); font-size: var(--fs-5); font-weight: var(--fw-medium); color: var(--muted); white-space: nowrap; }
+.sub-card-note { font-size: var(--fs-3); color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-card-pace { margin-left: auto; font-family: var(--font-figure); font-size: var(--fs-4); font-weight: var(--fw-medium); white-space: nowrap; }
+.sub-card-bar { display: block; position: relative; height: 7px; margin-top: var(--s-3); background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r-bar); overflow: hidden; }
+.sub-card-bar > .is-fill { position: absolute; top: 0; bottom: 0; left: 0; }
+.sub-card-bar > .is-elapsed { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text); }
+.sub-card-line { margin-top: var(--s-1); font-size: var(--fs-2); color: var(--faint); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-card-line.is-warn { color: var(--warn); }
+.sub-card-line.is-muted { color: var(--muted); }
+.sub-card-line.is-wrap { white-space: normal; overflow-wrap: anywhere; }
+.sub-card-row .is-warn { color: var(--warn); }
+.sub-card-row .is-muted { color: var(--muted); }
+.sub-card-second { display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-2); font-size: var(--fs-2); color: var(--faint); min-width: 0; }
+.sub-card-second > b { font-weight: var(--fw-semibold); }
+.sub-card-second .sub-card-bar { flex: 1; height: 5px; margin-top: 0; }
+.sub-card-money { color: var(--text); }
+/* Credit pools of the current window: a separate thin bar under the card, one segment per package. */
+.sub-card-pool { margin-top: var(--s-4); padding-top: var(--s-3); border-top: var(--rule); min-width: 0; }
+.sub-card-pool-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-4); min-width: 0; }
+.sub-card-pool-label { font-size: var(--fs-3); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-card-pool-amount { font-size: var(--fs-6); font-weight: var(--fw-semibold); color: var(--violet); }
+.sub-card-pool-aside { flex: none; font-size: var(--fs-3); color: var(--muted); white-space: nowrap; }
+.sub-card-pool-bar { position: relative; display: block; height: 5px; margin-top: var(--s-2); background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r-bar); overflow: hidden; }
+.sub-card-pool-bar > i { position: absolute; top: 0; bottom: 0; left: 0; background: var(--violet); }
+.sub-card-pool-line { display: flex; justify-content: space-between; gap: var(--s-5); margin-top: var(--s-1); font-size: var(--fs-2); color: var(--faint); }
+.sub-card-pool-line > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-card-pool-line.is-credit { color: var(--violet); }
+.sub-card-pool-dots { display: inline-flex; gap: 3px; margin-right: var(--s-2); vertical-align: 1px; }
+.sub-card-pool-dots > i { width: 7px; height: 7px; border-radius: var(--r-dot); background: var(--violet); }
+.sub-card-declared { color: var(--claude); }
+
+.rail-inactive-line {
+  display: flex; align-items: center; gap: var(--s-3); width: 100%; padding: var(--s-3) var(--s-6); border: 0; border-top: var(--rule);
+  background: transparent; font-family: var(--font-sans); font-size: var(--fs-3); color: var(--faint); text-align: left; cursor: pointer;
+}
+.rail-inactive-line:hover { color: var(--text); }
+
+/* Overview grid reuses the rows as cards: the one framed block. */
+.sub-card-grid { display: grid; gap: var(--s-8); }
+.sub-card-grid > .sub-card { border: 1px solid var(--line2); border-radius: var(--r-card); background: var(--surface); }
+.sub-card-grid > .sub-card[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+
+/* Compact rail (smaller desktop screens): the row keeps who, how much and how fast; details stay
+   in the row's tooltip and on the screens. */
+.subs-rail.is-compact .sub-card { padding: var(--s-5) var(--s-6); }
+.subs-rail.is-compact .sub-card-plan,
+.subs-rail.is-compact .sub-card-aside,
+.subs-rail.is-compact .sub-card-note,
+.subs-rail.is-compact .sub-card-row.is-meta,
+.subs-rail.is-compact .sub-card-row.is-usage,
+.subs-rail.is-compact .sub-card-pool,
+.subs-rail.is-compact [data-probe-trail] { display: none; }
+.subs-rail.is-compact .sub-card-pct { font-size: var(--fs-8); }
+.subs-rail.is-compact .sub-card-row.is-value { margin-top: var(--s-2); }
+.subs-rail.is-compact .rail-head { padding: 0 var(--s-5); }

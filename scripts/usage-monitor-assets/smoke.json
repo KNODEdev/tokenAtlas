@@ -1,0 +1,171 @@
+{
+  "ok": false,
+  "at": "2026-10-14T15:00:00+00:00",
+  "delivered": 8,
+  "pending": 0,
+  "errors": [],
+  "accounts": [
+    {
+      "provider": "codex",
+      "label": "account-one@example.test",
+      "error": null,
+      "readings": [
+        {
+          "kind": "primary",
+          "group": "codex",
+          "percent": 14,
+          "minutes": 10080
+        }
+      ],
+      "meters": [
+        {
+          "kind": "primary",
+          "group": "codex",
+          "scope": null,
+          "percent": 14,
+          "hours": 168.0,
+          "accountWide": true
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "label": "account-two@example.test",
+      "error": null,
+      "readings": [
+        {
+          "kind": "primary",
+          "group": "codex",
+          "percent": 46,
+          "minutes": 300
+        },
+        {
+          "kind": "secondary",
+          "group": "codex",
+          "percent": 11,
+          "minutes": 10080
+        }
+      ],
+      "meters": [
+        {
+          "kind": "primary",
+          "group": "codex",
+          "scope": null,
+          "percent": 46,
+          "hours": 5.0,
+          "accountWide": true
+        },
+        {
+          "kind": "secondary",
+          "group": "codex",
+          "scope": null,
+          "percent": 11,
+          "hours": 168.0,
+          "accountWide": true
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "label": "account-three-with-long-label@example.test",
+      "error": null,
+      "readings": [
+        {
+          "kind": "primary",
+          "group": "codex",
+          "percent": 0,
+          "minutes": 43200
+        }
+      ],
+      "meters": [
+        {
+          "kind": "primary",
+          "group": "codex",
+          "scope": null,
+          "percent": 0,
+          "hours": 720.0,
+          "accountWide": true
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "label": "account-four@example.test",
+      "error": null,
+      "readings": [
+        {
+          "kind": "primary",
+          "group": "codex",
+          "percent": 75,
+          "minutes": 10080
+        }
+      ],
+      "meters": [
+        {
+          "kind": "primary",
+          "group": "codex",
+          "scope": null,
+          "percent": 75,
+          "hours": 168.0,
+          "accountWide": true
+        }
+      ]
+    },
+    {
+      "provider": "claude",
+      "label": "account-one@example.test",
+      "error": null,
+      "readings": [
+        {
+          "kind": "session",
+          "group": "session",
+          "percent": 1
+        },
+        {
+          "kind": "weekly_all",
+          "group": "weekly",
+          "percent": 72
+        },
+        {
+          "kind": "weekly_scoped",
+          "group": "weekly",
+          "scope": "Fable",
+          "percent": 0
+        }
+      ],
+      "meters": [
+        {
+          "kind": "session",
+          "group": "session",
+          "scope": null,
+          "percent": 1,
+          "hours": 5,
+          "accountWide": true
+        },
+        {
+          "kind": "weekly_all",
+          "group": "weekly",
+          "scope": null,
+          "percent": 72,
+          "hours": 168,
+          "accountWide": true
+        },
+        {
+          "kind": "weekly_scoped",
+          "group": "weekly",
+          "scope": "Fable",
+          "percent": 0,
+          "hours": 168,
+          "accountWide": false
+        }
+      ]
+    },
+    {
+      "provider": "claude",
+      "label": "account-five@example.test",
+      "error": "[login-expired] Synthetic expired login, technical detail withheld from the normal interface.",
+      "readings": [],
+      "meters": []
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+# Preserve the exact invalid bytes, CRLF records and incomplete tails on checkout.
+*.jsonl -text

@@ -1,0 +1,75 @@
+/* Subscription analysis card (Capacity / Models) — layout from docs/design/tokenAtlas.dc.html.
+   One framed card; its bands (views, custom dates, scope) are divided by dashed rules, not inner frames. */
+.stats-head {
+  padding: var(--s-6) var(--s-9); display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-4) var(--s-6); flex-wrap: wrap; border-bottom: var(--rule);
+}
+/* The report's tab row with Period and Counter stays pinned under the page tabs (user, 2026-10-21). */
+.stats-head { position: sticky; top: var(--report-sticky-top, 0px); z-index: var(--z-sticky); background: var(--surface); }
+.stats-head-views { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
+.stats-head-controls { gap: var(--s-3) var(--s-5); }
+/* The view tabs stand on the head's own rule, which runs across the card; the chosen one is underlined on it. */
+/* The sticky head (above) also anchors the absolute ::after rule below, so it needs no position: relative. */
+.stats-head:has(.ui-tabs[data-variant="sections"]) {
+  padding-bottom: 0; align-items: flex-end; border-bottom: 1px solid var(--pencil);
+}
+/* The tabs' double rule (ui.css) moves to the head so both lines run across the card. */
+.stats-head:has(.ui-tabs[data-variant="sections"])::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -4px;
+  border-bottom: 1px solid var(--line); transform: rotate(-.12deg); pointer-events: none;
+}
+.stats-head .ui-tabs[data-variant="sections"] { border-bottom: 0; margin-bottom: -1px; }
+.stats-head .ui-tabs[data-variant="sections"]::after { content: none; }
+.stats-head:has(.ui-tabs[data-variant="sections"]) .stats-head-controls { padding-bottom: var(--s-5); }
+/* Under page tabs (Capacity) the view tabs are the second level (ui.css): the head keeps one plain rule and stands
+   right under the tabs above. */
+:is(:has(> .ui-tabs[data-variant="sections"]), :has(> * > .ui-tabs[data-variant="sections"])) ~ * .stats-head:has(.ui-tabs[data-variant="sections"]) {
+  padding-top: 0; border-bottom-color: var(--line2);
+}
+:is(:has(> .ui-tabs[data-variant="sections"]), :has(> * > .ui-tabs[data-variant="sections"])) ~ * .stats-head:has(.ui-tabs[data-variant="sections"])::after { content: none; }
+:is(:has(> .ui-tabs[data-variant="sections"]), :has(> * > .ui-tabs[data-variant="sections"])) ~ * .stats-head:has(.ui-tabs[data-variant="sections"]) .stats-head-controls { padding-bottom: var(--s-3); }
+
+.stats-custom { padding: var(--s-5) var(--s-9); gap: var(--s-5); border-bottom: var(--rule); }
+.stats-date {
+  display: flex; align-items: center; gap: var(--s-3); font-size: var(--fs-3);
+  color: var(--muted); white-space: nowrap;
+}
+
+.stats-meta { padding: var(--s-5) var(--s-9); border-bottom: var(--rule); display: flex; flex-direction: column; gap: var(--s-4); }
+.stats-meta-row { font-size: var(--fs-3); }
+.stats-scope { color: var(--muted); white-space: nowrap; }
+.stats-refresh-slot { flex-basis: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); text-align: right; }
+.stats-chips { display: inline-flex; flex-wrap: wrap; gap: var(--s-3); }
+.stats-count { font-size: var(--fs-3); color: var(--faint); white-space: nowrap; }
+.stats-filters-drawer { display: flex; flex-direction: column; width: min(calc(var(--s-10) * 44), 100vw); }
+.stats-filters-drawer > .codex-columns-drawer__header { flex: none; }
+.stats-filters-body { flex: 1; min-height: 0; overflow-y: auto; }
+.stats-filters-footer { flex: none; display: flex; justify-content: flex-end; align-items: center; gap: var(--s-4); padding: var(--s-7) var(--s-10) var(--s-9); border-top: var(--rule); }
+.stats-filter-controls { display: grid; gap: var(--s-6); padding-bottom: var(--s-7); margin-bottom: var(--s-7); border-bottom: var(--rule); }
+/* The label column is fixed, so every group's control starts on the same edge. */
+.stats-filter-controls > .ui-field { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-4) var(--s-6); }
+.stats-filter-controls > .ui-field > .ui-field-label { flex: 0 0 calc(var(--s-10) * 6); }
+.stats-window-filter { min-width: 0; display: grid; gap: var(--s-5); }
+.stats-window-filter .stats-section-title { margin: 0; }
+.stats-window-tools { display: flex; align-items: center; gap: var(--s-4); }
+.stats-window-search { flex: 1 1 auto; min-width: 0; }
+.stats-window-actions { display: flex; flex: none; align-items: center; gap: var(--s-3); }
+
+.stats-data { flex-direction: column; align-items: stretch; gap: var(--s-4); }
+.stats-data-row { gap: var(--s-3) var(--s-5); }
+.stats-price { margin-left: auto; gap: var(--s-3) var(--s-5); }
+
+.data-issues { display: flex; flex-direction: column; gap: var(--s-3); font-size: var(--fs-3); color: var(--muted); }
+.data-issues-head { color: var(--text); }
+.data-issues-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(150px, 1.4fr) auto; column-gap: var(--s-5); align-items: baseline; }
+.data-issues-what { color: var(--warn); }
+.data-issues-note { margin: 0; color: var(--faint); }
+
+.stats-body { padding: 0 var(--s-9) var(--s-9); min-width: 0; }
+.stats-provider { margin-top: var(--s-5); font-size: var(--fs-3); color: var(--muted); }
+/* Small headings inside the card: text voice, never the title voice. */
+.stats-section-title { display: flex; align-items: center; gap: var(--s-3); margin: var(--s-7) 0 var(--s-3); font-family: var(--font-sans); font-size: var(--fs-5); font-weight: var(--fw-semibold); color: var(--text); }
+.stats-line { font-size: var(--fs-3); color: var(--muted); line-height: 1.6; }
+
+/* On a tab's page the card has no frame (ui.css), so its bands align with the tab labels instead of an inner margin. */
+.ui-tab-page > .ui-card:has(> .stats-head) > * { padding-inline: 0; }

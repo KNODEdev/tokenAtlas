@@ -1,0 +1,190 @@
+.account-periods { font-size: var(--fs-5); line-height: 1.55; }
+.account-periods-heading { margin: 22px 0 4px; font-size: var(--fs-5); font-weight: var(--fw-semibold); }
+.account-periods-note { margin: 8px 0 0; color: var(--muted); }
+.account-periods-warn { color: var(--warn); }
+.account-periods-provider { font-size: var(--fs-3); font-weight: var(--fw-medium); color: var(--muted); }
+.account-periods-toolbar { display: flex; gap: 8px; margin: 10px 0; }
+
+.account-periods-expand { border: none; background: none; padding: 0; color: var(--accent); font: inherit; cursor: pointer; }
+.account-periods-expand:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Same dashed sheet as ErrorState. */
+.account-periods-reject { display: flex; gap: 12px; margin: 12px 0; padding: 14px 16px; border-radius: var(--r-card);
+  border: 1px dashed var(--crit); background: var(--crit-soft); }
+.account-periods-reject-title { font-size: var(--fs-5); font-weight: var(--fw-semibold); color: var(--crit); }
+.account-periods-reject-file { color: var(--muted); overflow-wrap: anywhere; }
+.account-periods-reject ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+
+/* No inner frame: the form sits in a card or a drawer that already has one. */
+.account-periods-form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.account-periods-form legend { padding: 0 0 var(--s-4); font-size: var(--fs-5); font-weight: var(--fw-semibold); }
+.account-periods-fields { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+/* The required dropdown's hidden validation input keeps its own look. */
+.account-periods-form input:not(.ui-dropdown-required), .account-periods-form .ui-dropdown {
+  box-sizing: border-box; max-width: 100%; min-width: 0; padding: 5px 7px; border: 1px solid var(--line2);
+  border-radius: var(--r-chip); background: var(--surface); color: var(--text); font: inherit;
+}
+.account-periods-form :is(input, .ui-dropdown):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.account-periods-preview { margin: 10px 0 0; color: var(--muted); }
+.account-periods-preview p { margin: 6px 0; }
+.account-periods-preview ul { margin: 4px 0; padding-left: 18px; }
+.account-periods-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+
+.account-periods-faint { color: var(--muted); }
+/* The last 90 days of plans under each account, in the multiplier colours of the bars. */
+.account-periods-strip { display: flex; gap: 1px; height: 6px; border-radius: var(--r-bar); overflow: hidden; background: var(--sunk); }
+.account-periods-strip > i { display: block; min-width: 1px; background: var(--line2); }
+.account-periods-strip > i.is-unknown { background: repeating-linear-gradient(135deg, transparent, transparent 2px, var(--line2) 2px, var(--line2) 3px); }
+.account-periods-strip > i.is-conflict { background: var(--warn); }
+.account-periods-strip > i.is-tier-1 { background: var(--ok); }
+.account-periods-strip > i.is-tier-5 { background: var(--accent); }
+.account-periods-strip > i.is-tier-20 { background: var(--violet); }
+.account-periods-breaks { margin: var(--s-2) 0 0; color: var(--warn); font-size: var(--fs-3); }
+.account-periods button:focus-visible, .account-periods summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.account-periods button:disabled { cursor: default; opacity: .5; }
+/* A group inside the card: divided by a rule, never framed. */
+.account-periods-evidence { margin-top: 10px; font-size: var(--fs-3); }
+.account-periods-evidence summary, .account-periods-form-extra summary { cursor: pointer; color: var(--muted); }
+.account-periods-evidence-body { padding: 8px 0; color: var(--muted); overflow-wrap: anywhere; }
+.account-periods-form-extra { margin-top: 14px; font-size: var(--fs-4); }
+.account-periods-form-extra > div { padding-top: 12px; }
+.account-periods-form input:not(.ui-dropdown-required), .account-periods-form .ui-dropdown { min-height: 36px; font-family: inherit; }
+.account-periods-form label { font-size: var(--fs-4); }
+.account-history-timeline-tools { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-8); margin: var(--s-9) 0 var(--s-8); }
+.account-history-chart { overflow-x: auto; }
+.account-history-axis, .account-history-lane { display: grid; grid-template-columns: 136px minmax(0, 1fr); gap: 12px; min-width: 0; }
+.account-history-axis { margin-bottom: 10px; font-family: var(--font-figure); font-size: var(--fs-2); color: var(--muted); }
+.account-history-axis > div { display: flex; justify-content: space-between; }
+.account-history-lane { align-items: center; margin: 14px 0; }
+/* Computer names never break mid-word: a long one is cut with an ellipsis and read in full from the tooltip. */
+.account-history-lane > span { min-width: 0; font-size: var(--fs-4); }
+.account-history-lane > span > :is(strong, small) { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-history-lane small { color: var(--muted); font-size: var(--fs-3); }
+.account-history-track { position: relative; height: 40px; border-radius: var(--r-chip); background: var(--sunk); background-image: linear-gradient(to right, var(--line) 1px, transparent 1px); background-size: 25% 100%; }
+/* No padding on the bar itself: with border-box it would widen a short period past its dates and over its neighbours. */
+.account-history-bar { box-sizing: border-box; position: absolute; top: 0; bottom: 0; min-width: 4px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--surface); border-radius: var(--r-bar); font-size: var(--fs-3); white-space: nowrap; overflow: hidden; padding: 0; user-select: none; container-type: inline-size; }
+.account-history-bar > span { overflow: hidden; text-overflow: ellipsis; padding: 0 32px 0 10px; }
+/* Too short for a label or the edit button: the bar stays exact and is edited from its table row. */
+@container (max-width: 56px) { .account-history-bar > span, .account-history-bar .account-history-edit { display: none; } }
+.account-history-bar.is-draggable { cursor: grab; touch-action: none; }
+.account-history-bar.is-draggable:active { cursor: grabbing; }
+/* The 8 px end zones (EDGE_PX in AccountHistoryTimeline) resize the period instead of moving it. */
+.account-history-bar.is-draggable::before, .account-history-bar.is-draggable::after { content: ""; position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+.account-history-bar.is-draggable::before { left: 0; }
+.account-history-bar.is-draggable::after { right: 0; }
+.account-history-edit { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); width: 18px; height: 18px; display: grid; place-items: center; padding: 0; border: 1px solid currentColor; border-radius: var(--r-chip); background: var(--surface); color: inherit; font: inherit; font-size: var(--fs-2); line-height: 1; cursor: pointer; opacity: .7; }
+.account-history-edit:hover:not(:disabled), .account-history-edit:focus-visible { opacity: 1; }
+/* The bar clips its content, so the focus ring sits on the button edge instead of outside it. */
+.account-periods .account-history-edit:focus-visible { outline-offset: 0; }
+.account-history-bar.is-plan { color: var(--muted); background: var(--sunk); border-color: var(--line2); font-weight: 600; }
+/* Plan multipliers use the capacity charts' colours: ×1 green, ×5 blue, ×20 violet. */
+.account-history-bar.is-plan.is-tier-1 { color: var(--ok); background: var(--ok-soft); border-color: var(--ok); }
+.account-history-bar.is-plan.is-tier-5 { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+.account-history-bar.is-plan.is-tier-20 { color: var(--violet); background: color-mix(in oklab, var(--violet) 14%, transparent); border-color: var(--violet); }
+.account-history-bar:is(.is-selected, .is-hovered) { box-shadow: inset 0 0 0 2px currentColor; z-index: 1; }
+.account-history-tier { font-weight: 600; color: var(--muted); }
+.account-history-tier.is-tier-1 { color: var(--ok); }
+.account-history-tier.is-tier-5 { color: var(--accent); }
+.account-history-tier.is-tier-20 { color: var(--violet); }
+/* Solid outline: your declaration; dashed: from readings (the tables' "Basis" column). */
+.account-history-bar.is-source { top: 7px; bottom: 7px; background: var(--ok-soft); color: var(--ok); border: 1px dashed var(--ok); }
+.account-history-bar.is-source.is-declared { border-style: solid; }
+.account-history-bar.is-unknown { background: repeating-linear-gradient(135deg, transparent, transparent 5px, var(--line) 5px, var(--line) 6px); color: var(--muted); }
+.account-history-bar.is-conflict { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+.account-periods-unassigned-period { width: 100%; display: grid; grid-template-columns: minmax(160px, 1fr) minmax(200px, 1fr) auto auto; gap: 16px; text-align: left; align-items: center; padding: 16px 0; border: 0; border-bottom: var(--rule); background: var(--surface); color: var(--text); cursor: pointer; font: inherit; }
+.account-periods-unassigned-period:hover { background: var(--sunk); }
+.account-periods-unassigned-period > span:last-child { color: var(--accent); }
+.account-period-drawer[open] { display: flex; flex-direction: column; font-size: var(--fs-5); }
+.account-period-drawer .codex-columns-drawer__header { flex: none; }
+.account-period-drawer .codex-columns-drawer__body { flex: 1; min-height: 0; overflow-y: auto; }
+.account-period-drawer .account-periods-form { min-height: 100%; display: flex; flex-direction: column; }
+.account-period-drawer .account-periods-form fieldset { border: 0; padding: 0; border-radius: 0; display: flex; flex-direction: column; flex: 1; gap: 16px; }
+.account-period-drawer .account-periods-form legend { padding: 0 0 16px; font-size: var(--fs-5); }
+/* Top-aligned: a field with its local-time line under it keeps its label level with the one beside it. */
+.account-period-drawer .account-periods-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.account-period-drawer .account-periods-fields > label:not(.account-periods-date) { grid-column: 1 / -1; }
+.account-period-drawer input:not(.ui-dropdown-required), .account-period-drawer .ui-dropdown { width: 100%; min-height: 40px; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--line2); border-radius: var(--r-chip); background: var(--surface); color: var(--text); font: inherit; box-sizing: border-box; }
+.account-period-drawer .account-periods-note { margin: 0; font-size: var(--fs-3); }
+.account-period-drawer .account-periods-form-extra { margin: 0; border-top: var(--rule); padding-top: 14px; }
+.account-period-drawer .account-periods-form-extra li { margin: 10px 0; }
+.account-period-drawer .account-periods-actions { position: sticky; bottom: -20px; margin-top: auto; padding: 18px 0; border-top: var(--rule); background: var(--surface); }
+.account-period-drawer .account-periods-actions > span { flex-basis: 100%; font-size: var(--fs-3); }
+.account-period-drawer-record { display: block; margin-bottom: 24px; }
+.account-history-bar:not(.is-unknown):not(:disabled) { cursor: grab; touch-action: none; }
+.account-history-bar:not(.is-unknown):not(:disabled)::before, .account-history-bar:not(.is-unknown):not(:disabled)::after { content: ""; position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+.account-history-bar::before { left: 0; }
+.account-history-bar::after { right: 0; }
+.account-history-bar:active:not(:disabled) { cursor: grabbing; }
+/* Panels reused inside the account card (price, promotions, rhythms) are groups of that card, never frames of their own. */
+.account-history-lists .ui-card { border: 0; background: transparent; }
+.account-history-assignments { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: var(--fs-4); }
+/* The account sheet scrolls on its own, so the column names stay over long tables. */
+.account-history-assignments th { position: sticky; top: 0; z-index: 2; background: var(--surface); text-align: left; font-weight: var(--fw-regular); font-size: var(--fs-3); color: var(--muted); padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line2); }
+.account-history-assignments td { padding: 10px 12px 10px 0; border-bottom: var(--rule); }
+.account-history-assignments tbody tr { cursor: pointer; }
+.account-history-assignments tbody tr:hover { background: var(--sunk); }
+.account-history-assignments tbody tr.is-selected { background: var(--accent-soft); }
+.account-history-assignments td button { font: inherit; font-weight: var(--fw-medium); color: var(--text); background: none; border: 0; padding: 0; cursor: pointer; }
+/* Subscription: a plan row folds its cycles; the cycle rows sit under the plan name, quieter. */
+.account-history-subscription .account-history-fold { display: inline-block; width: var(--s-8); color: var(--muted); }
+.account-history-subscription tr.is-cycle > td:first-child { padding-left: var(--s-8); color: var(--muted); }
+/* The Overview drawer holds one account's whole history, so it needs the timeline's width. */
+.subscription-periods-drawer { width: min(1480px, 96vw); }
+.account-periods-local { display: block; margin-top: 6px; font-size: var(--fs-3); color: var(--muted); }
+.account-periods-end-earlier { margin-top: 12px; padding: 12px; border-radius: var(--r-chip); background: var(--accent-soft); }
+.account-periods-end-earlier ul { margin: 8px 0 12px; }
+/* Limit windows tab: bars filled to the window's usage, ↓ where a plan change dropped the meter. */
+.account-history-window { position: absolute; top: 6px; bottom: 6px; min-width: 3px; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; border: 1px solid var(--line2); border-radius: var(--r-bar); background: var(--surface); font-family: var(--font-figure); font-size: var(--fs-2); font-weight: var(--fw-medium); white-space: nowrap; container-type: inline-size; }
+.account-history-window > i { position: absolute; left: 0; right: 0; bottom: 0; }
+.account-history-window > span { position: relative; padding-bottom: 3px; }
+@container (max-width: 34px) { .account-history-window > span { display: none; } }
+.account-history-window.is-current { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.account-history-window.is-empty, .account-history-legend i.is-empty { background: repeating-linear-gradient(135deg, transparent, transparent 5px, var(--line) 5px, var(--line) 6px); }
+.account-history-drop { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 2px solid var(--warn); z-index: 1; }
+.account-history-drop::after { content: "↓"; position: absolute; top: -14px; left: -5px; color: var(--warn); font-size: var(--fs-2); font-weight: var(--fw-bold); }
+.account-history-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 4px 0 0 148px; color: var(--muted); font-size: var(--fs-3); }
+.account-history-legend i.is-declared { border: 1px solid var(--ok); background: var(--ok-soft); }
+.account-history-legend i.is-observed { border: 1px dashed var(--ok); background: var(--ok-soft); }
+.account-history-legend i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; border-radius: var(--r-bar); vertical-align: -1px; }
+.account-history-legend .is-drop, .account-history-drop-label { color: var(--warn); }
+.account-history-windows { margin-top: 18px; }
+.account-history-windows tbody tr { cursor: default; }
+.account-history-bar.is-unknown.is-unpriced, .account-history-legend i.is-unpriced { color: var(--warn); border-color: var(--warn);
+  background: repeating-linear-gradient(135deg, var(--warn-soft), var(--warn-soft) 5px, color-mix(in oklab, var(--warn) 55%, transparent) 5px, color-mix(in oklab, var(--warn) 55%, transparent) 6px); }
+.account-history-bar.is-unpriced { font-weight: var(--fw-semibold); }
+.account-history-legend i.is-unpriced { border: 1px solid var(--warn); }
+/* Billing cycles (docs/billing-cycles-design-2026-10-08.md §7): a thin divider at each cycle start with its price and use;
+   solid for your declaration, dashed from readings; an inferred cycle (often without a plan bar under it) is a dashed box. They let
+   the plan bars below take every pointer, so dragging and the edit buttons keep working. */
+.account-history-cycle { box-sizing: border-box; position: absolute; top: 0; bottom: 0; z-index: 1; pointer-events: none; border-left: 1px solid color-mix(in oklab, var(--text) 60%, transparent); container-type: inline-size; }
+.account-history-cycle:is(.is-observed, .is-inferred, .is-uncertain) { border-left-style: dashed; }
+.account-history-cycle.is-inferred { border: 1px dashed var(--muted); border-radius: var(--r-chip); pointer-events: auto; cursor: pointer; }
+/* A selected or hovered billing period outlines its own stretch of the plan bar. */
+.account-history-cycle:is(.is-selected, .is-hovered) { z-index: 2; box-shadow: inset 0 0 0 2px var(--text); background: color-mix(in oklab, var(--text) 10%, transparent); }
+.account-history-cycle > span { position: absolute; left: 4px; right: 2px; bottom: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2); line-height: 1.2; color: var(--muted); }
+@container (max-width: 40px) { .account-history-cycle > span { display: none; } }
+.account-history-legend i.is-cycle { width: 0; height: 10px; border-radius: 0; border-left: 1px solid color-mix(in oklab, var(--text) 60%, transparent); }
+/* Cycles a just-saved edit reaches keep their old values, faint and pulsing, until the producer stores the new ones. */
+.account-history-cycles tr.is-pending > td { color: var(--faint); animation: ta-pulse 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .account-history-cycles tr.is-pending > td { animation: none; } }
+.account-history-cycles td.account-history-cycle-actions { display: flex; gap: var(--s-4); align-items: center; }
+.account-history-cycles td.account-history-cycle-actions .account-history-edit { position: static; transform: none; }
+.account-history-cycles td.account-history-cycle-actions button:not(.account-history-edit) { font-weight: var(--fw-semibold); color: var(--accent); }
+
+/* Settings → Accounts uses the workspace, rail, facts and detail-tab primitives (ui.css, paper-atlas §7); only its own parts are here. */
+.account-periods-choice-meta b { color: var(--text); font-weight: var(--fw-semibold); }
+.account-periods-account-choice .account-periods-strip { width: 76px; }
+.account-periods-all-choice { border-top: 0; border-bottom: var(--rule); }
+.account-periods-all-choice strong { font-weight: var(--fw-semibold); }
+.account-periods-more, .account-periods-empty { padding: var(--s-3) var(--s-6) 0; }
+.account-periods-more > .ui-disclosure, .account-periods-empty > .ui-disclosure { color: var(--muted); font-size: var(--fs-4); }
+.account-periods-empty { margin-top: var(--s-8); border-top: var(--rule); padding-top: var(--s-5); }
+.account-periods-history { min-width: 0; padding: var(--s-8) 0; }
+.account-periods-history + .account-periods-history { border-top: var(--rule); }
+.account-periods-histories > .account-periods-history:first-child { padding-top: 0; }
+.account-periods-history h3 { font-size: var(--fs-section); margin: 2px 0 0; font-weight: var(--fw-semibold); }
+.ui-fact-value .account-periods-expand { font-size: var(--fs-3); }
+.account-history-lists { display: grid; gap: var(--s-4); }
+.account-settings-tools { display: flex; justify-content: flex-end; }
+.account-settings-as-of input { width: 138px; padding: 0 var(--s-2); border: 0; background: transparent; color: var(--text); font-size: var(--fs-5); outline: none; }
+.account-history-fold > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-4); font-weight: var(--fw-semibold); }

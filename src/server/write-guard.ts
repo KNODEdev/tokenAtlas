@@ -1,0 +1,16 @@
+import { loopbackOrigin } from "./claude-login";
+
+const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * Refuses a write another web page could send to this loopback server. A form or `text/plain` fetch needs no CORS
+ * preflight, while `application/json` does and the server answers none; a present Origin must also be loopback
+ * (the Vite proxy uses another port). Returns null for reads and for the app's own JSON writes.
+ */
+export function refuseCrossSiteWrite(req: Request): Response | null {
+  if (READ_METHODS.has(req.method)) return null;
+  const json = (req.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json");
+  const origin = req.headers.get("origin");
+  if (json && (!origin || loopbackOrigin(origin))) return null;
+  return Response.json({ error: "Cross-origin request refused" }, { status: 403 });
+}

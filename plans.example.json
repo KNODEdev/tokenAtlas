@@ -1,0 +1,25 @@
+{
+  "_comment": [
+    "WZORZEC. Skopiuj do <TOKENATLAS_CONFIG>/plans.json.",
+    "Historia planu konta to okresy planu (Ustawienia -> Okresy kont), a cena to wersja",
+    "planu w katalogu Planow. Dawne etapy `segments` sa wycofane (27.09.2026): stary plik",
+    "nadal sie wczytuje, etapy zostaja w pliku bez zmian, ale nic ich nie czyta.",
+    "capacity_regimes zapisuje tylko znane wyjatki od zwyklej pojemnosci 1x",
+    "(promocje, triale, account override). factor=2 oznacza dwukrotnie wiekszy",
+    "limit w podanym okresie. plan_id i window_kind sa opcjonalnymi filtrami.",
+    "Brak wpisu nie oznacza braku danych procentowych: oznacza jawne zalozenie 1x."
+  ],
+  "capacity_regimes": [
+    {
+      "id": "codex1-summer-promo-2x",
+      "subscription": "codex1",
+      "factor": 2,
+      "from": "2026-06-01",
+      "until": "2026-06-30",
+      "plan_id": "codex-plus",
+      "window_kind": "weekly",
+      "source": "promotion",
+      "note": "Example only: remove unless confirmed for this account."
+    }
+  ]
+}

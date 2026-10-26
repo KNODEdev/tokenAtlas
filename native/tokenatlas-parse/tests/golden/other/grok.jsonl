@@ -1,0 +1,6 @@
+{broken "usage"
+{"timestamp": 0, "params": {"sessionId": "skip", "update": {"prompt_id": "p", "usage": {"inputTokens": 1}}}}
+{"timestamp": 1788264000123.9, "params": {"sessionId": "session\ud83d\ude00", "update": {"prompt_id": "prompt", "stop_reason": "end", "usage": {"modelUsage": {"10": {"inputTokens": 9007199254740993, "outputTokens": 1, "costUsdTicks": 1.25}, "2": {"inputTokens": 0, "outputTokens": 2, "cachedReadTokens": 3, "reasoningTokens": 4}, "m\ud83d\ude00\ud800": {"inputTokens": 5, "cacheCreationTokens": 2, "modelCalls": 3, "apiDurationMs": 0.01}, "zero": {"inputTokens": 0, "outputTokens": 0}}}}}}
+{"timestamp":1788264000000,"params":{"_meta":{"agentTimestampMs":-1},"sessionId":"s","update":{"prompt_id":"p","usage":{"inputTokens":1e400,"outputTokens":-0,"cachedReadTokens":null,"costUsdTicks":1e-7}}}}
+{"timestamp": 1788264000000, "params": {"sessionId": "s", "update": {"prompt_id": "fallback", "usage": {"inputTokens": 2, "outputTokens": 3, "modelUsage": {}}}}}
+{"params":{"sessionId":"bad-í €","update":{"prompt_id":"p","usage":{"inputTokens":1}}},"timestamp":1788264000000}

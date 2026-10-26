@@ -1,0 +1,1 @@
+ALTER TABLE `probe_windows` ADD `era_unattributed` integer DEFAULT 0 NOT NULL;

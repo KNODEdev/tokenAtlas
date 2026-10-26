@@ -1,0 +1,2615 @@
+{
+  "version": 2,
+  "currency": "USD",
+  "unit": "USD per 1,000,000 tokens",
+  "_comment": [
+    "Every token type carries its OWN rate - a cache read, a 5-minute cache write, a",
+    "1-hour cache write, fresh input and output are five different prices, not one price",
+    "with adjustments. They are written out explicitly rather than derived from multipliers",
+    "so the file can be audited line by line and a vendor with different cache economics",
+    "needs no code change.",
+    "This matters more than it looks: 97-99% of observed input is cache reads. Pricing",
+    "those at the fresh-input rate overstates cost by about an order of magnitude.",
+    "Anthropic derivation: cache read = 0.1x input, write 5m = 1.25x, write 1h = 2.0x."
+  ],
+  "token_types": {
+    "in_uncached": "fresh input, never cached",
+    "in_cache_read": "input served from cache",
+    "in_cache_write_5m": "input written to cache, 5-minute TTL",
+    "in_cache_write_1h": "input written to cache, 1-hour TTL",
+    "out_total": "output, including reasoning/thinking tokens"
+  },
+  "codex_accounting": {
+    "version": 1,
+    "long_context_premium": false,
+    "notes": [
+      "Dated reference estimates, not provider invoices or subscription percentages.",
+      "Credits follow the published token-based rate card; an Enterprise contract may differ.",
+      "API estimates use configured speed and default non-regional text pricing; tools and residency uplifts are excluded.",
+      "API input includes cache reads and writes. Positive writes require a dated write price; their credit valuation remains unconfirmed.",
+      "Historical coverage was explicitly requested on 2026-09-09. Backfilled rules use first observed UTC model days in the local two-machine archive, not a claim about the public launch date or past provider invoices. Historical rules have confidence=user; their numeric reference rates are from the linked current official sources.",
+      "First observed: GPT-6.1 Sol 2026-09-30; GPT-6 Sol/Luna 2026-09-23; GPT-6 Astra 2026-09-04; GPT-5.6 Sol/Terra/Luna 2026-07-09; GPT-5.5 2026-04-24; GPT-5.4 2026-03-07. verified_at is the verification date, not the effective start.",
+      "GPT-6 Sol and Luna rules start at their 2026-09-22 launch; OpenAI announced these launch prices as permanent, so no earlier vector is reconstructed. GPT-6.1 Sol rules start at its 2026-09-29 launch (API changelog).",
+      "All GPT-6 and GPT-5.6 models have separate Standard/Fast API rules and per-request long-context rates. Other unsupported API model/basis pairs remain unpriced.",
+      "2026-09-11 audit: historical reference vectors split on 2026-07-30 (Terra/Luna API and credits) and 2026-08-21 (Sol API). Earlier vectors are reconstructed from documented reductions; historical mode/long-context premiums and Sol cache pricing remain reference assumptions (confidence=user). Day boundaries use UTC because official notices do not give an exact change time.",
+      "Sol credit pricing: current 100/10/500 is confirmed, but its historical change date and prior vector are not established here. The existing retrospective credit reference is retained, not certified as historically billed. The Sol promotion has no confirmed end date; at least November 21 is not an end boundary."
+    ],
+    "rules": [
+      {
+        "id": "gpt-6-astra-credits-standard-20260908",
+        "model": "gpt-6-astra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 250,
+          "in_cache_read": 25,
+          "out_total": 1250
+        },
+        "multiplier": 1
+      },
+      {
+        "id": "gpt-6-astra-credits-fast-20260908",
+        "model": "gpt-6-astra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 250,
+          "in_cache_read": 25,
+          "out_total": 1250
+        },
+        "multiplier": 2.5
+      },
+      {
+        "id": "gpt-6-sol-credits-standard-20260922",
+        "model": "gpt-6-sol",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-09-22",
+        "verified_at": "2026-09-26",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 50,
+          "in_cache_read": 5,
+          "out_total": 250
+        },
+        "multiplier": 1
+      },
+      {
+        "id": "gpt-6-sol-credits-fast-20260922",
+        "model": "gpt-6-sol",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-09-22",
+        "verified_at": "2026-09-26",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 50,
+          "in_cache_read": 5,
+          "out_total": 250
+        },
+        "multiplier": 2.5
+      },
+      {
+        "id": "gpt-6.1-sol-credits-standard-20260929",
+        "model": "gpt-6.1-sol",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-09-29",
+        "verified_at": "2026-10-06",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 50,
+          "in_cache_read": 2.5,
+          "out_total": 250
+        },
+        "multiplier": 1
+      },
+      {
+        "id": "gpt-6.1-sol-credits-fast-20260929",
+        "model": "gpt-6.1-sol",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-09-29",
+        "verified_at": "2026-10-06",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 50,
+          "in_cache_read": 2.5,
+          "out_total": 250
+        },
+        "multiplier": 2.5
+      },
+      {
+        "id": "gpt-6-luna-credits-standard-20260922",
+        "model": "gpt-6-luna",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-09-22",
+        "verified_at": "2026-09-26",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 2.5,
+          "in_cache_read": 0.25,
+          "out_total": 12.5
+        },
+        "multiplier": 1
+      },
+      {
+        "id": "gpt-6-luna-credits-fast-20260922",
+        "model": "gpt-6-luna",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-09-22",
+        "verified_at": "2026-09-26",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 2.5,
+          "in_cache_read": 0.25,
+          "out_total": 12.5
+        },
+        "multiplier": 2.5
+      },
+      {
+        "id": "gpt-5.6-sol-credits-standard-20260908",
+        "model": "gpt-5.6-sol",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-08",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 100,
+          "in_cache_read": 10,
+          "out_total": 500
+        },
+        "multiplier": 1
+      },
+      {
+        "id": "gpt-5.6-sol-credits-fast-20260908",
+        "model": "gpt-5.6-sol",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-08",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 100,
+          "in_cache_read": 10,
+          "out_total": 500
+        },
+        "multiplier": 2.5
+      },
+      {
+        "id": "gpt-5.6-terra-credits-standard-20260908",
+        "model": "gpt-5.6-terra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-08",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 50,
+          "in_cache_read": 5,
+          "out_total": 300
+        },
+        "multiplier": 1
+      },
+      {
+        "id": "gpt-5.6-terra-credits-fast-20260908",
+        "model": "gpt-5.6-terra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-08",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 50,
+          "in_cache_read": 5,
+          "out_total": 300
+        },
+        "multiplier": 2.5
+      },
+      {
+        "id": "gpt-5.6-luna-credits-standard-20260908",
+        "model": "gpt-5.6-luna",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-08",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 5,
+          "in_cache_read": 0.5,
+          "out_total": 30
+        },
+        "multiplier": 1
+      },
+      {
+        "id": "gpt-5.6-luna-credits-fast-20260908",
+        "model": "gpt-5.6-luna",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-08",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 5,
+          "in_cache_read": 0.5,
+          "out_total": 30
+        },
+        "multiplier": 2.5
+      },
+      {
+        "id": "gpt-5.5-credits-standard-20260908",
+        "model": "gpt-5.5",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-08",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 125,
+          "in_cache_read": 12.5,
+          "out_total": 750
+        },
+        "multiplier": 1
+      },
+      {
+        "id": "gpt-5.5-credits-fast-20260908",
+        "model": "gpt-5.5",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-08",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 125,
+          "in_cache_read": 12.5,
+          "out_total": 750
+        },
+        "multiplier": 2.5
+      },
+      {
+        "id": "gpt-5.4-credits-standard-20260908",
+        "model": "gpt-5.4",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-08",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 62.5,
+          "in_cache_read": 6.25,
+          "out_total": 375
+        },
+        "multiplier": 1
+      },
+      {
+        "id": "gpt-5.4-credits-fast-20260908",
+        "model": "gpt-5.4",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-08",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 62.5,
+          "in_cache_read": 6.25,
+          "out_total": 375
+        },
+        "multiplier": 2
+      },
+      {
+        "id": "gpt-5.4-mini-credits-standard-20260908",
+        "model": "gpt-5.4-mini",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-08",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 18.75,
+          "in_cache_read": 1.875,
+          "out_total": 113
+        },
+        "multiplier": 1
+      },
+      {
+        "id": "gpt-6-astra-api-standard-20260908",
+        "model": "gpt-6-astra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6-astra",
+          "https://developers.openai.com/api/docs/guides/fast-mode",
+          "https://developers.openai.com/api/docs/pricing"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 10,
+          "in_cache_read": 1,
+          "in_cache_write": 12.5,
+          "out_total": 50
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 20,
+            "in_cache_read": 2,
+            "in_cache_write": 25,
+            "out_total": 75.0
+          }
+        }
+      },
+      {
+        "id": "gpt-6-astra-api-fast-20260908",
+        "model": "gpt-6-astra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6-astra",
+          "https://developers.openai.com/api/docs/guides/fast-mode",
+          "https://developers.openai.com/api/docs/pricing"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 20,
+          "in_cache_read": 2,
+          "in_cache_write": 25,
+          "out_total": 100
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 40,
+            "in_cache_read": 4,
+            "in_cache_write": 50,
+            "out_total": 150.0
+          }
+        }
+      },
+      {
+        "id": "gpt-6-sol-api-standard-20260922",
+        "model": "gpt-6-sol",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-09-22",
+        "verified_at": "2026-09-26",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6-sol",
+          "https://developers.openai.com/api/docs/pricing"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 2,
+          "in_cache_read": 0.2,
+          "in_cache_write": 2.5,
+          "out_total": 10
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 4,
+            "in_cache_read": 0.4,
+            "in_cache_write": 5,
+            "out_total": 15
+          }
+        }
+      },
+      {
+        "id": "gpt-6-sol-api-fast-20260922",
+        "model": "gpt-6-sol",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-09-22",
+        "verified_at": "2026-09-26",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6-sol",
+          "https://developers.openai.com/api/docs/pricing"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 4,
+          "in_cache_read": 0.4,
+          "in_cache_write": 5,
+          "out_total": 20
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 8,
+            "in_cache_read": 0.8,
+            "in_cache_write": 10,
+            "out_total": 30
+          }
+        },
+        "note": "The pricing page lists Fast short-context rates only; the model page prices Fast at 2x the applicable rate, so the long-context Fast rates are 2x the long-context Standard rates."
+      },
+      {
+        "id": "gpt-6.1-sol-api-standard-20260929",
+        "model": "gpt-6.1-sol",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-09-29",
+        "verified_at": "2026-10-06",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 2,
+          "in_cache_read": 0.1,
+          "in_cache_write": 2.5,
+          "out_total": 10
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 4,
+            "in_cache_read": 0.2,
+            "in_cache_write": 5,
+            "out_total": 15
+          }
+        }
+      },
+      {
+        "id": "gpt-6.1-sol-api-fast-20260929",
+        "model": "gpt-6.1-sol",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-09-29",
+        "verified_at": "2026-10-06",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 4,
+          "in_cache_read": 0.2,
+          "in_cache_write": 5,
+          "out_total": 20
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 8,
+            "in_cache_read": 0.4,
+            "in_cache_write": 10,
+            "out_total": 30
+          }
+        },
+        "note": "The pricing page lists Fast short-context rates only; the model page prices Fast at 2x Standard, so the long-context Fast rates are 2x the long-context Standard rates."
+      },
+      {
+        "id": "gpt-6-luna-api-standard-20260922",
+        "model": "gpt-6-luna",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-09-22",
+        "verified_at": "2026-09-26",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6-luna",
+          "https://developers.openai.com/api/docs/pricing"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 0.1,
+          "in_cache_read": 0.01,
+          "in_cache_write": 0.125,
+          "out_total": 0.5
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 0.2,
+            "in_cache_read": 0.02,
+            "in_cache_write": 0.25,
+            "out_total": 0.75
+          }
+        }
+      },
+      {
+        "id": "gpt-6-luna-api-fast-20260922",
+        "model": "gpt-6-luna",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-09-22",
+        "verified_at": "2026-09-26",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6-luna",
+          "https://developers.openai.com/api/docs/pricing"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 0.2,
+          "in_cache_read": 0.02,
+          "in_cache_write": 0.25,
+          "out_total": 1
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 0.4,
+            "in_cache_read": 0.04,
+            "in_cache_write": 0.5,
+            "out_total": 1.5
+          }
+        },
+        "note": "The pricing page lists Fast short-context rates only; the model page prices Fast at 2x the applicable rate, so the long-context Fast rates are 2x the long-context Standard rates."
+      },
+      {
+        "id": "gpt-5.6-sol-api-standard-20260908",
+        "model": "gpt-5.6-sol",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-08",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+          "https://developers.openai.com/api/docs/guides/fast-mode"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 4,
+          "in_cache_read": 0.4,
+          "in_cache_write": 5,
+          "out_total": 20
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 8,
+            "in_cache_read": 0.8,
+            "in_cache_write": 10,
+            "out_total": 30.0
+          }
+        }
+      },
+      {
+        "id": "gpt-5.6-sol-api-fast-20260908",
+        "model": "gpt-5.6-sol",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-08",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+          "https://developers.openai.com/api/docs/guides/fast-mode"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 8,
+          "in_cache_read": 0.8,
+          "in_cache_write": 10,
+          "out_total": 40
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 16,
+            "in_cache_read": 1.6,
+            "in_cache_write": 20,
+            "out_total": 60.0
+          }
+        }
+      },
+      {
+        "id": "gpt-5.6-terra-api-standard-20260909",
+        "model": "gpt-5.6-terra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+          "https://developers.openai.com/api/docs/pricing"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 2,
+          "in_cache_read": 0.2,
+          "in_cache_write": 2.5,
+          "out_total": 12
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 4,
+            "in_cache_read": 0.4,
+            "in_cache_write": 5,
+            "out_total": 18.0
+          }
+        }
+      },
+      {
+        "id": "gpt-5.6-terra-api-fast-20260909",
+        "model": "gpt-5.6-terra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+          "https://developers.openai.com/api/docs/pricing"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 4,
+          "in_cache_read": 0.4,
+          "in_cache_write": 5,
+          "out_total": 24
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 8,
+            "in_cache_read": 0.8,
+            "in_cache_write": 10,
+            "out_total": 36.0
+          }
+        }
+      },
+      {
+        "id": "gpt-5.6-luna-api-standard-20260909",
+        "model": "gpt-5.6-luna",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+          "https://developers.openai.com/api/docs/pricing"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 0.2,
+          "in_cache_read": 0.02,
+          "in_cache_write": 0.25,
+          "out_total": 1.2
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 0.4,
+            "in_cache_read": 0.04,
+            "in_cache_write": 0.5,
+            "out_total": 1.7999999999999998
+          }
+        }
+      },
+      {
+        "id": "gpt-5.6-luna-api-fast-20260909",
+        "model": "gpt-5.6-luna",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-09-08",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+          "https://developers.openai.com/api/docs/pricing"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 0.4,
+          "in_cache_read": 0.04,
+          "in_cache_write": 0.5,
+          "out_total": 2.4
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 0.8,
+            "in_cache_read": 0.08,
+            "in_cache_write": 1,
+            "out_total": 3.5999999999999996
+          }
+        }
+      },
+      {
+        "id": "gpt-6-astra-credits-standard-first-observed-20260904",
+        "model": "gpt-6-astra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-09-04",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 250,
+          "in_cache_read": 25,
+          "out_total": 1250
+        },
+        "multiplier": 1,
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-6-astra-credits-fast-first-observed-20260904",
+        "model": "gpt-6-astra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-09-04",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 250,
+          "in_cache_read": 25,
+          "out_total": 1250
+        },
+        "multiplier": 2.5,
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.6-sol-credits-standard-first-observed-20260709",
+        "model": "gpt-5.6-sol",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-07-09",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 100,
+          "in_cache_read": 10,
+          "out_total": 500
+        },
+        "multiplier": 1,
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.6-sol-credits-fast-first-observed-20260709",
+        "model": "gpt-5.6-sol",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-07-09",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 100,
+          "in_cache_read": 10,
+          "out_total": 500
+        },
+        "multiplier": 2.5,
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.6-terra-credits-standard-historical-before-20260730-20260709",
+        "model": "gpt-5.6-terra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-07-09",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed",
+          "https://learn.chatgpt.com/docs/whats-new#use-gpt-56-terra-and-luna-at-lower-rates"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 62.5,
+          "in_cache_read": 6.25,
+          "out_total": 375.0
+        },
+        "multiplier": 1,
+        "valid_until": "2026-07-30"
+      },
+      {
+        "id": "gpt-5.6-terra-credits-standard-price-change-20260730",
+        "model": "gpt-5.6-terra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-07-30",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed",
+          "https://learn.chatgpt.com/docs/whats-new#use-gpt-56-terra-and-luna-at-lower-rates"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 50,
+          "in_cache_read": 5,
+          "out_total": 300
+        },
+        "multiplier": 1,
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.6-terra-credits-fast-historical-before-20260730-20260709",
+        "model": "gpt-5.6-terra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-07-09",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed",
+          "https://learn.chatgpt.com/docs/whats-new#use-gpt-56-terra-and-luna-at-lower-rates"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 62.5,
+          "in_cache_read": 6.25,
+          "out_total": 375.0
+        },
+        "multiplier": 2.5,
+        "valid_until": "2026-07-30"
+      },
+      {
+        "id": "gpt-5.6-terra-credits-fast-price-change-20260730",
+        "model": "gpt-5.6-terra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-07-30",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed",
+          "https://learn.chatgpt.com/docs/whats-new#use-gpt-56-terra-and-luna-at-lower-rates"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 50,
+          "in_cache_read": 5,
+          "out_total": 300
+        },
+        "multiplier": 2.5,
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.6-luna-credits-standard-historical-before-20260730-20260709",
+        "model": "gpt-5.6-luna",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-07-09",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed",
+          "https://learn.chatgpt.com/docs/whats-new#use-gpt-56-terra-and-luna-at-lower-rates"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 25,
+          "in_cache_read": 2.5,
+          "out_total": 150
+        },
+        "multiplier": 1,
+        "valid_until": "2026-07-30"
+      },
+      {
+        "id": "gpt-5.6-luna-credits-standard-price-change-20260730",
+        "model": "gpt-5.6-luna",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-07-30",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed",
+          "https://learn.chatgpt.com/docs/whats-new#use-gpt-56-terra-and-luna-at-lower-rates"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 5,
+          "in_cache_read": 0.5,
+          "out_total": 30
+        },
+        "multiplier": 1,
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.6-luna-credits-fast-historical-before-20260730-20260709",
+        "model": "gpt-5.6-luna",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-07-09",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed",
+          "https://learn.chatgpt.com/docs/whats-new#use-gpt-56-terra-and-luna-at-lower-rates"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 25,
+          "in_cache_read": 2.5,
+          "out_total": 150
+        },
+        "multiplier": 2.5,
+        "valid_until": "2026-07-30"
+      },
+      {
+        "id": "gpt-5.6-luna-credits-fast-price-change-20260730",
+        "model": "gpt-5.6-luna",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-07-30",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed",
+          "https://learn.chatgpt.com/docs/whats-new#use-gpt-56-terra-and-luna-at-lower-rates"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 5,
+          "in_cache_read": 0.5,
+          "out_total": 30
+        },
+        "multiplier": 2.5,
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.5-credits-standard-first-observed-20260424",
+        "model": "gpt-5.5",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-04-24",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 125,
+          "in_cache_read": 12.5,
+          "out_total": 750
+        },
+        "multiplier": 1,
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.5-credits-fast-first-observed-20260424",
+        "model": "gpt-5.5",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-04-24",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 125,
+          "in_cache_read": 12.5,
+          "out_total": 750
+        },
+        "multiplier": 2.5,
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.4-credits-standard-20260402",
+        "model": "gpt-5.4",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-04-02",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 62.5,
+          "in_cache_read": 6.25,
+          "out_total": 375
+        },
+        "multiplier": 1,
+        "valid_until": "2026-09-08",
+      "note": "Codex moved subscription billing from per-message to per-token credits on 2026-04-02; no credit rate existed before that day, so this rule starts there rather than at the first observed use of the model."
+      },
+      {
+        "id": "gpt-5.4-credits-fast-20260402",
+        "model": "gpt-5.4",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-04-02",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 62.5,
+          "in_cache_read": 6.25,
+          "out_total": 375
+        },
+        "multiplier": 2,
+        "valid_until": "2026-09-08",
+      "note": "Codex moved subscription billing from per-message to per-token credits on 2026-04-02; no credit rate existed before that day, so this rule starts there rather than at the first observed use of the model."
+      },
+      {
+        "id": "gpt-6-astra-api-standard-first-observed-20260904",
+        "model": "gpt-6-astra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-09-04",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6-astra",
+          "https://developers.openai.com/api/docs/guides/fast-mode"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 10,
+          "in_cache_read": 1,
+          "in_cache_write": 12.5,
+          "out_total": 50
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 20,
+            "in_cache_read": 2,
+            "in_cache_write": 25,
+            "out_total": 75.0
+          }
+        },
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-6-astra-api-fast-first-observed-20260904",
+        "model": "gpt-6-astra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-09-04",
+        "verified_at": "2026-09-09",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6-astra",
+          "https://developers.openai.com/api/docs/guides/fast-mode"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 20,
+          "in_cache_read": 2,
+          "in_cache_write": 25,
+          "out_total": 100
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 40,
+            "in_cache_read": 4,
+            "in_cache_write": 50,
+            "out_total": 150.0
+          }
+        },
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.6-sol-api-standard-historical-before-20260821-20260709",
+        "model": "gpt-5.6-sol",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-07-09",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+          "https://developers.openai.com/api/docs/guides/fast-mode",
+          "https://developers.openai.com/api/docs/changelog#august-2026"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 5.0,
+          "in_cache_read": 0.5,
+          "in_cache_write": 6.25,
+          "out_total": 30.0
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 10.0,
+            "in_cache_read": 1.0,
+            "in_cache_write": 12.5,
+            "out_total": 45.0
+          }
+        },
+        "valid_until": "2026-08-21"
+      },
+      {
+        "id": "gpt-5.6-sol-api-standard-price-change-20260821",
+        "model": "gpt-5.6-sol",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-08-21",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+          "https://developers.openai.com/api/docs/guides/fast-mode",
+          "https://developers.openai.com/api/docs/changelog#august-2026"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 4,
+          "in_cache_read": 0.4,
+          "in_cache_write": 5,
+          "out_total": 20
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 8,
+            "in_cache_read": 0.8,
+            "in_cache_write": 10,
+            "out_total": 30.0
+          }
+        },
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.6-sol-api-fast-historical-before-20260821-20260709",
+        "model": "gpt-5.6-sol",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-07-09",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+          "https://developers.openai.com/api/docs/guides/fast-mode",
+          "https://developers.openai.com/api/docs/changelog#august-2026"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 10.0,
+          "in_cache_read": 1.0,
+          "in_cache_write": 12.5,
+          "out_total": 60.0
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 20.0,
+            "in_cache_read": 2.0,
+            "in_cache_write": 25,
+            "out_total": 90.0
+          }
+        },
+        "valid_until": "2026-08-21"
+      },
+      {
+        "id": "gpt-5.6-sol-api-fast-price-change-20260821",
+        "model": "gpt-5.6-sol",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-08-21",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+          "https://developers.openai.com/api/docs/guides/fast-mode",
+          "https://developers.openai.com/api/docs/changelog#august-2026"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 8,
+          "in_cache_read": 0.8,
+          "in_cache_write": 10,
+          "out_total": 40
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 16,
+            "in_cache_read": 1.6,
+            "in_cache_write": 20,
+            "out_total": 60.0
+          }
+        },
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.6-terra-api-standard-historical-before-20260730-20260709",
+        "model": "gpt-5.6-terra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-07-09",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog#july-2026"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 2.5,
+          "in_cache_read": 0.25,
+          "in_cache_write": 3.125,
+          "out_total": 15.0
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 5.0,
+            "in_cache_read": 0.5,
+            "in_cache_write": 6.25,
+            "out_total": 22.5
+          }
+        },
+        "valid_until": "2026-07-30"
+      },
+      {
+        "id": "gpt-5.6-terra-api-standard-price-change-20260730",
+        "model": "gpt-5.6-terra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-07-30",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog#july-2026"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 2,
+          "in_cache_read": 0.2,
+          "in_cache_write": 2.5,
+          "out_total": 12
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 4,
+            "in_cache_read": 0.4,
+            "in_cache_write": 5,
+            "out_total": 18.0
+          }
+        },
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.6-terra-api-fast-historical-before-20260730-20260709",
+        "model": "gpt-5.6-terra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-07-09",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog#july-2026"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 5.0,
+          "in_cache_read": 0.5,
+          "in_cache_write": 6.25,
+          "out_total": 30.0
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 10.0,
+            "in_cache_read": 1.0,
+            "in_cache_write": 12.5,
+            "out_total": 45.0
+          }
+        },
+        "valid_until": "2026-07-30"
+      },
+      {
+        "id": "gpt-5.6-terra-api-fast-price-change-20260730",
+        "model": "gpt-5.6-terra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-07-30",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog#july-2026"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 4,
+          "in_cache_read": 0.4,
+          "in_cache_write": 5,
+          "out_total": 24
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 8,
+            "in_cache_read": 0.8,
+            "in_cache_write": 10,
+            "out_total": 36.0
+          }
+        },
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.6-luna-api-standard-historical-before-20260730-20260709",
+        "model": "gpt-5.6-luna",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-07-09",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog#july-2026"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 1.0,
+          "in_cache_read": 0.1,
+          "in_cache_write": 1.25,
+          "out_total": 6.0
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 2.0,
+            "in_cache_read": 0.2,
+            "in_cache_write": 2.5,
+            "out_total": 9.0
+          }
+        },
+        "valid_until": "2026-07-30"
+      },
+      {
+        "id": "gpt-5.6-luna-api-standard-price-change-20260730",
+        "model": "gpt-5.6-luna",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-07-30",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog#july-2026"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 0.2,
+          "in_cache_read": 0.02,
+          "in_cache_write": 0.25,
+          "out_total": 1.2
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 0.4,
+            "in_cache_read": 0.04,
+            "in_cache_write": 0.5,
+            "out_total": 1.7999999999999998
+          }
+        },
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.6-luna-api-fast-historical-before-20260730-20260709",
+        "model": "gpt-5.6-luna",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-07-09",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog#july-2026"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 2.0,
+          "in_cache_read": 0.2,
+          "in_cache_write": 2.5,
+          "out_total": 12.0
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 4.0,
+            "in_cache_read": 0.4,
+            "in_cache_write": 5,
+            "out_total": 18.0
+          }
+        },
+        "valid_until": "2026-07-30"
+      },
+      {
+        "id": "gpt-5.6-luna-api-fast-price-change-20260730",
+        "model": "gpt-5.6-luna",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-07-30",
+        "verified_at": "2026-09-11",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog#july-2026"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 0.4,
+          "in_cache_read": 0.04,
+          "in_cache_write": 0.5,
+          "out_total": 2.4
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 0.8,
+            "in_cache_read": 0.08,
+            "in_cache_write": 1,
+            "out_total": 3.5999999999999996
+          }
+        },
+        "valid_until": "2026-09-08"
+      },
+      {
+        "id": "gpt-5.5-api-standard-reference",
+        "model": "gpt-5.5",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-04-23",
+        "rates": {
+          "in_uncached": 5,
+          "in_cache_read": 0.5,
+          "in_cache_write": 5,
+          "out_total": 30
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 10,
+            "in_cache_read": 1.0,
+            "in_cache_write": 10,
+            "out_total": 45.0
+          }
+        },
+        "verified_at": "2026-09-11",
+        "confidence": "user",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.5"
+        ],
+        "note": "Historical reference valuation using the documented Standard API rates from the model snapshot date; not an invoice."
+      },
+      {
+        "id": "gpt-5.4-api-standard-reference",
+        "model": "gpt-5.4",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-03-05",
+        "rates": {
+          "in_uncached": 2.5,
+          "in_cache_read": 0.25,
+          "in_cache_write": 2.5,
+          "out_total": 15
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 5.0,
+            "in_cache_read": 0.5,
+            "in_cache_write": 5,
+            "out_total": 22.5
+          }
+        },
+        "verified_at": "2026-09-11",
+        "confidence": "user",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.4"
+        ],
+        "note": "Historical reference valuation using the documented Standard API rates from the model snapshot date; not an invoice."
+      },
+      {
+        "id": "gpt-5.3-codex-api-standard-first-observed-20260209",
+        "model": "gpt-5.3-codex",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-02-09",
+        "verified_at": "2026-09-19",
+        "sources": [
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/models/gpt-5.3-codex"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 1.75,
+          "in_cache_read": 0.175,
+          "in_cache_write": 1.75,
+          "out_total": 14
+        },
+        "multiplier": 1,
+        "note": "Official Codex API reference rates, back-dated to the first observed use of the model; the price list documents the current price, not the February 2026 one. Cache-write tokens are billed as ordinary input: the Codex price list publishes no separate cache-write rate and no recorded event carries a nonzero cache-write counter."
+      },
+      {
+        "id": "gpt-5.3-codex-api-fast-first-observed-20260209",
+        "model": "gpt-5.3-codex",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-02-09",
+        "verified_at": "2026-09-19",
+        "sources": [
+          "https://developers.openai.com/api/docs/pricing"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 3.5,
+          "in_cache_read": 0.35,
+          "in_cache_write": 3.5,
+          "out_total": 28
+        },
+        "multiplier": 1,
+        "note": "Official Codex fast-tier rates (2x standard), back-dated to first observed use. No recorded event of this model carries a fast mode. Cache-write tokens are billed as ordinary input: the Codex price list publishes no separate cache-write rate and no recorded event carries a nonzero cache-write counter."
+      },
+      {
+        "id": "gpt-5.3-codex-credits-standard-20260402",
+        "model": "gpt-5.3-codex",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-04-02",
+        "verified_at": "2026-09-19",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://uibakery.io/blog/openai-codex-pricing"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 43.75,
+          "in_cache_read": 4.375,
+          "out_total": 350
+        },
+        "multiplier": 1,
+        "note": "Codex moved from per-message to token billing on 2026-04-02; no credit rate existed before that day, so this rule starts there. Rates are the API price times 25, the credit conversion every model in the current official card follows."
+      },
+      {
+        "id": "gpt-5.3-codex-credits-fast-20260402",
+        "model": "gpt-5.3-codex",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-04-02",
+        "verified_at": "2026-09-19",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://uibakery.io/blog/openai-codex-pricing"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 43.75,
+          "in_cache_read": 4.375,
+          "out_total": 350
+        },
+        "multiplier": 2,
+        "note": "Fast multiplier assumed equal to this model's documented API fast ratio (2x). No recorded event of this model carries a fast mode."
+      },
+      {
+        "id": "gpt-5.3-codex-spark-api-standard-free-20260212",
+        "model": "gpt-5.3-codex-spark",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-02-12",
+        "verified_at": "2026-10-09",
+        "sources": [
+          "https://openai.com/index/introducing-gpt-5-3-codex-spark/"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 0,
+          "in_cache_read": 0,
+          "in_cache_write": 0,
+          "out_total": 0
+        },
+        "multiplier": 1,
+        "note": "User decision 2026-10-09: Spark was free. It is a ChatGPT Pro research preview (announced 2026-02-12) with no pay-as-you-go API price, so its API equivalent is 0, not missing."
+      },
+      {
+        "id": "gpt-5.3-codex-spark-api-fast-free-20260212",
+        "model": "gpt-5.3-codex-spark",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-02-12",
+        "verified_at": "2026-10-09",
+        "sources": [
+          "https://openai.com/index/introducing-gpt-5-3-codex-spark/"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 0,
+          "in_cache_read": 0,
+          "in_cache_write": 0,
+          "out_total": 0
+        },
+        "multiplier": 1,
+        "note": "User decision 2026-10-09: Spark was free. It is a ChatGPT Pro research preview (announced 2026-02-12) with no pay-as-you-go API price, so its API equivalent is 0, not missing."
+      },
+      {
+        "id": "gpt-5.3-codex-spark-credits-standard-free-20260402",
+        "model": "gpt-5.3-codex-spark",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-04-02",
+        "verified_at": "2026-10-09",
+        "sources": [
+          "https://openai.com/index/introducing-gpt-5-3-codex-spark/"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 0,
+          "in_cache_read": 0,
+          "out_total": 0
+        },
+        "multiplier": 1,
+        "note": "User decision 2026-10-09: Spark was free. Its research-preview usage had its own allowance and did not count towards standard Codex limits, so it consumed no credits. Starts with Codex token billing (2026-04-02)."
+      },
+      {
+        "id": "gpt-5.3-codex-spark-credits-fast-free-20260402",
+        "model": "gpt-5.3-codex-spark",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-04-02",
+        "verified_at": "2026-10-09",
+        "sources": [
+          "https://openai.com/index/introducing-gpt-5-3-codex-spark/"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 0,
+          "in_cache_read": 0,
+          "out_total": 0
+        },
+        "multiplier": 1,
+        "note": "User decision 2026-10-09: Spark was free. Its research-preview usage had its own allowance and did not count towards standard Codex limits, so it consumed no credits. Starts with Codex token billing (2026-04-02)."
+      },
+      {
+        "id": "gpt-5.2-codex-api-standard-first-observed-20251220",
+        "model": "gpt-5.2-codex",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2025-12-20",
+        "verified_at": "2026-09-19",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.2-codex"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 1.75,
+          "in_cache_read": 0.175,
+          "in_cache_write": 1.75,
+          "out_total": 14
+        },
+        "multiplier": 1,
+        "note": "Official model-page rates, back-dated to the first observed use of the model; the page documents the current price, not the price on that day. No credit rule exists: the model ran entirely inside the per-message billing era that ended on 2026-04-02. Cache-write tokens are billed as ordinary input: the Codex price list publishes no separate cache-write rate and no recorded event carries a nonzero cache-write counter."
+      },
+      {
+        "id": "gpt-5-codex-api-standard-first-observed-20250916",
+        "model": "gpt-5-codex",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2025-09-16",
+        "verified_at": "2026-09-19",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5-codex"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 1.25,
+          "in_cache_read": 0.125,
+          "in_cache_write": 1.25,
+          "out_total": 10
+        },
+        "multiplier": 1,
+        "note": "Official model-page rates, back-dated to the first observed use of the model; the page documents the current price, not the price on that day. No credit rule exists: the model ran entirely inside the per-message billing era that ended on 2026-04-02. Cache-write tokens are billed as ordinary input: the Codex price list publishes no separate cache-write rate and no recorded event carries a nonzero cache-write counter."
+      },
+      {
+        "id": "gpt-5.1-codex-api-standard-first-observed-20251116",
+        "model": "gpt-5.1-codex",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2025-11-16",
+        "verified_at": "2026-09-19",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.1-codex"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 1.25,
+          "in_cache_read": 0.125,
+          "in_cache_write": 1.25,
+          "out_total": 10
+        },
+        "multiplier": 1,
+        "note": "Official model-page rates, back-dated to the first observed use of the model; the page documents the current price, not the price on that day. No credit rule exists: the model ran entirely inside the per-message billing era that ended on 2026-04-02. Cache-write tokens are billed as ordinary input: the Codex price list publishes no separate cache-write rate and no recorded event carries a nonzero cache-write counter."
+      },
+      {
+        "id": "gpt-5.1-codex-max-api-standard-first-observed-20251121",
+        "model": "gpt-5.1-codex-max",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2025-11-21",
+        "verified_at": "2026-09-19",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.1-codex-max"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 1.25,
+          "in_cache_read": 0.125,
+          "in_cache_write": 1.25,
+          "out_total": 10
+        },
+        "multiplier": 1,
+        "note": "Official model-page rates, back-dated to the first observed use of the model; the page documents the current price, not the price on that day. No credit rule exists: the model ran entirely inside the per-message billing era that ended on 2026-04-02. Cache-write tokens are billed as ordinary input: the Codex price list publishes no separate cache-write rate and no recorded event carries a nonzero cache-write counter."
+      },
+      {
+        "id": "gpt-5.1-codex-mini-api-standard-first-observed-20260110",
+        "model": "gpt-5.1-codex-mini",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-01-10",
+        "verified_at": "2026-09-19",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.1-codex-mini"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 0.25,
+          "in_cache_read": 0.025,
+          "in_cache_write": 0.25,
+          "out_total": 2
+        },
+        "multiplier": 1,
+        "note": "Official model-page rates, back-dated to the first observed use of the model; the page documents the current price, not the price on that day. No credit rule exists: the model ran entirely inside the per-message billing era that ended on 2026-04-02. Cache-write tokens are billed as ordinary input: the Codex price list publishes no separate cache-write rate and no recorded event carries a nonzero cache-write counter."
+      },
+      {
+        "id": "gpt-5-api-standard-first-observed-20250916",
+        "model": "gpt-5",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2025-09-16",
+        "verified_at": "2026-09-19",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 1.25,
+          "in_cache_read": 0.125,
+          "in_cache_write": 1.25,
+          "out_total": 10
+        },
+        "multiplier": 1,
+        "note": "Official model-page rates, back-dated to the first observed use of the model; the page documents the current price, not the price on that day. No credit rule exists: the model ran entirely inside the per-message billing era that ended on 2026-04-02. Cache-write tokens are billed as ordinary input: the Codex price list publishes no separate cache-write rate and no recorded event carries a nonzero cache-write counter."
+      },
+      {
+        "id": "gpt-reserve-api-standard-first-observed-20260919",
+        "model": "gpt-reserve",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-09-19",
+        "verified_at": "2026-09-19",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-5.6-luna"
+        ],
+        "confidence": "user",
+        "rates": {
+          "in_uncached": 0.2,
+          "in_cache_read": 0.02,
+          "in_cache_write": 0.2,
+          "out_total": 1.2
+        },
+        "multiplier": 1,
+        "note": "Reserve tier offered beside the subscription, usable once the weekly allowance is spent; recorded readings show it does not move the meter, so it stays out of the cycle counter and has no credit rule. The account operator identifies it as GPT-5.6 Luna and these are Luna's official Standard rates; the transcript records only the name gpt-reserve, so the identity is declared, not evidenced. Cache-write tokens are billed as ordinary input: the Codex price list publishes no separate cache-write rate and no recorded event carries a nonzero cache-write counter."
+      }
+    ]
+  },
+  "vendors": {
+    "anthropic": {
+      "verified": true,
+      "source": "claude-api skill model table (cached 2026-06-24); cache multipliers from shared/prompt-caching.md",
+      "notes": [
+        "claude-sonnet-5 ($2/$10, 5m write $2.50, 1h write $4, cache read $0.20) applies for its whole history: the launch price announced as introductory through 2026-08-31 became the standard price and the planned $3/$15 step on 2026-09-01 did not happen (platform.claude.com/docs/en/about-claude/pricing, verified 2026-10-06).",
+        "claude-opus-5 fast mode bills at double - transcripts record it in usage.speed, so it must be priced from that field, not from the model id alone.",
+        "claude-opus-5-5 ($4/$20, cache read $0.20, fast $8/$40) is from the claude-api skill table on 2026-09-23; the fast rate was published before launch and should be re-checked on the pricing page.",
+        "claude-fable-5-1 and claude-mythos-5-1 read cache at 0.025x base input ($0.25/MTok), not the 0.1x every other model uses (platform.claude.com/docs/en/about-claude/pricing, 2026-09-20).",
+        "claude-opus-4-5-20251101 and claude-sonnet-4-5-20250929 are dated ids the index carries; lookup is exact-match, so they need their own entry at the undated release's rates.",
+        "claude-sonnet-5-5 ($2/$10, 5m write $2.50, 1h write $4, cache read $0.20; no fast mode) is from platform.claude.com/docs/en/about-claude/pricing, verified 2026-10-06.",
+        "claude-haiku-5-5 launched 2026-10-07: prompts up to 100,000 total input tokens cost $0.10/$0.50, cache read $0.01, writes 5m $0.125 / 1h $0.20 per MTok; strictly above 100,000 all categories cost 5x. Prompt length includes cache reads and writes. Source: https://platform.claude.com/docs/en/models/haiku-5-5/overview and https://platform.claude.com/docs/en/about-claude/pricing, verified 2026-10-13."
+      ],
+      "models": {
+        "claude-fable-5": {
+          "in_uncached": 10.0,
+          "in_cache_read": 1.0,
+          "in_cache_write_5m": 12.5,
+          "in_cache_write_1h": 20.0,
+          "out_total": 50.0
+        },
+        "claude-fable-5-1": {
+          "in_uncached": 10.0,
+          "in_cache_read": 0.25,
+          "in_cache_write_5m": 12.5,
+          "in_cache_write_1h": 20.0,
+          "out_total": 50.0
+        },
+        "claude-mythos-5": {
+          "in_uncached": 10.0,
+          "in_cache_read": 1.0,
+          "in_cache_write_5m": 12.5,
+          "in_cache_write_1h": 20.0,
+          "out_total": 50.0
+        },
+        "claude-mythos-5-1": {
+          "in_uncached": 10.0,
+          "in_cache_read": 0.25,
+          "in_cache_write_5m": 12.5,
+          "in_cache_write_1h": 20.0,
+          "out_total": 50.0
+        },
+        "claude-opus-5": {
+          "in_uncached": 5.0,
+          "in_cache_read": 0.5,
+          "in_cache_write_5m": 6.25,
+          "in_cache_write_1h": 10.0,
+          "out_total": 25.0,
+          "fast": {
+            "in_uncached": 10.0,
+            "in_cache_read": 1.0,
+            "in_cache_write_5m": 12.5,
+            "in_cache_write_1h": 20.0,
+            "out_total": 50.0
+          }
+        },
+        "claude-opus-5-5": {
+          "in_uncached": 4.0,
+          "in_cache_read": 0.2,
+          "in_cache_write_5m": 5.0,
+          "in_cache_write_1h": 8.0,
+          "out_total": 20.0,
+          "fast": {
+            "in_uncached": 8.0,
+            "in_cache_read": 0.4,
+            "in_cache_write_5m": 10.0,
+            "in_cache_write_1h": 16.0,
+            "out_total": 40.0
+          }
+        },
+        "claude-opus-4-8": {
+          "in_uncached": 5.0,
+          "in_cache_read": 0.5,
+          "in_cache_write_5m": 6.25,
+          "in_cache_write_1h": 10.0,
+          "out_total": 25.0
+        },
+        "claude-opus-4-7": {
+          "in_uncached": 5.0,
+          "in_cache_read": 0.5,
+          "in_cache_write_5m": 6.25,
+          "in_cache_write_1h": 10.0,
+          "out_total": 25.0
+        },
+        "claude-opus-4-6": {
+          "in_uncached": 5.0,
+          "in_cache_read": 0.5,
+          "in_cache_write_5m": 6.25,
+          "in_cache_write_1h": 10.0,
+          "out_total": 25.0
+        },
+        "claude-sonnet-4-6": {
+          "in_uncached": 3.0,
+          "in_cache_read": 0.3,
+          "in_cache_write_5m": 3.75,
+          "in_cache_write_1h": 6.0,
+          "out_total": 15.0
+        },
+        "claude-haiku-4-5": {
+          "in_uncached": 1.0,
+          "in_cache_read": 0.1,
+          "in_cache_write_5m": 1.25,
+          "in_cache_write_1h": 2.0,
+          "out_total": 5.0
+        },
+        "claude-haiku-4-5-20251001": {
+          "in_uncached": 1.0,
+          "in_cache_read": 0.1,
+          "in_cache_write_5m": 1.25,
+          "in_cache_write_1h": 2.0,
+          "out_total": 5.0
+        },
+        "claude-opus-4-5-20251101": {
+          "in_uncached": 5.0,
+          "in_cache_read": 0.5,
+          "in_cache_write_5m": 6.25,
+          "in_cache_write_1h": 10.0,
+          "out_total": 25.0
+        },
+        "claude-sonnet-4-5-20250929": {
+          "in_uncached": 3.0,
+          "in_cache_read": 0.3,
+          "in_cache_write_5m": 3.75,
+          "in_cache_write_1h": 6.0,
+          "out_total": 15.0
+        },
+        "claude-sonnet-5": {
+          "in_uncached": 2.0,
+          "in_cache_read": 0.2,
+          "in_cache_write_5m": 2.5,
+          "in_cache_write_1h": 4.0,
+          "out_total": 10.0
+        },
+        "claude-sonnet-5-5": {
+          "in_uncached": 2.0,
+          "in_cache_read": 0.2,
+          "in_cache_write_5m": 2.5,
+          "in_cache_write_1h": 4.0,
+          "out_total": 10.0
+        }
+      }
+    },
+    "openai": {
+      "verified": false,
+      "source": "Official Astra and GPT-5.6 API references verified 2026-09-09. Other legacy models retain their individual provenance. Historical dated-rule coverage uses user-authorized first observed model dates.",
+      "notes": [
+        "OpenAI cache reads bill at 10% of the input rate for every model checked except GPT-6.1 Sol, which bills them at 5%.",
+        "Cache WRITE: Astra API lists a 1.25x input rate. The indexed counter overlap with input is not established, so the dated accounting calculator leaves positive write counters unpriced.",
+        "Codex reports input_tokens INCLUSIVE of cached_input_tokens; fresh input must be computed as in_tok - cached_in before pricing.",
+        "Reasoning tokens are billed as output.",
+        "Subscription ladder: pro 200 / x5 100 (appears as plan_type 'prolite') / plus 20."
+      ],
+      "models": {
+        "gpt-5.6-sol": {
+          "in_uncached": 4,
+          "in_cache_read": 0.4,
+          "in_cache_write": 5.0,
+          "out_total": 20,
+          "confidence": "official-standard-reference",
+          "note": "Current Standard API reference: 4/.4/20 since the August 21, 2026 promotion, lasting at least through November 21 (no confirmed end date). Dated accounting uses the reconstructed earlier 5/.5/30 reference; the old cached-input rate remains an explicit historical assumption.",
+          "source": "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+          "verified_at": "2026-09-09",
+          "fast": {
+            "in_uncached": 8,
+            "in_cache_read": 0.8,
+            "in_cache_write": 10.0,
+            "out_total": 40
+          }
+        },
+        "gpt-5.6-terra": {
+          "in_uncached": 2.0,
+          "in_cache_read": 0.2,
+          "in_cache_write": 2.5,
+          "out_total": 12.0,
+          "confidence": "official-standard-reference",
+          "fast": {
+            "in_uncached": 4.0,
+            "in_cache_read": 0.4,
+            "in_cache_write": 5.0,
+            "out_total": 24.0
+          },
+          "source": "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+          "verified_at": "2026-09-09"
+        },
+        "gpt-5.6-luna": {
+          "in_uncached": 0.2,
+          "in_cache_read": 0.02,
+          "in_cache_write": 0.25,
+          "out_total": 1.2,
+          "confidence": "official-standard-reference",
+          "fast": {
+            "in_uncached": 0.4,
+            "in_cache_read": 0.04,
+            "in_cache_write": 0.5,
+            "out_total": 2.4
+          },
+          "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+          "verified_at": "2026-09-09"
+        },
+        "gpt-5.5": {
+          "in_uncached": 5.0,
+          "in_cache_read": 0.5,
+          "in_cache_write": 0.0,
+          "out_total": 30.0,
+          "confidence": "secondary-sources"
+        },
+        "gpt-5.4": {
+          "in_uncached": 2.5,
+          "in_cache_read": 0.25,
+          "in_cache_write": 0.0,
+          "out_total": 15.0,
+          "confidence": "secondary-sources"
+        },
+        "gpt-5.3-codex": {
+          "in_uncached": 1.75,
+          "in_cache_read": 0.175,
+          "in_cache_write": 0.0,
+          "out_total": 14.0,
+          "confidence": "secondary-sources"
+        },
+        "gpt-5.2-codex": {
+          "in_uncached": 1.75,
+          "in_cache_read": 0.175,
+          "in_cache_write": 0.0,
+          "out_total": 14.0,
+          "confidence": "secondary-sources"
+        },
+        "gpt-5.3-codex-spark": {
+          "in_uncached": 0.0,
+          "in_cache_read": 0.0,
+          "in_cache_write": 0.0,
+          "out_total": 0.0,
+          "free": true,
+          "confidence": "user",
+          "note": "Free (user decision 2026-10-09): a ChatGPT Pro-only research preview with no pay-as-you-go API price and its own allowance outside standard Codex limits. Codex amounts follow codex_accounting rules gpt-5.3-codex-spark-*-free-*."
+        },
+        "codex-auto-review": {
+          "in_uncached": null,
+          "in_cache_read": null,
+          "in_cache_write": null,
+          "out_total": null,
+          "confidence": "UNKNOWN",
+          "note": "Codex internal review. Recorded tokens are internal overhead, not user-work tokens. Model price and subscription charging are unknown; leave unpriced."
+        },
+        "gpt-5-codex": {
+          "in_uncached": null,
+          "in_cache_read": null,
+          "in_cache_write": null,
+          "out_total": null,
+          "confidence": "UNKNOWN"
+        },
+        "gpt-5.1-codex": {
+          "in_uncached": null,
+          "in_cache_read": null,
+          "in_cache_write": null,
+          "out_total": null,
+          "confidence": "UNKNOWN"
+        },
+        "gpt-5.1-codex-max": {
+          "in_uncached": null,
+          "in_cache_read": null,
+          "in_cache_write": null,
+          "out_total": null,
+          "confidence": "UNKNOWN"
+        },
+        "gpt-5.1-codex-mini": {
+          "in_uncached": null,
+          "in_cache_read": null,
+          "in_cache_write": null,
+          "out_total": null,
+          "confidence": "UNKNOWN"
+        },
+        "gpt-5": {
+          "in_uncached": null,
+          "in_cache_read": null,
+          "in_cache_write": null,
+          "out_total": null,
+          "confidence": "UNKNOWN"
+        },
+        "gpt-6-astra": {
+          "in_uncached": 10,
+          "in_cache_read": 1,
+          "in_cache_write": 12.5,
+          "out_total": 50,
+          "fast": {
+            "in_uncached": 20,
+            "in_cache_read": 2,
+            "in_cache_write": 25,
+            "out_total": 100
+          },
+          "confidence": "official-standard-reference",
+          "source": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+          "verified_at": "2026-09-08",
+          "note": "Standard API reference rates. >272K input: input/cache x2, output x1.5 per request. Codex credits and Speed multipliers are dated in codex_accounting; request-level long-context premiums are not reconstructed from aggregated history."
+        },
+        "gpt-6-sol": {
+          "in_uncached": 2,
+          "in_cache_read": 0.2,
+          "in_cache_write": 2.5,
+          "out_total": 10,
+          "fast": {
+            "in_uncached": 4,
+            "in_cache_read": 0.4,
+            "in_cache_write": 5,
+            "out_total": 20
+          },
+          "confidence": "official-standard-reference",
+          "source": "https://developers.openai.com/api/docs/models/gpt-6-sol",
+          "verified_at": "2026-09-26",
+          "note": "Standard API reference rates since the 2026-09-22 launch. >272K input: input/cache x2, output x1.5 per request."
+        },
+        "gpt-6.1-sol": {
+          "in_uncached": 2,
+          "in_cache_read": 0.1,
+          "in_cache_write": 2.5,
+          "out_total": 10,
+          "fast": {
+            "in_uncached": 4,
+            "in_cache_read": 0.2,
+            "in_cache_write": 5,
+            "out_total": 20
+          },
+          "confidence": "official-standard-reference",
+          "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+          "verified_at": "2026-10-06",
+          "note": "Standard API reference rates since the 2026-09-29 launch; cached input is 5% of input, not 10%. >272K input: input/cache x2, output x1.5 per request."
+        },
+        "gpt-6-luna": {
+          "in_uncached": 0.1,
+          "in_cache_read": 0.01,
+          "in_cache_write": 0.125,
+          "out_total": 0.5,
+          "fast": {
+            "in_uncached": 0.2,
+            "in_cache_read": 0.02,
+            "in_cache_write": 0.25,
+            "out_total": 1
+          },
+          "confidence": "official-standard-reference",
+          "source": "https://developers.openai.com/api/docs/models/gpt-6-luna",
+          "verified_at": "2026-09-26",
+          "note": "Standard API reference rates since the 2026-09-22 launch. >272K input: input/cache x2, output x1.5 per request."
+        }
+      }
+    },
+    "google": {
+      "verified": true,
+      "source": "Official Gemini API Standard paid tier for the Flash models (ai.google.dev/gemini-api/docs/pricing and /changelog), verified 2026-10-06. Pro and default entries keep the hand-collected 2026-08-24 rates.",
+      "notes": [
+        "Antigravity NIE podaje wlasnej ceny generacji - w odroznieniu od groka, ktory zwraca costUsdTicks.",
+        "Dolary tego vendora sa wiec API-eq: nasz cennik zastosowany do zmierzonych tokenow. Mowia, ile ten ruch kosztowalby bez abonamentu, nie ile abonament kosztuje.",
+        "Flash cache read is the official context caching price (0.1x input for every Flash model listed); storage per hour is not priced. Pro and default entries keep the earlier 0.25x assumption. Antigravity raportuje cache ROZLACZNIE z inputem (bywa od niego wiekszy), wiec obie pozycje sa liczone osobno i nie wolno ich sumowac przed wycena.",
+        "Warianty nazw ('gemini-3-flash-a', 'gemini-3-flash-medium-control') dopasowuja sie po najdluzszym prefiksie - patrz rateFor() w src/ingest/gemini.ts.",
+        "claude-opus-4-6-thinking pojawia sie w magazynie Antigravity, bo konto ma druga grupe limitu 'Claude and GPT models'. Jego stawki NIE sa tutaj - siedza pod vendorem anthropic i tam trzeba je brac.",
+        "Flash dates (changelog): 3 Flash Preview launched 2025-12-17, 3.6 Flash GA 2026-07-21, 3.7 Flash GA 2026-08-13 at an introductory price through 2026-12-31, 3.8 Flash GA 2026-09-02. The pricing page states one price per model plus the 2027-01-01 step for 3.6/3.7/3.8; no earlier official price was found, so the current official price applies from each model's first local use (3.8 Flash calls from 2026-08-30 precede its GA date and use the GA price). Vendor entries have no valid_from; only until/after is encoded.",
+        "gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash: $0.75 input / $0.075 context caching / $3.75 output through 2026-12-31, then $1.50 / $0.15 / $7.50.",
+        "gemini-3-flash prices the gemini-3-flash-* Antigravity variants at the official gemini-3-flash-preview rate: $0.50 input / $0.05 context caching / $3.00 output (text, image, video), with no announced change date."
+      ],
+      "models": {
+        "gemini-3.8-flash": {
+          "in_uncached": 0.75,
+          "in_cache_read": 0.075,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3.75,
+          "until": "2026-12-31",
+          "after": {
+            "in_uncached": 1.5,
+            "in_cache_read": 0.15,
+            "out_total": 7.5
+          }
+        },
+        "gemini-3.8-flash-exp-a": {
+          "in_uncached": 0.75,
+          "in_cache_read": 0.075,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3.75,
+          "until": "2026-12-31",
+          "after": {
+            "in_uncached": 1.5,
+            "in_cache_read": 0.15,
+            "out_total": 7.5
+          },
+          "confidence": "PROXY",
+          "proxy_for": "gemini-3.8-flash",
+          "note": "Antigravity variant of gemini-3.8-flash (seen 2026-09-20); no separate public price. Priced as gemini-3.8-flash (user decision 2026-10-09)."
+        },
+        "gemini-3.8-flash-n": {
+          "in_uncached": 0.75,
+          "in_cache_read": 0.075,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3.75,
+          "until": "2026-12-31",
+          "after": {
+            "in_uncached": 1.5,
+            "in_cache_read": 0.15,
+            "out_total": 7.5
+          },
+          "confidence": "PROXY",
+          "proxy_for": "gemini-3.8-flash",
+          "note": "Antigravity variant of gemini-3.8-flash (seen 2026-10-06..08); no separate public price. Priced as gemini-3.8-flash (user decision 2026-10-09)."
+        },
+        "gemini-3.8-flash-tiered": {
+          "in_uncached": 0.75,
+          "in_cache_read": 0.075,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3.75,
+          "until": "2026-12-31",
+          "after": {
+            "in_uncached": 1.5,
+            "in_cache_read": 0.15,
+            "out_total": 7.5
+          },
+          "confidence": "PROXY",
+          "proxy_for": "gemini-3.8-flash",
+          "note": "Antigravity variant of gemini-3.8-flash (seen 2026-10-08); no separate public price. Priced as gemini-3.8-flash (user decision 2026-10-09)."
+        },
+        "gemini-3.7-flash": {
+          "in_uncached": 0.75,
+          "in_cache_read": 0.075,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3.75,
+          "until": "2026-12-31",
+          "after": {
+            "in_uncached": 1.5,
+            "in_cache_read": 0.15,
+            "out_total": 7.5
+          }
+        },
+        "gemini-3.7-flash-control": {
+          "in_uncached": 0.75,
+          "in_cache_read": 0.075,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3.75,
+          "until": "2026-12-31",
+          "after": {
+            "in_uncached": 1.5,
+            "in_cache_read": 0.15,
+            "out_total": 7.5
+          },
+          "confidence": "PROXY",
+          "proxy_for": "gemini-3.7-flash",
+          "note": "Antigravity experiment variant of gemini-3.7-flash (seen 2026-08-18..24); no separate public price. Priced as gemini-3.7-flash (user decision 2026-10-09)."
+        },
+        "gemini-3.7-flash-safety-le": {
+          "in_uncached": 0.75,
+          "in_cache_read": 0.075,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3.75,
+          "until": "2026-12-31",
+          "after": {
+            "in_uncached": 1.5,
+            "in_cache_read": 0.15,
+            "out_total": 7.5
+          },
+          "confidence": "PROXY",
+          "proxy_for": "gemini-3.7-flash",
+          "note": "Antigravity experiment variant of gemini-3.7-flash (seen 2026-08-22..27); no separate public price. Priced as gemini-3.7-flash (user decision 2026-10-09)."
+        },
+        "gemini-3.7-flash-exp-a": {
+          "in_uncached": 0.75,
+          "in_cache_read": 0.075,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3.75,
+          "until": "2026-12-31",
+          "after": {
+            "in_uncached": 1.5,
+            "in_cache_read": 0.15,
+            "out_total": 7.5
+          },
+          "confidence": "PROXY",
+          "proxy_for": "gemini-3.7-flash",
+          "note": "Antigravity experiment variant of gemini-3.7-flash (seen 2026-08-27); no separate public price. Priced as gemini-3.7-flash (user decision 2026-10-09)."
+        },
+        "gemini-3.6-flash": {
+          "in_uncached": 0.75,
+          "in_cache_read": 0.075,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3.75,
+          "until": "2026-12-31",
+          "after": {
+            "in_uncached": 1.5,
+            "in_cache_read": 0.15,
+            "out_total": 7.5
+          }
+        },
+        "gemini-3-flash": {
+          "in_uncached": 0.5,
+          "in_cache_read": 0.05,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3
+        },
+        "gemini-default": {
+          "in_uncached": 0.3,
+          "in_cache_read": 0.075,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 2.5
+        },
+        "gemini-3.7-pro": {
+          "in_uncached": 1.25,
+          "in_cache_read": 0.3125,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 10.0
+        },
+        "gemini-pro-default": {
+          "in_uncached": 1.25,
+          "in_cache_read": 0.3125,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 10.0
+        }
+      }
+    },
+    "zai": {
+      "verified": false,
+      "source": "cennik listowy z.ai (docs.z.ai/guides/overview/pricing), zebrany 2026-08-24",
+      "notes": [
+        "Plan GLM Coding NIE rozlicza sie w dolarach - opencode zapisuje przy kazdej wiadomosci cost 0, bo vendor zadnej ceny nie zwraca. Limit planu jest w KREDYTACH, wazonych per model i typ tokena, i nie ma stalego przelicznika na dolary.",
+        "Te stawki sa wiec API-eq, tak jak u gemini: nasz cennik zastosowany do zmierzonych tokenow. Mowia, ile ten ruch kosztowalby po cenniku z.ai BEZ abonamentu - czyli ile abonament oszczedza, a nie ile z niego zeszlo.",
+        "Zapis cache: 'Cached Input Storage' jest u z.ai czasowo darmowy, wiec null, a nie zero z palca - null znaczy 'nie wyceniamy', zero znaczyloby 'kosztuje 0 na stale'.",
+        "Tokeny GLM licza sie ROZLACZNIE (input bez cache read, reasoning obok output) - sprawdzone na wiadomosci opencode: 10582 + 3 + 64 = 10649 = total."
+      ],
+      "models": {
+        "glm-5.3": {
+          "in_uncached": 1.4,
+          "in_cache_read": 0.26,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 4.4
+        },
+        "glm-5.2": {
+          "in_uncached": 1.4,
+          "in_cache_read": 0.26,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 4.4
+        },
+        "glm-5.2-highspeed": {
+          "in_uncached": 1.4,
+          "in_cache_read": 0.26,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 4.4
+        },
+        "glm-5.1": {
+          "in_uncached": 1.4,
+          "in_cache_read": 0.26,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 4.4
+        },
+        "glm-5": {
+          "in_uncached": 1.0,
+          "in_cache_read": 0.2,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3.2
+        },
+        "glm-5-turbo": {
+          "in_uncached": 1.2,
+          "in_cache_read": 0.24,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 4.0
+        },
+        "glm-5v-turbo": {
+          "in_uncached": 1.2,
+          "in_cache_read": 0.24,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 4.0
+        }
+      }
+    },
+    "xai": {
+      "verified": false,
+      "source": "local operator configuration; no shipped xAI model rates",
+      "notes": [
+        "xAI / Grok API cennik modeli - brak zadeklarowanych stawek bazowych; edycja lokalna zapisuje do konfiguracji."
+      ],
+      "models": {}
+    }
+  },
+  "subscriptions": {
+    "_comment": "OpenAI and Anthropic prices confirmed by the user 2026-08-22. Grok probe reports SuperGrok; its $30 monthly price was verified against https://x.ai/pricing on 2026-08-28.",
+    "_confidence": "per-entry",
+    "codex1": {
+      "plan": "pro",
+      "usd_per_month": 200.0,
+      "confidence": "user-confirmed"
+    },
+    "codex2": {
+      "plan": "plus",
+      "usd_per_month": 20.0,
+      "confidence": "user-confirmed"
+    },
+    "codex3": {
+      "plan": "plus",
+      "usd_per_month": 20.0,
+      "confidence": "user-confirmed"
+    },
+    "claude": {
+      "plan": "max-20x",
+      "usd_per_month": 200.0,
+      "confidence": "user-confirmed"
+    },
+    "grok": {
+      "plan": "SuperGrok",
+      "usd_per_month": 30.0,
+      "confidence": "verified: https://x.ai/pricing (2026-08-28)"
+    }
+  },
+  "codex_credits": {
+    "unit": "credits per 1,000,000 tokens",
+    "basis": "standard-reference",
+    "verified_at": "2026-09-08",
+    "source": "https://learn.chatgpt.com/docs/pricing",
+    "note": "Reference equivalent, not billed credits or included allowance. Fast mode and plan-specific billing require separate evidence.",
+    "models": {
+      "gpt-6-astra": {
+        "input": 250,
+        "cached_input": 25,
+        "output": 1250
+      },
+      "gpt-6-sol": {
+        "input": 50,
+        "cached_input": 5,
+        "output": 250
+      },
+      "gpt-6.1-sol": {
+        "input": 50,
+        "cached_input": 2.5,
+        "output": 250
+      },
+      "gpt-6-luna": {
+        "input": 2.5,
+        "cached_input": 0.25,
+        "output": 12.5
+      },
+      "gpt-5.6-sol": {
+        "input": 100,
+        "cached_input": 10,
+        "output": 500
+      },
+      "gpt-5.6-terra": {
+        "input": 50,
+        "cached_input": 5,
+        "output": 300
+      },
+      "gpt-5.6-luna": {
+        "input": 5,
+        "cached_input": 0.5,
+        "output": 30
+      },
+      "gpt-5.5": {
+        "input": 125,
+        "cached_input": 12.5,
+        "output": 750
+      },
+      "gpt-5.4": {
+        "input": 62.5,
+        "cached_input": 6.25,
+        "output": 375
+      },
+      "gpt-5.4-mini": {
+        "input": 18.75,
+        "cached_input": 1.875,
+        "output": 113
+      }
+    }
+  }
+}

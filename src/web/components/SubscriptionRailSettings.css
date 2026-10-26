@@ -1,0 +1,17 @@
+.subscription-rail-settings { width: min(960px, 100vw); }
+.subscription-rail-settings__scroll { overflow-x: auto; }
+.subscription-rail-settings__table { width: 100%; min-width: 800px; border-collapse: collapse; text-align: left; font-size: var(--fs-4); }
+.subscription-rail-settings__table th,
+.subscription-rail-settings__table td { padding: 7px 10px; border-bottom: var(--rule); white-space: nowrap; vertical-align: middle; }
+.subscription-rail-settings__table thead th { color: var(--muted); font-size: var(--fs-3); font-weight: var(--fw-regular); border-bottom: 1px solid var(--line2); }
+.subscription-rail-settings__table tbody th { font-weight: 400; }
+.subscription-rail-settings__table th:first-child,
+.subscription-rail-settings__table td:first-child { width: 28px; padding-left: 0; padding-right: 0; }
+.subscription-rail-settings__table th:nth-child(2),
+.subscription-rail-settings__table td:nth-child(2) { width: 42px; text-align: center; }
+.subscription-rail-settings__table td:last-child { width: 60px; padding-right: 0; }
+.subscription-rail-settings__table .subscription-rail-settings__provider > * { padding-top: 17px; border-bottom-color: var(--line2); }
+.subscription-rail-settings__table .subscription-rail-settings__provider th { font-size: var(--fs-5); font-weight: var(--fw-semibold); }
+.subscription-rail-settings__source { max-width: 260px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.subscription-rail-settings__archived { color: var(--muted); font-size: var(--fs-3); }
+.subscription-rail-settings__table [data-drop-target] > * { border-bottom-color: var(--text); }

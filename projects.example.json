@@ -1,0 +1,24 @@
+{
+  "_comment": [
+    "WZORZEC. Skopiuj do <TOKENATLAS_CONFIG>/projects.json (domyslnie",
+    "<archiwum>/config/projects.json) i edytuj - albo po prostu uzyj ekranu",
+    "Projects, ktory zapisze tam plik sam.",
+    "Ten plik NIE jedzie w repozytorium: niesie nazwy projektow i katalogi",
+    "klientow, a reguly jednego uzytkownika nadpisalyby reguly drugiego.",
+    "match: { store?, cwd? (prefiks albo glob), repo?, project?, from?, until? }"
+  ],
+  "projects": [
+    {
+      "id": "przyklad",
+      "name": "Przyklad",
+      "matches": [
+        {
+          "cwd": "C:/dev/przyklad"
+        },
+        {
+          "repo": "grupa/przyklad"
+        }
+      ]
+    }
+  ]
+}

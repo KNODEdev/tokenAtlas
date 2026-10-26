@@ -1,0 +1,20 @@
+/* Usage events (docs/design/audit-models-events-projects-mockup.html); legends come from History.css. */
+/* Where the list came from: a sunken well inside the card, no frame of its own. */
+.events-origin {
+  margin-top: var(--s-4); padding: var(--s-3) var(--s-6); border-radius: var(--r-chip);
+  background: var(--sunk); font-size: var(--fs-4); color: var(--muted);
+}
+.events-origin b { color: var(--text); font-weight: var(--fw-semibold); }
+.events-filters { margin: var(--s-6) 0 var(--s-5); }
+.events-faint { color: var(--faint); font-size: var(--fs-3); }
+.events-muted { color: var(--faint); }
+.events-summary { margin-bottom: var(--s-3); font-size: var(--fs-3); line-height: 1.6; color: var(--muted); }
+
+.events-row { cursor: pointer; }
+.events-row[aria-expanded="true"], .events-detail { background: var(--sunk); }
+.events-provider { display: inline-flex; align-items: center; gap: var(--s-3); }
+.events-provider i { display: inline-block; width: 8px; height: 8px; border-radius: var(--r-bar); flex-shrink: 0; }
+.events-detail .archive-legend { margin: 0; white-space: normal; }
+.events-detail .archive-legend b { color: var(--text); font-family: var(--font-figure); font-weight: var(--fw-medium); letter-spacing: var(--ls-tight); }
+
+.events-pages { display: flex; justify-content: space-between; align-items: center; gap: var(--s-6); margin-top: var(--s-6); font-size: var(--fs-3); color: var(--muted); }

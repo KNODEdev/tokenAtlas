@@ -1,0 +1,10 @@
+{
+  "_comment": [
+    "WZORZEC. Skopiuj do <TOKENATLAS_CONFIG>/claude-gauge.json.",
+    "Anthropic nie publikuje przebiegu tygodnia, wiec procent bierze sie z",
+    "recznych odczytow z konta. Kazdy odczyt to jedna obserwacja."
+  ],
+  "plan": "max-20x",
+  "window_hours": 168,
+  "observations": []
+}

@@ -1,0 +1,78 @@
+/* Capacity → Subscription month: the cycle table and the chosen cycle's details (docs/design/paper-atlas.md). */
+.subscription-month-row { cursor: pointer; }
+.subscription-month-row:hover > td { background: var(--raised); }
+/* Selected = a wash, never a side bar. */
+.subscription-month-row.is-selected > td { background: var(--accent-soft); }
+.subscription-month-bonus { text-align: right; }
+.subscription-month-detail { margin-top: var(--s-7); padding-top: var(--s-5); border-top: var(--rule); }
+/* The cycle heading keeps warnings and calibration provenance together. */
+.subscription-month-detail-head { display: flex; align-items: baseline; gap: var(--s-5); margin-bottom: var(--s-4); }
+.subscription-month-detail h3 { margin: 0; font-family: var(--font-display); font-weight: var(--fw-display); font-size: var(--fs-section); }
+.subscription-month-help-line { display: block; }
+.subscription-month-help-line + .subscription-month-help-line { margin-top: var(--s-2); }
+/* Capacity and used tokens as two rows of one small table, sized to its figures. */
+.subscription-month-tokens .ui-table { width: auto; font-size: var(--fs-3); }
+.subscription-month-tokens :is(.ui-th, .ui-td) { padding-block: var(--s-1); padding-inline: var(--s-3) var(--s-6); }
+.subscription-month-tokens .ui-td:first-child { color: var(--muted); }
+/* The cycle's stored warnings: one marker beside its heading, the sentences in its tooltip. */
+.subscription-month-warnings { margin-left: var(--s-4); font-family: var(--font-sans); font-size: var(--fs-3); vertical-align: middle; cursor: help; }
+/* Eight columns: tighter cell padding than the default table so the row fits beside the subscription rail. */
+.subscription-month-table :is(.ui-th, .ui-td) { padding-inline: var(--s-3); }
+.subscription-month-table .ui-table { font-size: var(--fs-3); }
+/* A second, quieter line in a cell: "ongoing", the share used to date. */
+.subscription-month-sub { display: block; font-family: var(--font-sans); font-size: var(--fs-2); color: var(--muted); }
+/* Capacity vs usage of a period: the period choice and the note on cycles left out. */
+.subscription-month-summary-controls { margin-bottom: var(--s-4); }
+.subscription-month-summary .ui-kpi-note .ui-bar { margin-bottom: var(--s-2); }
+.subscription-month-summary .ui-kpi-note > span { display: block; }
+.subscription-month-summary-note { margin: var(--s-3) 0 0; font-size: var(--fs-3); color: var(--muted); }
+/* The chosen cycle's windows: a compact list that scrolls within the details. */
+.subscription-month-windows { margin-top: var(--s-6); }
+.subscription-month-windows-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); margin: 0 0 var(--s-3); font-size: var(--fs-3); color: var(--muted); }
+/* The windows over the cycle's time: width = time in the cycle, fill from the bottom = used before the end, ink = how it ended. */
+.subscription-month-strip { position: relative; height: 32px; background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r-bar); overflow: hidden; }
+.subscription-month-strip-window { position: absolute; top: 0; bottom: 0; display: flex; align-items: flex-end; border-right: 2px solid var(--surface); }
+.subscription-month-strip-window:hover { background: var(--raised); }
+.subscription-month-strip-fill { width: 100%; }
+.subscription-month-strip-axis { display: flex; justify-content: space-between; margin: var(--s-1) 0 var(--s-4); font-family: var(--font-figure); font-size: var(--fs-2); color: var(--muted); }
+.subscription-month-windows-list { max-height: 24rem; overflow-y: auto; }
+/* Sized to its content rather than stretched across the card: the eye stays on one row. */
+.subscription-month-windows-list .ui-table { width: auto; font-size: var(--fs-3); }
+.subscription-month-windows-list :is(.ui-th, .ui-td) { padding-block: var(--s-1); padding-inline: var(--s-3) var(--s-6); white-space: nowrap; }
+.subscription-month-cause { display: inline-flex; align-items: center; gap: var(--s-2); }
+.subscription-month-cause::before { content: ""; width: 7px; height: 7px; flex: 0 0 7px; border-radius: var(--r-dot); background: var(--cause-ink); }
+.subscription-month-used { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--s-3); }
+.subscription-month-used .ui-bar { width: 56px; }
+.subscription-month-used > span { min-width: 4ch; }
+/* Value per $1 (user decision 21.10): one bar per table row; used is solid vendor ink over its capacity washed in the same ink. */
+.value-chart { margin: 0; }
+.value-chart-legend { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-6); margin-bottom: var(--s-4); font-size: var(--fs-2); color: var(--muted); }
+.value-chart-legend > span { display: inline-flex; align-items: center; gap: var(--s-2); }
+.value-chart-key { display: inline-block; width: 10px; height: 10px; border-radius: var(--r-bar); }
+.value-chart-key.is-used { background: var(--text); }
+.value-chart-key.is-capacity { background: color-mix(in oklab, var(--text) 22%, transparent); }
+.value-chart-key.is-reference { width: 0; height: 12px; border-radius: 0; border-left: 1px dashed var(--muted); }
+.value-chart-row, .value-chart-axis { display: grid; grid-template-columns: minmax(12rem, 22rem) 1fr 9rem; align-items: center; gap: var(--s-5); }
+.value-chart-row { padding-block: var(--s-1); }
+.value-chart-row.is-selectable { cursor: pointer; }
+.value-chart-row.is-selectable:hover { background: var(--raised); }
+/* Selected = a wash, never a side bar. */
+.value-chart-row.is-selected { background: var(--accent-soft); }
+.value-chart-label { min-width: 0; font-size: var(--fs-3); }
+/* One line per row: the name, then its plan quieter. */
+.value-chart-label { display: flex; gap: var(--s-3); align-items: baseline; overflow: hidden; white-space: nowrap; }
+.value-chart-label > span { overflow: hidden; text-overflow: ellipsis; }
+.value-chart-label > span:first-child { flex: none; max-width: 70%; }
+.value-chart-sub { font-size: var(--fs-2); color: var(--muted); }
+.value-chart-track { position: relative; height: 12px; }
+.value-chart-capacity, .value-chart-used { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 var(--r-bar) var(--r-bar) 0; }
+.value-chart-capacity { background: color-mix(in oklab, var(--value-ink) 24%, transparent); }
+.value-chart-used { background: var(--value-ink); }
+.value-chart-reference { position: absolute; top: calc(-1 * var(--s-2)); bottom: calc(-1 * var(--s-2)); border-left: 1px dashed var(--muted); }
+.value-chart-figure { text-align: right; font-size: var(--fs-3); white-space: nowrap; }
+.value-chart-figure > span { color: var(--muted); }
+.value-chart-axis { margin-top: var(--s-2); font-size: var(--fs-2); color: var(--muted); }
+.value-chart-ticks { position: relative; height: 1.2em; }
+.value-chart-ticks > span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.value-chart-ticks > span:first-child { transform: none; }
+.value-chart-ticks > span:last-child { transform: translateX(-100%); }

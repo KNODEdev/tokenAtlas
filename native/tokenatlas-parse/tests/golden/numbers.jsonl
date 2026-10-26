@@ -1,0 +1,2 @@
+{"type":"session_meta","payload":{"originator":"codex-tui","thread_source":{"subagent":{"9":1e-5,"2":0.0001,"a":1.2345678901234567,"b":9007199254740993,"c":1000000000000000100,"d":-0,"e":1e16,"f":5e-324}},"cwd":"C:/repo/golden"}}
+{"type":"thread_settings_applied","payload":{"thread_settings":{"service_tier":{"z":[0.00001,0.0001,0.1,1e15,1e16,1e20,1e21,1e100,1.7976931348623157e308],"10":false,"2":true,"01":null,"4294967295":"ordinary"}}}}

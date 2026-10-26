@@ -1,0 +1,21 @@
+.capacity-cycle-models { margin-bottom: var(--s-6); }
+.capacity-cycle-models .ui-toolbar > .capacity-cycle-note { margin: 0; }
+.capacity-model-chart { margin: var(--s-8) 0; }
+.capacity-model-chart-row { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 4fr) minmax(0, 1fr) minmax(0, .55fr); gap: var(--s-6); align-items: center; padding: var(--s-4) 0; }
+.capacity-model-chart-row > span:first-child { overflow-wrap: anywhere; }
+.capacity-model-track { height: var(--s-9); background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r-bar); overflow: hidden; }
+.capacity-model-fill { display: flex; height: 100%; }
+.capacity-model-unpriced { color: var(--muted); padding-inline: var(--s-4); font-size: var(--fs-3); }
+.capacity-model-amount, .capacity-model-share { text-align: right; white-space: nowrap; font-family: var(--font-figure); letter-spacing: -0.02em; }
+.capacity-model-share { color: var(--muted); }
+.capacity-cycle-models td .capacity-cycle-note { margin-top: var(--s-1); }
+/* All models together, set off from the last model by a solid rule. */
+.capacity-model-total > .ui-td { border-top: 1px solid var(--line); font-weight: var(--fw-medium); }
+.capacity-model-total .capacity-cycle-note { font-weight: var(--fw-regular); }
+/* A row without valuation keeps its label and drops the empty track. */
+.capacity-model-track[data-unpriced] { background: transparent; border-color: transparent; }
+/* Computers tab: a computer's row, its profiles indented under it. */
+.capacity-machine-name { font-weight: var(--fw-medium); }
+.capacity-machine-row .ui-td { font-weight: var(--fw-medium); }
+.capacity-source-row .ui-td { color: var(--muted); }
+.capacity-source-row .ui-td:first-child { padding-left: var(--s-10); }

@@ -1,0 +1,353 @@
+{
+  "_comment": [
+    "Shipped catalog of provider Plans. A Plan is a provider offer, independent of",
+    "our Subscription that held it. Each Plan has dated versions; a version may carry",
+    "price, qualitative limits, sources, and a curated default_reference.",
+    "",
+    "provider_groups[].aliases is the only adapter-to-rate-card bridge: OpenAI <-",
+    "codex | openai. Stored account and rate-card IDs are not migrated.",
+    "",
+    "usd_per_month: null means unverified, never free. default_reference is published",
+    "only by editing this repository file; ordinary local API writes cannot change it.",
+    "A missing token vector stays absent with a reason - never inferred from another",
+    "Plan, version, or provider-wide mix. Multiplier/qualitative limits stay in",
+    "`limits`, not as a fabricated token vector.",
+    "",
+    "Prices, dates and sources: TALK-002 catalog-seed.json / catalog-research.md.",
+    "Scalar/multiplier capacity claims from that seed are kept as limits or as an",
+    "explicit absent reference. No token values were invented."
+  ],
+  "provider_groups": [
+    {
+      "id": "openai",
+      "label": "OpenAI",
+      "aliases": ["codex", "openai"],
+      "plans": [
+        {
+          "plan_id": "codex-plus",
+          "label": "Plus",
+          "aliases": ["plus"],
+          "versions": [
+            {
+              "from": "2023-02-01",
+              "usd_per_month": 20,
+              "limits": { "window_hours": 5, "credits_multiplier": 1 },
+              "source": "https://learn.chatgpt.com/docs/pricing",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes a 5-hour window and credits multiplier, not a per-1% token vector"
+              }
+            }
+          ]
+        },
+        {
+          "plan_id": "codex-pro-5x",
+          "label": "Pro (5x)",
+          "aliases": ["pro-5x", "5x", "prolite"],
+          "versions": [
+            {
+              "from": "2026-04-08",
+              "usd_per_month": 100,
+              "limits": { "window_hours": 5, "credits_multiplier": 5 },
+              "source": "https://learn.chatgpt.com/docs/pricing",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes only a 5x credits multiplier of Plus, not a token vector"
+              }
+            }
+          ]
+        },
+        {
+          "plan_id": "codex-pro-20x",
+          "label": "Pro (20x)",
+          "aliases": ["pro-20x", "20x", "pro"],
+          "versions": [
+            {
+              "from": "2024-12-05",
+              "usd_per_month": 200,
+              "limits": { "window_hours": 5, "credits_multiplier": 20 },
+              "source": "https://openai.com/index/introducing-chatgpt-pro/",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes only a 20x credits multiplier of Plus, not a token vector"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "anthropic",
+      "label": "Anthropic",
+      "aliases": ["claude", "anthropic"],
+      "plans": [
+        {
+          "plan_id": "claude-pro",
+          "label": "Pro",
+          "aliases": ["pro"],
+          "versions": [
+            {
+              "from": "2023-09-07",
+              "usd_per_month": 20,
+              "usd_per_month_annual": 17,
+              "limits": { "window_hours": 5, "credits_multiplier": 1 },
+              "source": "https://www.anthropic.com/news/claude-pro",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes window length, not a per-1% token vector"
+              }
+            },
+            {
+              "from": "2025-08-28",
+              "usd_per_month": 20,
+              "usd_per_month_annual": 17,
+              "limits": { "window_hours": 5, "weekly_cap": true, "credits_multiplier": 1 },
+              "note": "weekly caps announced 2025-07-28, in force 2025-08-28 - a limit change without a price change",
+              "source": "https://support.anthropic.com",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes window length and a weekly cap, not a per-1% token vector"
+              }
+            }
+          ]
+        },
+        {
+          "plan_id": "claude-max-5x",
+          "label": "Max 5x",
+          "aliases": ["max-5x"],
+          "versions": [
+            {
+              "from": "2025-04-09",
+              "usd_per_month": 100,
+              "limits": { "window_hours": 5, "credits_multiplier": 5 },
+              "source": "https://support.claude.com/en/articles/11049741-what-is-the-max-plan",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes only a 5x multiplier of Pro, not a token vector"
+              }
+            },
+            {
+              "from": "2025-08-28",
+              "usd_per_month": 100,
+              "limits": { "window_hours": 5, "weekly_cap": true, "credits_multiplier": 5 },
+              "note": "weekly caps announced 2025-07-28, in force 2025-08-28 - a limit change without a price change",
+              "source": "https://support.anthropic.com",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes a 5x multiplier of Pro and a weekly cap, not a token vector"
+              }
+            }
+          ]
+        },
+        {
+          "plan_id": "claude-max-20x",
+          "label": "Max 20x",
+          "aliases": ["max-20x"],
+          "versions": [
+            {
+              "from": "2025-04-09",
+              "usd_per_month": 200,
+              "limits": { "window_hours": 5, "credits_multiplier": 20 },
+              "source": "https://support.claude.com/en/articles/11049741-what-is-the-max-plan",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes only a 20x multiplier of Pro, not a token vector"
+              }
+            },
+            {
+              "from": "2025-08-28",
+              "usd_per_month": 200,
+              "limits": { "window_hours": 5, "weekly_cap": true, "credits_multiplier": 20 },
+              "note": "weekly caps announced 2025-07-28, in force 2025-08-28 - a limit change without a price change",
+              "source": "https://support.anthropic.com",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes a 20x multiplier of Pro and a weekly cap, not a token vector"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "zai",
+      "label": "Z.AI",
+      "aliases": ["glm", "zai", "z-ai"],
+      "plans": [
+        {
+          "plan_id": "glm-coding-lite",
+          "label": "GLM Coding Lite",
+          "aliases": ["coding-lite", "lite"],
+          "versions": [
+            {
+              "from": null,
+              "usd_per_month": 18,
+              "limits": {},
+              "note": "only GLM price agreed by both research sweeps; limit unit contradictory (credits vs prompts), so limits stay empty",
+              "source": "https://zcode.z.ai/en",
+              "default_reference": {
+                "absent": true,
+                "reason": "limit unit is contradictory across sources (credits vs prompts); no token vector"
+              }
+            }
+          ]
+        },
+        {
+          "plan_id": "glm-coding-pro",
+          "label": "GLM Coding Pro",
+          "aliases": ["coding-pro"],
+          "versions": [
+            {
+              "from": null,
+              "usd_per_month": null,
+              "limits": {},
+              "note": "conflicting prices ($80 vs $72); not averaged - remains unverified",
+              "source": "https://zcode.z.ai/en",
+              "default_reference": {
+                "absent": true,
+                "reason": "price and limit unit unverified; no token vector"
+              }
+            }
+          ]
+        },
+        {
+          "plan_id": "glm-coding-max",
+          "label": "GLM Coding Max",
+          "aliases": ["coding-max"],
+          "versions": [
+            {
+              "from": null,
+              "usd_per_month": null,
+              "limits": {},
+              "note": "conflicting prices ($168 vs $160); not averaged - remains unverified",
+              "source": "https://zcode.z.ai/en",
+              "default_reference": {
+                "absent": true,
+                "reason": "price and limit unit unverified; no token vector"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "xai",
+      "label": "xAI",
+      "aliases": ["grok", "xai"],
+      "plans": [
+        {
+          "plan_id": "grok-supergrok",
+          "label": "SuperGrok",
+          "aliases": ["supergrok"],
+          "versions": [
+            {
+              "from": null,
+              "usd_per_month": 30,
+              "limits": {},
+              "source": "https://x.ai/pricing",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes a monthly price, not a per-1% token vector"
+              }
+            }
+          ]
+        },
+        {
+          "plan_id": "grok-supergrok-plus",
+          "label": "SuperGrok Plus",
+          "aliases": ["supergrok-plus"],
+          "versions": [
+            {
+              "from": null,
+              "usd_per_month": 100,
+              "limits": {},
+              "source": "https://x.ai/pricing",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes a monthly price, not a per-1% token vector"
+              }
+            }
+          ]
+        },
+        {
+          "plan_id": "grok-supergrok-heavy",
+          "label": "SuperGrok Heavy",
+          "aliases": ["supergrok-heavy", "heavy"],
+          "versions": [
+            {
+              "from": null,
+              "usd_per_month": null,
+              "limits": {},
+              "note": "x.ai/pricing does not publish a Heavy price; a generic $300 claim was rejected",
+              "source": "https://x.ai/pricing",
+              "default_reference": {
+                "absent": true,
+                "reason": "price unpublished on vendor page; no token vector"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "google",
+      "label": "Google",
+      "aliases": ["gemini", "google"],
+      "plans": [
+        {
+          "plan_id": "google-ai-pro",
+          "label": "Google AI Pro",
+          "aliases": ["ai-pro", "pro"],
+          "versions": [
+            {
+              "from": null,
+              "usd_per_month": 19.99,
+              "limits": { "window_hours": 5, "gemini_cli_requests_per_day": 1500 },
+              "note": "start date conflicting across sources (2025-05-20 vs 2024-02-08) - from stays null",
+              "source": "https://gemini.google/subscriptions/",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes request caps, not a per-1% token vector"
+              }
+            }
+          ]
+        },
+        {
+          "plan_id": "google-ai-ultra-5x",
+          "label": "Google AI Ultra (5x)",
+          "aliases": ["ultra-5x", "ultra"],
+          "versions": [
+            {
+              "from": "2025-05-20",
+              "usd_per_month": 249.99,
+              "limits": { "gemini_cli_requests_per_day": 2000, "credits_multiplier": 5 },
+              "note": "launch price 249.99 on 2025-05-20; later $99.99 has no sourced effective date, so that price is not assigned to any version",
+              "source": "https://gemini.google/subscriptions/",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes a 5x qualitative multiple, not a token vector"
+              }
+            }
+          ]
+        },
+        {
+          "plan_id": "google-ai-ultra-20x",
+          "label": "Google AI Ultra (20x)",
+          "aliases": ["ultra-20x"],
+          "versions": [
+            {
+              "from": "2025-05-20",
+              "usd_per_month": 199.99,
+              "limits": { "gemini_cli_requests_per_day": 2000, "credits_multiplier": 20 },
+              "source": "https://gemini.google/subscriptions/",
+              "default_reference": {
+                "absent": true,
+                "reason": "source publishes a 20x qualitative multiple, not a token vector"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

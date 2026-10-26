@@ -1,0 +1,29 @@
+/* A choice of subscriptions and their parts (models in Speed, cycles in Capacity) in the app's drawer: providers,
+   subscriptions, their parts. The class names come from Speed, where the drawer first appeared. */
+.speed-drawer-list { display: flex; flex-direction: column; gap: var(--s-9); }
+.speed-drawer-global, .speed-drawer-provider h3 { display: flex; justify-content: space-between; align-items: center; gap: var(--s-4); }
+.speed-drawer-global { color: var(--muted); }
+/* Provider name: a small heading inside the drawer, not a title. */
+.speed-drawer-provider h3 {
+  margin: 0; padding-bottom: var(--s-4); border-bottom: var(--rule);
+  font-family: var(--font-sans); font-size: var(--fs-5); font-weight: var(--fw-semibold); color: var(--text);
+}
+.speed-drawer-actions { display: inline-flex; gap: var(--s-3); font-weight: var(--fw-regular); }
+/* Standalone pencilled buttons, as .ui-button at the drawer's small size. */
+.speed-drawer-actions button {
+  padding: var(--s-1) var(--s-5); border: 1px solid var(--pencil); border-radius: var(--r-control); background: var(--surface);
+  box-shadow: var(--lift); color: var(--text); cursor: pointer; font-family: var(--font-sans); font-size: var(--fs-3);
+}
+.speed-drawer-actions button:hover { background: var(--accent-soft); }
+.speed-drawer-sub { padding: var(--s-4) 0; border-bottom: var(--rule); }
+.speed-drawer-sub.is-failed .speed-drawer-facts, .speed-drawer-error { color: var(--warn); }
+/* Two classes: the shared drawer body sets `label { display: block }` (CodexColumnsDrawer.css), which outranks one class. */
+.speed-drawer-list .speed-drawer-row { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-1) 0; cursor: pointer; }
+/* The shared drawer styles its form fields full width (AccountPeriodsSettings.css); a checkbox here keeps its own size. */
+.speed-drawer .speed-drawer-row input[type="checkbox"], .capacity-compare-drawer :is(.speed-drawer-row, .capacity-choice-table) input[type="checkbox"] { flex-shrink: 0; width: auto; min-height: 0; margin: 0; padding: 0; accent-color: var(--accent); }
+.speed-drawer-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.speed-drawer-facts { flex-shrink: 0; color: var(--muted); font-size: var(--fs-3); }
+.speed-drawer-error { padding-left: var(--s-10); font-size: var(--fs-3); overflow-wrap: anywhere; }
+.speed-drawer-models { padding-left: var(--s-10); }
+.speed-drawer-inactive { color: var(--faint); font-size: var(--fs-3); }
+.speed-drawer-models .speed-drawer-name { color: var(--muted); }

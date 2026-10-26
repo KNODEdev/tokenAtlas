@@ -1,0 +1,10 @@
+{
+  "scope": { "account": "codex1", "since": "2026-08-01", "until": "2026-09-12", "window_minutes": 300 },
+  "windows": [{
+    "account": "codex1", "plan": "pro", "reset": "2026-08-31T11:21:00Z",
+    "cycle_start": "2026-08-31T06:21:00Z", "cycle_end": "2026-08-31T11:21:00Z",
+    "start": "2026-08-31T06:21:00Z", "end": "2026-08-31T06:30:12.379Z",
+    "usage": { "events": 45, "tokens": 2922384, "input": 2912813, "cached": 2719488, "output": 9571, "fast_tokens": 0, "unknown_tokens": 475867, "priced_tokens": 2367157, "unpriced_events": 20, "api_standard": 0.08063108000000002, "credits_low": 2.015777, "credits_high": 2.5420055 },
+    "cycle_usage": { "events": 1201, "tokens": 137492378, "input": 137109485, "cached": 133679104, "output": 382893, "fast_tokens": 0, "unknown_tokens": 59865603, "priced_tokens": 130438589, "unpriced_events": 146, "api_standard": 62.21852720000001, "credits_low": 1555.463179999998, "credits_high": 2723.0674384999975 }
+  }]
+}

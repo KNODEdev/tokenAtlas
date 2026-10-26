@@ -1,0 +1,18 @@
+/* One cycle's evidence: status chips, a small traffic table beside short fact lines, then sources. */
+.evidence { min-width: 0; display: flex; flex-direction: column; gap: var(--s-6); font-size: var(--fs-4); }
+.evidence p { margin: 0; }
+.evidence-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); font-family: var(--font-mono); }
+.evidence-note { margin: 0; padding: var(--s-3) var(--s-5); border-radius: var(--r-chip); background: var(--sunk); color: var(--text); white-space: pre-line; }
+/* Two columns while each gets 280px, one below the other otherwise; fact lines wrap inside their column. */
+.evidence-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: var(--s-6) var(--s-8); align-items: start; }
+.evidence-facts { min-width: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--s-3) var(--s-6); margin: 0; font-size: var(--fs-3); }
+.evidence-facts dt { font-family: var(--font-sans); font-size: var(--fs-3); font-weight: var(--fw-medium); color: var(--muted); }
+.evidence-facts dd { margin: 0; min-width: 0; color: var(--text); line-height: 1.5; white-space: normal; overflow-wrap: anywhere; }
+.evidence-facts dd .ui-help { margin-left: var(--s-3); }
+.evidence-faint { color: var(--faint); }
+.evidence-declared { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--s-1); font-size: var(--fs-3); color: var(--muted); }
+.evidence-disclosures { display: flex; flex-direction: column; gap: var(--s-3); }
+.evidence-disclosures .capacity-detail { margin: 0; }
+.evidence-disclosures .capacity-detail > summary { font-size: var(--fs-3); color: var(--muted); }
+.evidence-disclosures p { font-size: var(--fs-3); color: var(--muted); margin: var(--s-2) 0; max-width: 900px; }
+.evidence-actions { gap: var(--s-3) var(--s-8); }

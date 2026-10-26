@@ -1,0 +1,11 @@
+/* Settings → Accounts → Windows (docs/design/paper-atlas.md). */
+.window-end-settings-tools { align-items: flex-end; margin-bottom: var(--s-4); }
+.window-end-settings-status { font-size: var(--fs-3); color: var(--muted); }
+.window-end-settings-empty { margin: var(--s-4) 0; font-size: var(--fs-3); color: var(--muted); }
+.window-end-settings-list .ui-table { width: auto; font-size: var(--fs-3); }
+.window-end-settings-list :is(.ui-th, .ui-td) { padding-block: var(--s-1); padding-inline: var(--s-3) var(--s-6); white-space: nowrap; }
+/* The linked cycle's windows: a wash, never a side bar. */
+.window-end-settings-list tr.is-selected > td { background: var(--accent-soft); }
+.window-end-settings-fixed { color: var(--faint); }
+.window-end-cause { display: inline-flex; align-items: center; gap: var(--s-2); }
+.window-end-cause::before { content: ""; width: 7px; height: 7px; flex: 0 0 7px; border-radius: var(--r-dot); background: var(--cause-ink); }

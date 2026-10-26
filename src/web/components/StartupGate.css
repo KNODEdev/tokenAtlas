@@ -1,0 +1,8 @@
+.startup-panel { max-width: 940px; }
+.startup-status { display: flex; align-items: center; gap: var(--s-5); padding: var(--s-8) 0; }
+.startup-status strong { font-size: var(--fs-5); font-weight: var(--fw-semibold); }
+.startup-status .mono { color: var(--muted); }
+.startup-location { display: flex; gap: var(--s-5); border-top: var(--rule); padding-top: var(--s-5); font-size: var(--fs-3); }
+.startup-location + .startup-location { border-top: 0; padding-top: var(--s-3); }
+.startup-location span:first-child { color: var(--muted); }
+.startup-location span:last-child { overflow-wrap: anywhere; }

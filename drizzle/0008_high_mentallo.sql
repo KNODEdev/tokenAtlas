@@ -1,0 +1,1 @@
+ALTER TABLE `glm_probe` ADD `vendor_percent` real;

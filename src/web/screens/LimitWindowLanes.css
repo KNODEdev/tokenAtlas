@@ -1,0 +1,37 @@
+.lanes-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 230px) minmax(0, 1fr) 230px;
+  gap: var(--s-6);
+  align-items: center;
+}
+.lanes-head { padding: 0 var(--s-3) var(--s-3); font-size: var(--fs-2); color: var(--faint); }
+.lanes-body {
+  width: 100%;
+  padding: var(--s-4) var(--s-3);
+  border: none;
+  border-top: var(--rule);
+  background: transparent;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.lanes-name { display: flex; align-items: center; gap: var(--s-3); min-width: 0; font-size: var(--fs-4); font-weight: 600; white-space: nowrap; }
+.lanes-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: var(--r-dot); }
+.lanes-chip { font-size: var(--fs-2); font-weight: 400; padding: 1px 5px; border-radius: var(--r-chip); border: 1px solid var(--line2); color: var(--muted); }
+.lanes-track { position: relative; height: 16px; background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r-bar); overflow: hidden; }
+.lanes-axis { position: relative; height: 14px; }
+.lanes-axis > span { position: absolute; top: 0; white-space: nowrap; }
+.lanes-segment { position: absolute; top: 0; bottom: 0; }
+.lanes-segment[data-state="open"] { opacity: 0.55; }
+.lanes-segment[data-state="spent"] { background: var(--crit); opacity: 0.8; }
+.lanes-reset { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--text); }
+.lanes-moment { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed var(--accent); pointer-events: none; }
+.lanes-value { font-size: var(--fs-3); line-height: 1.4; }
+.lanes-figure { font-family: var(--font-figure); font-size: var(--fs-5); font-weight: 500; }
+.lanes-muted { color: var(--muted); }
+.lanes-suggest { display: flex; align-items: baseline; gap: var(--s-4); flex-wrap: wrap; margin: var(--s-4) 0 var(--s-6); padding: var(--s-4) var(--s-6); background: var(--ok-soft); border-radius: var(--r-chip); font-size: var(--fs-4); }
+.lanes-suggest button { padding: 0; border: none; background: transparent; font: inherit; font-weight: 600; color: var(--ok); cursor: pointer; }
+.lanes-legend { display: flex; gap: var(--s-7); flex-wrap: wrap; margin-top: var(--s-4); font-size: var(--fs-2); color: var(--faint); }
+.lanes-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.lanes-swatch { display: inline-block; width: 12px; height: 9px; border-radius: var(--r-bar); }

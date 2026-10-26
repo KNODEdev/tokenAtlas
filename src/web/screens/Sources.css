@@ -1,0 +1,61 @@
+/* Data sources (docs/design/audit-settings-sources-mockup.html): one row per provider, checks, the recovery copy. */
+.sources { display: flex; flex-direction: column; gap: var(--s-7); min-width: 0; }
+.sources-muted { color: var(--muted); }
+.sources-crit { color: var(--crit); }
+.sources-right { text-align: right; justify-self: end; }
+
+.sources-head { display: grid; gap: var(--s-4); padding: 0 0 var(--s-6); }
+.sources-note, .sources-blocked { font-size: var(--fs-3); color: var(--warn); }
+.sources-blocked { padding: var(--s-3) var(--s-5); border-radius: var(--r-chip); background: var(--warn-soft); }
+.sources-confirm {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); flex-wrap: wrap; padding: var(--s-4) var(--s-5);
+  border-radius: var(--r-chip); background: var(--warn-soft); font-size: var(--fs-4);
+}
+
+/* Sized for the ~810 px card body at 1400 px with both rails open. */
+.sources-grid {
+  display: grid; grid-template-columns: 116px minmax(0, 1.2fr) 88px minmax(0, 1.4fr) 116px; gap: var(--s-6); align-items: center;
+  padding: var(--s-5); border-bottom: var(--rule);
+}
+.sources-grid-head {
+  padding-block: var(--s-4); font-size: var(--fs-3); color: var(--muted); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line2);
+}
+.sources-row { font-size: var(--fs-4); }
+.sources-row > .sources-right { font-family: var(--font-figure); letter-spacing: -0.02em; }
+.sources-provider { font-family: var(--font-sans); font-size: var(--fs-4); font-weight: var(--fw-semibold); text-decoration: none; }
+.sources-outcome { display: flex; align-items: center; gap: var(--s-3); min-width: 0; font-size: var(--fs-3); color: var(--muted); }
+.sources-outcome > .mono { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Data age: the text, and a dot on a logarithmic now → 30-day track (ticks at 1 h, 1 day and 7 days). */
+.sources-age { display: grid; gap: var(--s-2); min-width: 0; font-size: var(--fs-3); }
+.sources-age-track {
+  position: relative; height: 4px; border-radius: var(--r-bar); background: var(--sunk);
+  background-image: linear-gradient(var(--line2), var(--line2)), linear-gradient(var(--line2), var(--line2)), linear-gradient(var(--line2), var(--line2));
+  background-size: 1px 100%; background-repeat: no-repeat; background-position: 10.5% 0, 48.9% 0, 78% 0;
+}
+.sources-age-track > i { position: absolute; top: 50%; width: 9px; height: 9px; border: 2px solid var(--surface); border-radius: var(--r-circle); transform: translate(-50%, -50%); }
+
+.sources-foot { padding: var(--s-5) 0 var(--s-6); }
+.sources-run-details > summary { cursor: pointer; font-size: var(--fs-3); color: var(--muted); }
+.sources-run-details > div { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-6); margin-top: var(--s-3); font-size: var(--fs-3); color: var(--muted); }
+.sources-run-details b { color: var(--text); }
+.sources-run-details .sources-crit { flex-basis: 100%; overflow-wrap: anywhere; }
+
+.sources-checks { list-style: none; margin: var(--s-4) 0 0; padding: 0; }
+.sources-checks > li {
+  display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: var(--s-5); align-items: baseline;
+  padding: var(--s-4) 0; border-top: var(--rule); font-size: var(--fs-4);
+}
+.sources-checks > li > i {
+  display: inline-grid; place-items: center; width: 16px; height: 16px; border: 1px solid; border-radius: var(--r-circle);
+  font-family: var(--font-sans); font-size: var(--fs-2); font-style: normal; font-weight: var(--fw-bold);
+}
+.sources-checks > li > span { min-width: 0; overflow-wrap: anywhere; }
+.sources-check-items > summary { cursor: pointer; font-size: var(--fs-3); color: var(--muted); }
+.sources-check-items ul { margin: var(--s-2) 0 0; padding-left: var(--s-8); max-height: calc(var(--s-12) * 6); overflow-y: auto; font-size: var(--fs-3); color: var(--muted); }
+
+.sources-snapshot { display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); }
+.sources-snapshot > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-5); min-width: 0; font-size: var(--fs-4); }
+.sources-snapshot > div > span { font-size: var(--fs-3); }
+.sources-snapshot b { cursor: help; }
+.sources-snapshot-note { margin-top: var(--s-3); font-size: var(--fs-3); }

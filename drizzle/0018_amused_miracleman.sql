@@ -1,0 +1,1 @@
+CREATE INDEX `claude_events_model_idx` ON `claude_events` (`model`);

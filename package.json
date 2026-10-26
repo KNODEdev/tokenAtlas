@@ -1,0 +1,57 @@
+{
+  "name": "tokenatlas",
+  "type": "module",
+  "private": true,
+  "license": "Apache-2.0",
+  "scripts": {
+    "archive:compress": "bun run scripts/archive-compress.ts",
+    "test": "bun test ./src ./scripts",
+    "accounting:codex": "bun run src/server/codex-accounting-cli.ts",
+    "audit:window": "bun run scripts/audit-subscription-window.ts",
+    "ingest:claude": "bun run src/ingest/claude.ts",
+    "ingest:opencode": "bun run src/ingest/opencode.ts",
+    "ingest:grok": "bun run src/ingest/grok.ts",
+    "ingest:gemini": "bun run src/ingest/gemini.ts",
+    "sync": "bun run src/sync/cli.ts",
+    "verify": "bun run src/verify.ts",
+    "doctor": "bun run src/doctor.ts",
+    "remap": "bun run src/projects/remap.ts",
+    "serve": "bun run src/server/api.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun run src/db/migrate.ts",
+    "dev:web": "vite",
+    "build:web": "vite build",
+    "news:measurements": "bun run scripts/news/export-tibo-measurements.ts",
+    "typecheck": "tsc --noEmit",
+    "build:ds": "tsc -p tsconfig.ds.json",
+    "journal:status": "bun run scripts/gauge-journal-status.ts",
+    "review:preflight": "bun run scripts/review-preflight.ts",
+    "review:transport": "bun test src/sync/gauge-current.acceptance.test.ts",
+    "review:replica": "bun run scripts/review-replica.ts",
+    "review:overview": "bun run scripts/review-overview.ts",
+    "review:read-path": "bun run scripts/lib/read-path-harness.ts",
+    "review:read-path-browser": "python scripts/test-read-path-browser.py",
+    "benchmark:planhealth": "bun run scripts/benchmark-planhealth.ts",
+    "benchmark:cycle-breakdown": "bun run scripts/benchmark-cycle-breakdown.ts",
+    "benchmark:overview": "bun run scripts/benchmark-overview-read.ts"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/bun": "latest",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "drizzle-kit": "^0.31.10",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.2.2"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "types": "dist/types/web/components/index.d.ts"
+}

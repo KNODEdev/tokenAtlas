@@ -1,0 +1,51 @@
+__pycache__/
+*.pyc
+node_modules/
+# Rebuilt by _dev.bat; keep public/legacy.html as a source file.
+/public/assets/
+/public/index.html
+.env
+.env.*
+!.env.example
+.env.bak-*
+/env.ftp
+/env.ftp.bak-*
+/%SystemDrive%/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.pem
+*.p12
+*.pfx
+.dev-cache/
+.tmp/
+.tmp-run/
+/nul
+.ds-sync/
+ds-bundle/
+.claude/settings.local.json
+.claude/launch.json
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+.grok/
+/rtk/
+dist/
+_golden/
+**/TMP/
+do-work/working/.dw.busy.json
+
+# Deklaracje uzytkownika - NIE naleza do repozytorium.
+# Opisuja te osobe (nazwy projektow, katalogi klientow, loginy, zmierzone
+# zuzycie), a nie aplikacje, i sa per-instalacja: reguly jednego uzytkownika
+# nadpisalyby reguly drugiego. Mieszkaja w TOKENATLAS_CONFIG, domyslnie
+# <archiwum>/config, ktore OneDrive synchronizuje prywatnie miedzy maszynami.
+# Wzorce jada w repo jako *.example.json. rate-cards.json ZOSTAJE sledzony:
+# cennik vendora jest wspolny i sluzy za wartosc startowa.
+projects.json
+accounts.json
+cycles.json
+plans.json
+claude-gauge.json
+grok-gauge.json

@@ -1,0 +1,2 @@
+{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":1,"output_tokens":1},"total_token_usage":{"input_tokens":0,"output_tokens":0}},"rate_limits":{"primary":{"window_minutes":0,"used_percent":-0.0}}}}
+{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":1,"output_tokens":1},"total_token_usage":{"input_tokens":-0.0,"output_tokens":0}},"rate_limits":{"primary":{"window_minutes":-0.0,"used_percent":0}}}}

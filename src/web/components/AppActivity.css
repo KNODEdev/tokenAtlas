@@ -1,0 +1,25 @@
+/* Status details: background tasks as rows (name, bar, count), then prices and synchronization side by side,
+   then waiting views. Times, causes and definitions sit in each heading's help dot. */
+.app-activity-content { display: grid; gap: var(--s-2); padding: var(--s-4) 0; }
+.app-activity-content p { margin: 0; font-size: var(--fs-4); }
+.app-activity-section { padding: var(--s-4) 0; }
+.app-activity-section + .app-activity-section,
+.app-activity-content > * + .app-activity-pair,
+.app-activity-pair + .app-activity-section { border-top: var(--rule); }
+.app-activity-section h3 { display: flex; align-items: center; gap: var(--s-3); margin: 0 0 var(--s-4); font-size: var(--fs-5); font-weight: var(--fw-semibold); color: var(--text); }
+.app-activity-task { display: grid; grid-template-columns: minmax(160px, 220px) minmax(120px, 1fr) minmax(120px, 160px); gap: var(--s-6); align-items: center;
+  padding: var(--s-3) 0; border-bottom: 1px solid var(--line); font-size: var(--fs-4); }
+.app-activity-task:last-child { border-bottom: 0; }
+.app-activity-task-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-activity-task-state { color: var(--muted); font-size: var(--fs-3); text-align: right; white-space: nowrap; }
+.app-activity-task-state.is-done { color: var(--ok); }
+.app-activity-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--s-11); }
+.app-activity-pair > .app-activity-section + .app-activity-section { border-top: 0; }
+.app-activity-chips { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-5); }
+.app-activity-content .app-activity-meta { font-size: var(--fs-3); color: var(--muted); }
+.app-activity-line .is-ok { color: var(--ok); }
+.app-activity-line .is-warn, .app-activity-row .is-warn { color: var(--warn); }
+.app-activity-line .is-crit { color: var(--crit); }
+.app-activity-line .is-accent { color: var(--accent); }
+.app-activity-warning { color: var(--warn); }
+.app-activity-row { display: flex; justify-content: space-between; gap: var(--s-4); padding: var(--s-2) 0; }

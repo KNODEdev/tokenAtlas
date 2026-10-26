@@ -1,0 +1,9 @@
+/* Page tabs (IA-2026-10-19 v1.1): page tabs on one rule, the open tab's views beside them. */
+.page-tabs { display: flex; align-items: center; gap: var(--s-4) var(--s-8); flex-wrap: wrap; }
+/* Pinned under the screen head; the paper behind it hides the report scrolling underneath. */
+.page-tabs[style*="top"] { position: sticky; z-index: var(--z-sticky); background: var(--surface); padding-top: var(--s-3); margin-top: calc(-1 * var(--s-3)); }
+.page-tabs > .ui-tabs[data-variant="sections"] { flex: 1 1 auto; }
+/* The report's scope: one quiet line, actions at its end. */
+.context-bar { display: flex; align-items: center; gap: var(--s-3) var(--s-5); flex-wrap: wrap; font-size: var(--fs-4); color: var(--muted); }
+.context-bar-scope { min-width: 0; }
+.context-bar-actions { margin-left: auto; display: flex; align-items: center; gap: var(--s-4); }

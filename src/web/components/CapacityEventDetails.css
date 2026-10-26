@@ -1,0 +1,6 @@
+.capacity-event-drawer[open] { display: flex; flex-direction: column; }
+.capacity-event-drawer .codex-columns-drawer__header { flex: none; }
+.capacity-event-drawer .codex-columns-drawer__body { flex: 1; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; }
+.capacity-event-drawer section p { line-height: 1.6; white-space: pre-line; }
+.capacity-event-note-preview { display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+.capacity-marker[role="button"] { cursor: pointer; }

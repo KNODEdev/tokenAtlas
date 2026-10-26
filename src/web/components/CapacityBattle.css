@@ -1,0 +1,25 @@
+/* Capacity battle: tiers as rows, one plan per provider in each, the lead on one scale (docs/design/paper-atlas.md). */
+.capacity-battle-table { width: 100%; margin-top: var(--s-6); border-collapse: collapse; table-layout: fixed; }
+.capacity-battle-table th { padding: var(--s-3) var(--s-5); text-align: left; font-size: var(--fs-3); font-weight: var(--fw-regular); color: var(--muted); border-bottom: 1px solid var(--line2); }
+.capacity-battle-table thead th:first-child, .capacity-battle-table tbody th { width: 8%; }
+.capacity-battle-table thead th:last-child { width: 26%; }
+.capacity-battle-table td, .capacity-battle-table tbody th { padding: var(--s-6) var(--s-5); vertical-align: top; border-bottom: var(--rule); }
+.capacity-battle-none { color: var(--faint); font-size: var(--fs-3); }
+
+.capacity-battle-plan { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; }
+.capacity-battle-plan-head { display: flex; align-items: baseline; gap: var(--s-4); font-size: var(--fs-4); }
+.capacity-battle-plan-head span { color: var(--muted); font-family: var(--font-figure); font-size: var(--fs-3); }
+.capacity-battle-value { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-2) var(--s-5); font-family: var(--font-figure); font-size: var(--fs-6); font-weight: var(--fw-semibold); color: var(--text); }
+.capacity-battle-value span { font-size: var(--fs-3); font-weight: var(--fw-regular); color: var(--muted); }
+.capacity-battle-plan.is-derived .capacity-battle-value { color: var(--muted); font-weight: var(--fw-medium); }
+.capacity-battle-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2) var(--s-4); font-size: var(--fs-3); color: var(--muted); }
+.capacity-battle-meta .speed-drawer-actions { align-items: center; }
+
+.capacity-battle-lead { display: flex; flex-direction: column; gap: var(--s-2); padding-top: var(--s-2); font-size: var(--fs-3); color: var(--text); }
+.capacity-battle-bar { height: 8px; border: 1px solid var(--line); border-radius: var(--r-bar); background: var(--sunk); overflow: hidden; }
+.capacity-battle-bar i { display: block; height: 100%; }
+.capacity-battle-bar.is-derived i { opacity: .4; }
+.capacity-battle-lead span { margin-top: var(--s-1); font-weight: var(--fw-medium); }
+
+.capacity-battle-empty { margin: 0; font-size: var(--fs-3); color: var(--muted); }
+.capacity-battle-attach .capacity-battle-account { max-width: 0; width: 34%; overflow: hidden; text-overflow: ellipsis; }

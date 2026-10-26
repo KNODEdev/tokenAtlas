@@ -1,0 +1,8 @@
+{
+  "_comment": [
+    "WZORZEC. Skopiuj do <TOKENATLAS_CONFIG>/cycles.json.",
+    "Rytm okien rozliczeniowych. Edytowalny z ekranu Data sources ->",
+    "Deklaracje, wiec zwykle nie trzeba go tworzyc recznie."
+  ],
+  "windows": []
+}
