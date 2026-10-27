@@ -69,6 +69,7 @@ test("cost refresh and failure isolate old amounts while preserving drawer contr
     async (input: URL | RequestInfo) => Response.json(historyFor(String(input))), { preconnect() {} },
   ));
   const price = () => findByAttribute(dom.host, "data-main-figure", "")!.textContent;
+  const tab = (key: string) => invoke(findByAttribute(dom.host, "data-detail-tab", key)!, "onClick");
   let retries = 0;
   const render = (cost: ProjectCostResponse | null, costLoading = false, costError: string | null = null) =>
     root.render(<ProjectDrawer subject={subject} cost={cost} costLoading={costLoading} costError={costError}
@@ -77,10 +78,10 @@ test("cost refresh and failure isolate old amounts while preserving drawer contr
     await act(async () => render(costFor()));
     expect(price()).toBe("$5.50");
     expect(findByAttribute(dom.host, "data-summary", "")!.textContent).toContain("1h 00m of work");
+    await tab("cost");
     const more = nodes(dom.host).find(node => node.tagName === "BUTTON" && node.textContent === "more columns")!;
     await invoke(more, "onClick");
-    const whatIf = nodes(dom.host).find(node => node.tagName === "BUTTON" && node.textContent.includes("What if all traffic"))!;
-    await invoke(whatIf, "onClick");
+    await tab("summary");
 
     await act(async () => render(costFor(), true));
     expect(price()).toBe("…");
@@ -94,8 +95,9 @@ test("cost refresh and failure isolate old amounts while preserving drawer contr
 
     await act(async () => render(costFor(subject, 9)));
     expect(price()).toBe("$9.00");
+    // A choice made on another tab survives the refresh and the tab switch.
+    await tab("cost");
     expect(nodes(dom.host).find(node => node.tagName === "BUTTON" && node.textContent === "more columns")!.getAttribute("aria-pressed")).toBe("true");
-    expect(nodes(dom.host).find(node => node.tagName === "BUTTON" && node.textContent.includes("What if all traffic"))!.getAttribute("aria-expanded")).toBe("true");
     expect(read).toHaveBeenCalledTimes(1);
   } finally {
     await act(async () => root.unmount()); read.mockRestore(); dom.restore();

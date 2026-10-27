@@ -9,6 +9,7 @@ import { convert, planUnits } from "../../lib/planUnits";
 import { projectConflictHint } from "../../lib/project-coverage";
 import type { RosterCard } from "../../lib/roster";
 import { subscriptionColor } from "../mix";
+import { projectShares } from "./shares";
 import { subjectKey } from "./format";
 import { type SplitLine, planHistoryLine, currentPlan, planPeriodsTooltip } from "./subscriptions";
 import type { WhatIfRow } from "./WhatIfTable";
@@ -144,6 +145,10 @@ export function useProjectDrawerCost(
       }),
     [distinctSubIds, spendOfSub, units, nameOf, apiUsd, rangeDays, catalog],
   );
+  const shares = useMemo(
+    () => subjectCost ? projectShares(subjectCost, effectiveCost?.subscriptions ?? [], (count) => `${t("other", "pozostałe")} (${count})`) : null,
+    [subjectCost, effectiveCost, language, t],
+  );
   const subscriptionCount = !isCostPending && !isCostFailed ? subSlices.length : null;
   return {
     summary: {
@@ -152,7 +157,7 @@ export function useProjectDrawerCost(
       isCostPending, isCostFailed, costError, subscriptionCount,
     },
     receipt: { lines: receiptLines, uncalibrated },
-    units, vendorBySub, whatIfRows,
+    units, vendorBySub, whatIfRows, shares,
   };
 }
 

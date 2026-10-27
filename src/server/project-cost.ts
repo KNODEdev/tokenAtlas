@@ -12,9 +12,9 @@ import { buildSubscriptionCapacities, computeSeatTime, computeEquivalentsAndProv
 import { codexSubjectNormalized } from "./codex-accounting";
 import { planLabelOf } from "./plans";
 import { round2, allocatePaidAcrossSubjects } from "./pricing";
-import type { ProjectCostResponse, Bucket, TokenTypeBreakdown, SubscriptionSpend, SubjectCost, ProjectCostCoverage } from "./project-cost-contracts";
+import type { ProjectCostResponse, Bucket, ModelSlice, TokenTypeBreakdown, SubscriptionSpend, SubjectCost, ProjectCostCoverage } from "./project-cost-contracts";
 import { dailyAggregate } from "./project-cost-daily";
-import { zeroTypes, addTypes, daySelected, daysBetween, roundTypes, aggregateBilled } from "./project-cost-values";
+import { addModels, zeroTypes, addTypes, daySelected, daysBetween, roundTypes, aggregateBilled } from "./project-cost-values";
 import type { AccountEvidence, ConflictEvidence } from "./project-cost-evidence";
 import { subscriptionSpans, planPricingInputs, subscriptionPlanPricing } from "./project-cost-plan-pricing";
 import { tableExists } from "./project-cost-schema";
@@ -63,7 +63,8 @@ function computeProjectCost(
     calls: number,
     tokens: number,
     tt: TokenTypeBreakdown,
-    tu: TokenTypeBreakdown | null
+    tu: TokenTypeBreakdown | null,
+    models: Record<string, ModelSlice> | undefined
   ) => {
     if (!Number.isFinite(usd)) return;
     if (!subMeta.has(subId)) subMeta.set(subId, { vendor, basis });
@@ -78,6 +79,7 @@ function computeProjectCost(
       if (!cur.tu) cur.tu = zeroTypes();
       addTypes(cur.tu, tu);
     }
+    addModels(cur.models ??= {}, models);
     inner.set(key, cur);
     bySub.set(subId, inner);
   };
@@ -98,7 +100,8 @@ function computeProjectCost(
       bucket.calls,
       bucket.tokens,
       bucket.tt,
-      bucket.tu
+      bucket.tu,
+      bucket.models
     );
   }
   for (const item of aggregate.unpricedOrder) {
@@ -108,7 +111,7 @@ function computeProjectCost(
   // 'claude' bucket, and its already day-selected sums are added, not recomputed.
   for (const group of claude.groups) {
     add(group.account, "claude", "rate-card", group.subject, group.api_usd, group.calls, group.tokens,
-      group.tokens_by_type, group.api_usd_by_type);
+      group.tokens_by_type, group.api_usd_by_type, group.models);
     if (group.subject === "p:_tmp") tmpTokens += group.tokens;
     else if (!group.subject) {
       unassignedTokens += group.tokens;
@@ -141,7 +144,7 @@ function computeProjectCost(
     }
     for (const group of usage.groups) {
       add(group.account, usage.provider, "rate-card", group.subject, group.api_usd, group.calls, group.tokens,
-        group.tokens_by_type, group.api_usd_by_type);
+        group.tokens_by_type, group.api_usd_by_type, group.models);
       if (group.subject === "p:_tmp") tmpTokens += group.tokens;
       else if (!group.subject) {
         unassignedTokens += group.tokens;
@@ -281,6 +284,7 @@ function computeProjectCost(
       row.api_usd += b.api_usd;
       row.calls += b.calls;
       row.by_sub[subId] = (row.by_sub[subId] ?? 0) + b.api_usd;
+      addModels(row.models ??= {}, b.models);
       subjects.set(key, row);
     }
     const subSeat = computeSeatTime(paid ?? 0, monthly);
@@ -388,6 +392,7 @@ function computeProjectCost(
       row.billed_usd == null || pricedSpend <= 0 ? null : round4((row.billed_usd / pricedSpend) * 100);
     billedRounded += row.billed_usd ?? 0;
     for (const k of Object.keys(row.by_sub)) row.by_sub[k] = round2(row.by_sub[k] ?? 0);
+    for (const slice of Object.values(row.models ?? {})) slice.api_usd = round2(slice.api_usd);
   }
   billedRounded = round2(billedRounded);
   subscriptions.sort((a, b) => b.api_usd - a.api_usd);

@@ -12,6 +12,13 @@ export interface TokenTypeBreakdown {
   out: number;
 }
 
+/** Priced traffic of one model; a subject's model slices add up to its tokens, calls and api_usd. */
+export interface ModelSlice {
+  tokens: number;
+  calls: number;
+  api_usd: number;
+}
+
 export interface SubjectSubscriptionSlice {
   tokens: number;
   api_usd: number;
@@ -39,6 +46,8 @@ export interface SubjectCost {
   priced_spend_usd: number;
   calls: number;
   by_sub: Record<string, number>;
+  /** Priced traffic by model name (unpriced calls stay in `unpriced`). */
+  models?: Record<string, ModelSlice>;
   subscriptions: Record<string, SubjectSubscriptionSlice>;
 }
 
@@ -161,6 +170,7 @@ export interface Bucket {
   tokens: number;
   tt: TokenTypeBreakdown;
   tu: TokenTypeBreakdown | null;
+  models?: Record<string, ModelSlice>;
 }
 
 export interface DailyBucket extends Bucket {

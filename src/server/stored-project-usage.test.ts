@@ -27,7 +27,7 @@ type Types = { in_uncached: number; cache_read: number; cache_write: number; out
 function oracle(db: Database, rates: RateCard, range: { since?: string; until?: string }) {
   const resolver = loadAccountResolver(db);
   const groups = new Map<string, { account: string; subject: string | null; tokens: number; calls: number; types: Types; api: number; byType: Types;
-    standard: number | null }>();
+    standard: number | null; models: Record<string, { tokens: number; calls: number; api: number }> }>();
   const unpriced = new Map<string, { account: string; model: string; reason: string; tokens: number; calls: number }>();
   const from = `${range.since ?? "2000-01-01"}T00:00:00.000Z`;
   const until = new Date(Date.parse(`${range.until ?? "2099-12-31"}T00:00:00.000Z`) + 86_400_000).toISOString();
@@ -42,9 +42,11 @@ function oracle(db: Database, rates: RateCard, range: { since?: string; until?: 
       }
       const key = `${account}|${event.subject ?? ""}`;
       const row = groups.get(key) ?? { account, subject: event.subject ?? null, tokens: 0, calls: 0,
-        types: { in_uncached: 0, cache_read: 0, cache_write: 0, out: 0 }, api: 0, byType: { in_uncached: 0, cache_read: 0, cache_write: 0, out: 0 }, standard: 0 };
+        types: { in_uncached: 0, cache_read: 0, cache_write: 0, out: 0 }, api: 0, byType: { in_uncached: 0, cache_read: 0, cache_write: 0, out: 0 }, standard: 0, models: {} };
       const cost = (bucket: keyof typeof actual.costs) => actual.costs[bucket] ?? 0;
       row.tokens += tokens; row.calls++; row.api += actual.amount;
+      const model = row.models[event.model || "?"] ??= { tokens: 0, calls: 0, api: 0 };
+      model.tokens += tokens; model.calls++; model.api += actual.amount;
       row.types.in_uncached += q.in_uncached; row.types.cache_read += q.in_cache_read; row.types.out += q.out_total;
       row.types.cache_write += q.in_cache_write_5m + q.in_cache_write_1h + q.in_cache_write_unknown;
       row.byType.in_uncached += cost("in_uncached"); row.byType.cache_read += cost("in_cache_read"); row.byType.out += cost("out_total");
@@ -67,6 +69,12 @@ function expectOracle(db: Database, rates: RateCard, range: { since?: string; un
     expect(group.api_usd).toBeCloseTo(want.api, 12);
     for (const type of ["in_uncached", "cache_read", "cache_write", "out"] as const) expect(group.api_usd_by_type[type]).toBeCloseTo(want.byType[type], 12);
     if (want.standard === null) expect(group.standard_usd).toBeNull(); else expect(group.standard_usd!).toBeCloseTo(want.standard, 12);
+    // The model split is the same priced calls by model, so its parts add up to the group.
+    expect(Object.keys(group.models).sort()).toEqual(Object.keys(want.models).sort());
+    for (const [model, slice] of Object.entries(group.models)) {
+      expect([slice.tokens, slice.calls]).toEqual([want.models[model]!.tokens, want.models[model]!.calls]);
+      expect(slice.api_usd).toBeCloseTo(want.models[model]!.api, 12);
+    }
   });
   expect([...usage.unpriced].sort((a, b) => `${a.account}|${a.model}|${a.reason}`.localeCompare(`${b.account}|${b.model}|${b.reason}`)))
     .toEqual(expected.unpriced);
@@ -139,7 +147,14 @@ test("stored project usage equals the priced calls after a late call, a rate cha
     const moved = expectOracle(f.db, rates);
     expect(moved.groups.some(group => group.subject === "p:moved")).toBe(true);
     expect(moved.groups.some(group => group.subject === `p:${PROJECT}`)).toBe(false);
-    expect(buildProjectCost(f.db, rates, new Map(), RANGE).subjects.map(row => row.subject)).toContain("p:moved");
+    const report = buildProjectCost(f.db, rates, new Map(), RANGE);
+    expect(report.subjects.map(row => row.subject)).toContain("p:moved");
+    for (const row of report.subjects) {
+      const parts = Object.values(row.models ?? {});
+      expect(parts.reduce((sum, part) => sum + part.tokens, 0)).toBe(row.tokens);
+      expect(parts.reduce((sum, part) => sum + part.calls, 0)).toBe(row.calls);
+      expect(parts.reduce((sum, part) => sum + part.api_usd, 0)).toBeCloseTo(row.api_usd, 1);
+    }
     expect(changes(f.db)).toBe(written);
   } finally { f.teardown(); }
 }, 60_000);

@@ -4533,5 +4533,21 @@
   "Cache read is part of Input. Cache write is shown separately; its overlap with input is unconfirmed. Total = Input + Output.": "Le cache read fait partie de l’Input. Le cache write est affiché séparément ; son recoupement avec l’entrée n’est pas confirmé. Total = Input + Output.",
   "Input includes cache read and cache write. Total = Input + Output.": "L’Input inclut le cache read et le cache write. Total = Input + Output.",
   "Priced tokens": "Tokens valorisés",
-  "USD / 1M is the API value divided by the priced tokens, input and output together. Cache / input is cache read divided by all input.": "USD / 1M est la valeur API divisée par les tokens valorisés, entrée et sortie ensemble. Cache / input est le cache read divisé par l’ensemble de l’entrée."
+  "USD / 1M is the API value divided by the priced tokens, input and output together. Cache / input is cache read divided by all input.": "USD / 1M est la valeur API divisée par les tokens valorisés, entrée et sortie ensemble. Cache / input est le cache read divisé par l’ensemble de l’entrée.",
+  "About these shares": "À propos de ces parts",
+  "Calls without a price are not included; they are listed in the report's data coverage. A model cannot carry a share of the subscription cost: that cost is known only per subscription.": "Les appels sans prix ne sont pas inclus ; ils figurent dans la couverture des données du rapport. Un modèle ne porte pas de part du coût d'abonnement : ce coût n'est connu que par abonnement.",
+  "Cost and subscriptions": "Coût et abonnements",
+  "Known part only: some subscription has no price for this range": "Partie connue seulement : un abonnement n'a pas de prix pour cette période",
+  "No priced traffic in the selected period.": "Aucun trafic valorisé sur la période choisie.",
+  "Priced tokens of this part": "Tokens valorisés de cette part",
+  "Project details": "Détails du projet",
+  "Share of the known cost from your subscriptions": "Part du coût connu de vos abonnements",
+  "Share of the project's priced tokens": "Part des tokens valorisés du projet",
+  "Share of the project's value at API prices": "Part de la valeur du projet aux prix de l'API",
+  "Summary": "Résumé",
+  "The model split needs a newer server.": "La répartition par modèle nécessite un serveur plus récent.",
+  "Timeline": "Déroulement",
+  "What did it consist of?": "De quoi se composait-il ?",
+  "of API value": "de la valeur API",
+  "Shares of the project's priced traffic in the selected range. The ring shows the share of the value at API prices.": "Parts du trafic valorisé du projet sur la période choisie. L'anneau montre la part de la valeur aux prix de l'API."
 }

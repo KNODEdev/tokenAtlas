@@ -59,6 +59,8 @@ export interface SubjectSubscriptionSlice {
   tokens_by_type: TokenTypeBreakdown;
   usd_by_type: TokenTypeBreakdown | null;
   billed_usd: number | null;
+  /** False when the amount is a known subtotal (sent by servers with dated plan periods). */
+  billed_complete?: boolean;
   billing_unavailable_reasons?: BillingUnavailableReason[];
   share: number;
   calls: number;
@@ -79,6 +81,8 @@ export interface SubjectCost {
   priced_spend_usd: number;
   calls: number;
   by_sub: Record<string, number>;
+  /** Priced traffic by model name; the slices add up to the subject's tokens and api_usd. */
+  models?: Record<string, { tokens: number; calls: number; api_usd: number }>;
   subscriptions: Record<string, SubjectSubscriptionSlice>;
 }
 export interface PlanPeriod {

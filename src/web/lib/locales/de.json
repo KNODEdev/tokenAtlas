@@ -4533,5 +4533,21 @@
   "Cache read is part of Input. Cache write is shown separately; its overlap with input is unconfirmed. Total = Input + Output.": "Cache read ist Teil des Inputs. Cache write wird separat gezeigt; seine Überschneidung mit dem Input ist unbestätigt. Summe = Input + Output.",
   "Input includes cache read and cache write. Total = Input + Output.": "Input enthält Cache read und Cache write. Summe = Input + Output.",
   "Priced tokens": "Bepreiste Tokens",
-  "USD / 1M is the API value divided by the priced tokens, input and output together. Cache / input is cache read divided by all input.": "USD / 1M ist der API-Wert geteilt durch die bepreisten Tokens, Input und Output zusammen. Cache / input ist Cache read geteilt durch den gesamten Input."
+  "USD / 1M is the API value divided by the priced tokens, input and output together. Cache / input is cache read divided by all input.": "USD / 1M ist der API-Wert geteilt durch die bepreisten Tokens, Input und Output zusammen. Cache / input ist Cache read geteilt durch den gesamten Input.",
+  "About these shares": "Zu diesen Anteilen",
+  "Calls without a price are not included; they are listed in the report's data coverage. A model cannot carry a share of the subscription cost: that cost is known only per subscription.": "Aufrufe ohne Preis sind nicht enthalten; sie stehen in der Datenabdeckung des Berichts. Ein Modell trägt keinen Anteil an den Abonnementkosten: Diese Kosten sind nur je Abonnement bekannt.",
+  "Cost and subscriptions": "Kosten und Abonnements",
+  "Known part only: some subscription has no price for this range": "Nur der bekannte Teil: Ein Abonnement hat für diesen Zeitraum keinen Preis",
+  "No priced traffic in the selected period.": "Kein bepreister Traffic im gewählten Zeitraum.",
+  "Priced tokens of this part": "Bepreiste Tokens dieses Teils",
+  "Project details": "Projektdetails",
+  "Share of the known cost from your subscriptions": "Anteil an den bekannten Kosten deiner Abonnements",
+  "Share of the project's priced tokens": "Anteil an den bepreisten Tokens des Projekts",
+  "Share of the project's value at API prices": "Anteil am Wert des Projekts zu API-Preisen",
+  "Summary": "Übersicht",
+  "The model split needs a newer server.": "Die Aufteilung nach Modell braucht einen neueren Server.",
+  "Timeline": "Verlauf",
+  "What did it consist of?": "Woraus bestand es?",
+  "of API value": "des API-Werts",
+  "Shares of the project's priced traffic in the selected range. The ring shows the share of the value at API prices.": "Anteile am bepreisten Traffic des Projekts im gewählten Zeitraum. Der Ring zeigt den Anteil am Wert zu API-Preisen."
 }

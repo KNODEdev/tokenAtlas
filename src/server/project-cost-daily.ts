@@ -1,5 +1,5 @@
 import { isReadonlyConnection, type Database } from "../db/sqlite";
-import type { ProjectCostDailyAggregate, DailyBucket, DailyUnpriced, DailyTokenCalls, TokenTypeBreakdown } from "./project-cost-contracts";
+import type { ProjectCostDailyAggregate, DailyBucket, DailyUnpriced, DailyTokenCalls, ModelSlice, TokenTypeBreakdown } from "./project-cost-contracts";
 import { ACCOUNT_PERIODS, loadPeriods } from "../db/period-store";
 import { codexLedgerFactsPending } from "../db/read-freshness";
 import { usageLedgerClock } from "./usage-ledger-producer";
@@ -9,7 +9,7 @@ import type { Rational } from "../db/price-ledger-exact";
 import { codexLedgerApiTokenAmounts, ledgerPresentationNumber, codexLedgerReadContext, codexLedgerPendingReason, codexLedgerReadStamp } from "../db/codex-ledger-adapters";
 import { rational, add } from "../db/price-ledger-exact";
 import { readLedgerSums, requireUsageLedgerSums, sumTokens } from "./ledger-sums";
-import { addTypes, zeroTypes } from "./project-cost-values";
+import { addModels, addTypes, zeroTypes } from "./project-cost-values";
 import { readProjectCodexRows, codexPlanRow } from "./project-cost-codex";
 import { readCodexLedgerState } from "../db/codex-ledger-state";
 import { SubscriptionFactsPending } from "../db/subscription-facts";
@@ -70,7 +70,8 @@ function buildDailyAggregate(
     calls: number,
     tokens: number,
     tt: TokenTypeBreakdown,
-    tu: TokenTypeBreakdown | null
+    tu: TokenTypeBreakdown | null,
+    models: Record<string, ModelSlice>
   ) => {
     if (!Number.isFinite(usd)) return;
     const key = subject ?? "";
@@ -86,8 +87,9 @@ function buildDailyAggregate(
         if (!current.tu) current.tu = zeroTypes();
         addTypes(current.tu, tu);
       }
+      addModels(current.models ??= {}, models);
     } else {
-      const created = { day, subId, subject: key, vendor, basis, api_usd: usd, calls, tokens, tt, tu };
+      const created = { day, subId, subject: key, vendor, basis, api_usd: usd, calls, tokens, tt, tu, models };
       days.set(day, created);
       bucketOrder.push(created);
     }
@@ -129,7 +131,8 @@ function buildDailyAggregate(
   if (codex) {
     const { rows, ledger } = codex;
     const exactBuckets = new Map<string, { day:string; subId:string; subject:string|null; amount:Rational; calls:number; tokens:number;
-      tt:TokenTypeBreakdown; tu:Record<keyof TokenTypeBreakdown,Rational> }>();
+      tt:TokenTypeBreakdown; tu:Record<keyof TokenTypeBreakdown,Rational>;
+      models:Map<string,{amount:Rational;calls:number;tokens:number}> }>();
     for (const { group, account } of rows) {
       const planned = codexPlanRow(group, account);
       if (!planned) continue;
@@ -145,8 +148,11 @@ function buildDailyAggregate(
       const typed = codexLedgerApiTokenAmounts(sqlite, group, ledger)!;
       const key = JSON.stringify([row.day,subId,row.subject]);
       const sum = exactBuckets.get(key) ?? { day:row.day,subId,subject:row.subject,amount:rational(0n),calls:0,tokens:0,
-        tt:zeroTypes(),tu:{in_uncached:rational(0n),cache_read:rational(0n),cache_write:rational(0n),out:rational(0n)} };
+        tt:zeroTypes(),tu:{in_uncached:rational(0n),cache_read:rational(0n),cache_write:rational(0n),out:rational(0n)},models:new Map() };
       sum.amount = add(sum.amount,value); sum.calls += calls; sum.tokens += rowTok;
+      const modelSum = sum.models.get(row.model || "?") ?? { amount:rational(0n),calls:0,tokens:0 };
+      modelSum.amount = add(modelSum.amount,value); modelSum.calls += calls; modelSum.tokens += rowTok;
+      sum.models.set(row.model || "?",modelSum);
       const counts = { in_uncached:Number(group.tokens.in_uncached),cache_read:Number(group.tokens.in_cache_read),
         cache_write:Number(group.tokens.in_cache_write_unknown),out:Number(group.tokens.out_total) };
       addTypes(sum.tt,counts);
@@ -156,7 +162,8 @@ function buildDailyAggregate(
     for (const sum of exactBuckets.values()) addBucket(sum.day,sum.subId,"codex","rate-card",sum.subject,
       ledgerPresentationNumber(sum.amount),sum.calls,sum.tokens,sum.tt,
       {in_uncached:ledgerPresentationNumber(sum.tu.in_uncached),cache_read:ledgerPresentationNumber(sum.tu.cache_read),
-        cache_write:ledgerPresentationNumber(sum.tu.cache_write),out:ledgerPresentationNumber(sum.tu.out)});
+        cache_write:ledgerPresentationNumber(sum.tu.cache_write),out:ledgerPresentationNumber(sum.tu.out)},
+      Object.fromEntries([...sum.models].map(([model,part])=>[model,{tokens:part.tokens,calls:part.calls,api_usd:ledgerPresentationNumber(part.amount)}])));
   }
   // Claude's traffic comes from the shared, account-scoped fact index and the registered
   // valuations in claude-project-usage, so duplicate copies of one call are never priced twice.

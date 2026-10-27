@@ -12,7 +12,7 @@ import type {
   SubjectSubscriptionSlice,
   SubscriptionSpend,
 } from "../lib/api";
-import { ProjectDrawer } from "./ProjectDrawer";
+import { ProjectDrawer, type ProjectDrawerTab } from "./ProjectDrawer";
 import { historyForRequest } from "./project-drawer/history";
 import { ProjectMixChart } from "./project-drawer/ProjectMixChart";
 import { ProjectTimeChart } from "./project-drawer/ProjectTimeChart";
@@ -658,7 +658,7 @@ function drawerCost(subject: SubjectCost, subscriptions: SubscriptionSpend[]): P
     notes: [],
   };
 }
-function renderDrawer(cost: ProjectCostResponse): string {
+function renderDrawer(cost: ProjectCostResponse, tab: ProjectDrawerTab = "summary"): string {
   return renderToStaticMarkup(
     <ProjectDrawer
       subject={drawerSubject}
@@ -669,6 +669,7 @@ function renderDrawer(cost: ProjectCostResponse): string {
       rangeDays={30}
       idleGap={15}
       onClose={() => {}}
+      initialTab={tab}
     />,
   );
 }
@@ -684,9 +685,9 @@ it("uses roster account names throughout project MIX while preserving separate s
   const subscriptions = Object.fromEntries(ids.map(id => [id, drawerSlice(5)]));
   const cost = drawerCost(drawerSubjectCost({ subscriptions, billed_usd: 10, billed_complete: true }), spends);
   const before = JSON.stringify(cost);
-  const html = renderToStaticMarkup(<ProjectDrawer subject={drawerSubject} cost={cost} cards={cards}
-    since={cost.since!} rangeDays={30} idleGap={15} onClose={() => {}} />);
-  // The split table and the what-if table, open by default since 20.10, each name the subscription once per row.
+  const html = (["cost", "simulation"] as const).map(tab => renderToStaticMarkup(<ProjectDrawer subject={drawerSubject} cost={cost} cards={cards}
+    since={cost.since!} rangeDays={30} idleGap={15} onClose={() => {}} initialTab={tab} />)).join("");
+  // The split table (Cost tab) and the what-if table (Simulation tab) each name the subscription once per row.
   expect((html.match(/>owner@example.com</g) ?? []).length).toBe(4);
   for (const id of ids) expect(html).not.toContain(id);
   expect(JSON.stringify(cost)).toBe(before);
@@ -723,17 +724,16 @@ describe("ProjectDrawer subject billed completeness", () => {
     expect(html).not.toContain("$0.00");
   });
   it("renders a mixed known subtotal as incomplete and keeps the null member", () => {
-    const html = renderDrawer(
-      drawerCost(
-        drawerSubjectCost({
-          billed_usd: 5.5,
-          billed_complete: false,
-          share_of_priced_spend_pct: 40,
-          subscriptions: { grok: drawerSlice(null, 163.23), codex1: drawerSlice(5.5, 10) },
-        }),
-        [drawerSpend("codex1", "codex", 5.5), drawerSpend("grok", "grok", null)],
-      ),
+    const cost = drawerCost(
+      drawerSubjectCost({
+        billed_usd: 5.5,
+        billed_complete: false,
+        share_of_priced_spend_pct: 40,
+        subscriptions: { grok: drawerSlice(null, 163.23), codex1: drawerSlice(5.5, 10) },
+      }),
+      [drawerSpend("codex1", "codex", 5.5), drawerSpend("grok", "grok", null)],
     );
+    const html = renderDrawer(cost) + renderDrawer(cost, "cost");
     expect(html).toContain("$5.50");
     expect(html).toContain("data-billed-incomplete");
     expect(html).toContain("incomplete");
@@ -757,10 +757,10 @@ describe("ProjectDrawer subject billed completeness", () => {
     expect(html).toContain("$0.00");
     expect(html).not.toContain("data-billed-incomplete");
     expect(html).not.toContain("data-billed-unavailable");
-    // The billed figures above the what-if section carry no incompleteness; what-if capacity states are its own.
-    const billed = html.split('data-section="what-if"')[0]!;
-    expect(billed).not.toContain("incomplete");
-    expect(billed).not.toContain("unavailable");
+    // The Summary's billed figures carry no incompleteness; what-if capacity states live on the Simulation tab.
+    expect(html).not.toContain('data-section="what-if"');
+    expect(html).not.toContain("incomplete");
+    expect(html).not.toContain("unavailable");
   });
 
   it("explains account conflicts for an incomplete allocation and keeps the old no-field behavior", () => {
@@ -832,36 +832,67 @@ describe("ProjectDrawer views", () => {
       { plan: "pro", usd_per_month: 200, from: "2026-08-06", until: "2026-08-10", days: 5, usd: 33, source: "observed" },
     ],
   });
-  // IA-2026-10-19 v1.1 adds the collapsed plan simulation as the last question of a project's drawer.
-  it("answers in one scroll of five questions, in order, without tabs or a visible glossary", () => {
+  // IA-2026-10-19 PR-2: Summary, Timeline, Cost and subscriptions, Plan simulation, one panel open at a time.
+  it("splits the drawer into four page tabs, each with its own questions", () => {
     const cost = drawerCost(
       drawerSubjectCost({ billed_usd: 5.5, billed_complete: true, subscriptions: { codex1: drawerSlice(5.5, 10) } }),
       [drawerSpend("codex1", "codex", 5.5)],
     );
-    const html = renderDrawer(cost);
-    expect(html).not.toContain('role="tablist"');
-    expect(html).not.toContain('role="tab"');
-    const order = [...html.matchAll(/data-section="([^"]+)"/g)].map((m) => m[1]);
-    expect(order).toEqual(["cost", "time", "subscriptions", "what-if", "plan"]);
-    const questions = [
-      "How much did this project cost?",
-      "How did it spread over time?",
-      "Which subscriptions carried it?",
-      "What if all traffic went through one subscription?",
-    ];
-    const at = questions.map((q) => html.indexOf(q));
-    expect(at.every((i) => i >= 0)).toBe(true);
-    expect([...at].sort((a, b) => a - b)).toEqual(at);
-    // History is in the same scroll (still loading in a static render), with its controls in the section head.
-    expect(html).toContain("Loading usage history");
-    expect(html).toContain("values visible");
+    const sections = (html: string) => [...html.matchAll(/data-section="([^"]+)"/g)].map((m) => m[1]);
+    const summary = renderDrawer(cost);
+    expect(summary.match(/role="tab"/g)).toHaveLength(4);
+    expect([...summary.matchAll(/role="tab"[^>]*>([^<]+)</g)].map((m) => m[1])).toEqual(["Summary", "Timeline", "Cost and subscriptions", "Plan simulation"]);
+    expect(summary).toMatch(/aria-selected="true" data-detail-tab="summary"/);
+    expect(sections(summary)).toEqual(["cost", "shares"]);
+    const timeline = renderDrawer(cost, "timeline");
+    expect(sections(timeline)).toEqual(["time"]);
+    // History is still loading in a static render; its controls stay in the section head.
+    expect(timeline).toContain("Loading usage history");
+    expect(timeline).toContain("values visible");
+    const split = renderDrawer(cost, "cost");
+    expect(sections(split)).toEqual(["subscriptions"]);
     // Capacity columns, the old glossary and the plan cards are not on screen by default.
-    expect(html).toContain("more columns");
-    expect(html).not.toContain("5h sessions");
-    expect(html).not.toContain("weekly / monthly subs.");
-    expect(html).not.toContain("Compare all plans");
-    expect(html).not.toContain("Purchased subscription time");
-    expect(html).not.toContain("convert all traffic to a subscription");
+    expect(split).toContain("more columns");
+    expect(split).not.toContain("5h sessions");
+    expect(split).not.toContain("weekly / monthly subs.");
+    expect(split).not.toContain("Purchased subscription time");
+    expect(split).not.toContain("convert all traffic to a subscription");
+    // The simulation tab opens both hypothetical answers without a fold; a project also gets the plan simulation.
+    const simulation = renderToStaticMarkup(
+      <ProjectDrawer subject={drawerSubject} cost={cost} since={cost.since!} rangeDays={30} idleGap={15} onClose={() => {}} initialTab="simulation" />,
+    );
+    expect(sections(simulation)).toEqual(["what-if", "plan"]);
+    expect(simulation).toContain("What if all traffic went through one subscription?");
+    expect(simulation).toContain("Preparing project choices");
+  });
+  it("shows the priced traffic split by provider and by model on the Summary", () => {
+    const cost = drawerCost(
+      drawerSubjectCost({
+        tokens: 300, api_usd: 40, billed_usd: 5.5, billed_complete: false,
+        subscriptions: { codex1: drawerSlice(5.5, 30), claude1: { ...drawerSlice(null, 10), tokens: 200 } },
+        models: { "gpt-5.5": { tokens: 100, calls: 1, api_usd: 30 }, "claude-opus-5-5": { tokens: 200, calls: 1, api_usd: 10 } },
+      }),
+      [drawerSpend("codex1", "codex", 5.5), drawerSpend("claude1", "claude", null)],
+    );
+    const html = renderDrawer(cost);
+    const providers = html.slice(html.indexOf('data-shares="providers"'), html.indexOf('data-shares="models"'));
+    expect([...providers.matchAll(/data-share-row="([^"]+)"/g)].map((m) => m[1])).toEqual(["codex", "claude"]);
+    expect(providers).toContain(">Codex<");
+    expect(providers).toContain(">75.0%<");
+    expect(providers).toContain(">66.7%<");
+    // A provider without a price shows absence, never $0, and takes no share of the known cost.
+    expect(providers).toContain("no price");
+    expect(providers).toContain(">100.0%<");
+    // The ring draws one arc per part, largest API value first, with the total in its middle.
+    expect([...providers.matchAll(/data-share-arc="([^"]+)"/g)].map((m) => m[1])).toEqual(["codex", "claude"]);
+    expect(providers).toContain(">$40.00<");
+    const models = html.slice(html.indexOf('data-shares="models"'));
+    expect([...models.matchAll(/data-share-row="([^"]+)"/g)].map((m) => m[1])).toEqual(["gpt-5.5", "claude-opus-5-5"]);
+    expect(models).not.toContain("subscriptions");
+    // An older server without the model split says so instead of an empty table.
+    const older = renderDrawer(drawerCost(drawerSubjectCost({ billed_usd: 5.5, billed_complete: true, subscriptions: { codex1: drawerSlice(5.5, 10) } }),
+      [drawerSpend("codex1", "codex", 5.5)]));
+    expect(older).toContain("The model split needs a newer server.");
   });
   it("opens with a plain summary sentence and the subscription cost as the main figure", () => {
     const cost = drawerCost(
@@ -885,7 +916,8 @@ describe("ProjectDrawer views", () => {
       drawerSubjectCost({ billed_usd: 5.5, billed_complete: true, subscriptions: { codex1: drawerSlice(5.5, 10) } }),
       [planSpend()],
     );
-    const html = renderDrawer(cost);
+    // The chip on the what-if row names the current plan; the split row's chip carries the periods.
+    const html = renderDrawer(cost, "cost") + renderDrawer(cost, "simulation");
     expect(html).toContain(">Pro · ×20<");
     const tip = html.match(/<span title="(plan from account periods[^"]*)"/)?.[1] ?? "";
     expect(tip).toContain("Plus · ×1 · $20.00 · declaration");
@@ -896,13 +928,14 @@ describe("ProjectDrawer views", () => {
       drawerCost(drawerSubjectCost({ billed_usd: 5.5, billed_complete: true, subscriptions: { codex1: drawerSlice(5.5, 10) } }), [
         drawerSpend("codex1", "codex", 5.5),
       ]),
+      "simulation",
     );
     expect(bare).toContain("Price falls back to rate-cards.json.");
     // A stretch priced from a billing cycle shows the payment, its USD equivalent and the NBP rate behind it.
     const paid = planSpend();
     paid.plan_periods[1] = { ...paid.plan_periods[1]!, cycle: { start: "2026-08-06T00:00:00.000Z", end: "2026-09-06T00:00:00.000Z", source: "repeated",
       amount: 813, currency: "PLN", usd: 208.72, fx: { currency: "PLN", day: "2026-08-06", rate: 1, usd_rate: 3.8952, effective_day: "2026-08-05", table: "151/A/NBP/2026" } } };
-    const cycled = renderDrawer(drawerCost(drawerSubjectCost({ billed_usd: 5.5, billed_complete: true, subscriptions: { codex1: drawerSlice(5.5, 10) } }), [paid]));
+    const cycled = renderDrawer(drawerCost(drawerSubjectCost({ billed_usd: 5.5, billed_complete: true, subscriptions: { codex1: drawerSlice(5.5, 10) } }), [paid]), "cost");
     expect(cycled.match(/<span title="(plan from account periods[^"]*)"/)?.[1]).toContain("Pro · ×20 · 813.00 PLN ≈ $208.72 (NBP 2026-08-05, 3.8952) / cycle · repeated payment");
   });
   it("lists one what-if row per subscription, measured first, with a measurement tag for the rest", () => {

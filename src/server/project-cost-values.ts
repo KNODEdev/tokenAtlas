@@ -1,4 +1,4 @@
-import type { TokenTypeBreakdown } from "./project-cost-contracts";
+import type { ModelSlice, TokenTypeBreakdown } from "./project-cost-contracts";
 import { round2 } from "./pricing";
 
 const DAYS_PER_MONTH = 30.44;
@@ -12,6 +12,16 @@ export function addTypes(target: TokenTypeBreakdown, src: TokenTypeBreakdown): v
   target.cache_read += src.cache_read;
   target.cache_write += src.cache_write;
   target.out += src.out;
+}
+
+/** Adds each model's slice of `src` into `target`. */
+export function addModels(target: Record<string, ModelSlice>, src: Record<string, ModelSlice> | undefined): void {
+  for (const [model, slice] of Object.entries(src ?? {})) {
+    const current = target[model] ??= { tokens: 0, calls: 0, api_usd: 0 };
+    current.tokens += slice.tokens;
+    current.calls += slice.calls;
+    current.api_usd += slice.api_usd;
+  }
 }
 
 export function roundTypes(t: TokenTypeBreakdown, digits: 2 | 4): TokenTypeBreakdown {

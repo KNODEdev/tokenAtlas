@@ -9,6 +9,7 @@ import { ownedAccounts, ownedRegisterRows, presentedReason } from "./stored-hist
 import { currentProjectRules, placeSubject } from "../projects/rules-now";
 import { TOKEN_BUCKETS, type TokenBucket } from "./subscription-accounting-adapters";
 import type { RateCard } from "./pricing";
+import type { ModelSlice } from "./project-cost-contracts";
 
 /**
  * Project traffic and money of the shared-ledger providers (Claude, Grok, GLM plan calls) for the project cost report, from
@@ -30,6 +31,8 @@ export interface ProjectUsageGroup {
   api_usd: number; api_usd_by_type: ProjectTokenTypes;
   /** Standard-mode API equivalent of the same calls; null when any of them has no Standard price. */
   standard_usd: number | null;
+  /** The same priced calls by model. */
+  models: Record<string, ModelSlice>;
 }
 /** Calls whose actual-mode price is unknown, never valued as zero, with the account that owns them. */
 export interface ProjectUnpricedGroup { account: string; model: string; reason: string; tokens: number; calls: number }
@@ -63,7 +66,8 @@ const TYPE_OF: Record<TokenBucket, keyof ProjectTokenTypes> = { in_uncached: "in
   in_cache_write_5m: "cache_write", in_cache_write_1h: "cache_write", in_cache_write_unknown: "cache_write", out_total: "out" };
 
 type Exact = { subject: string | null; firstDay: string; tokens: number; calls: number; types: Record<keyof ProjectTokenTypes, number>;
-  actual: bigint; byType: Record<keyof ProjectTokenTypes, bigint>; standard: bigint | null };
+  actual: bigint; byType: Record<keyof ProjectTokenTypes, bigint>; standard: bigint | null;
+  models: Map<string, { tokens: number; calls: number; actual: bigint }> };
 const zero = () => ({ in_uncached: 0, cache_read: 0, cache_write: 0, out: 0 });
 const zeroExact = () => ({ in_uncached: 0n, cache_read: 0n, cache_write: 0n, out: 0n });
 
@@ -82,7 +86,7 @@ export function storedProjectUsage(db: Database, provider: "claude" | ProjectFac
   const groupOf = (account: string, subject: string | null, day: string): Exact => {
     const byAccount = groups.get(account) ?? groups.set(account, new Map()).get(account)!;
     let group = byAccount.get(subject ?? "");
-    if (!group) byAccount.set(subject ?? "", group = { subject, firstDay: day, tokens: 0, calls: 0, types: zero(), actual: 0n, byType: zeroExact(), standard: 0n });
+    if (!group) byAccount.set(subject ?? "", group = { subject, firstDay: day, tokens: 0, calls: 0, types: zero(), actual: 0n, byType: zeroExact(), standard: 0n, models: new Map() });
     if (day < group.firstDay) group.firstDay = day;
     return group;
   };
@@ -94,8 +98,8 @@ export function storedProjectUsage(db: Database, provider: "claude" | ProjectFac
     unpriced.set(key, item);
   };
   /** Priced calls of one row (or one call): bucket sums valued at the key's stored rates, which must add up to the stored amount. */
-  const addPriced = (group: Exact, counts: Record<TokenBucket, number>, calls: number, key: number, actual: bigint, standard: bigint | null) => {
-    const keyed = ratesOf(key), byType = zeroExact();
+  const addPriced = (group: Exact, model: string | null, counts: Record<TokenBucket, number>, calls: number, key: number, actual: bigint, standard: bigint | null) => {
+    const keyed = ratesOf(key), byType = zeroExact(), tokensBefore = group.tokens;
     for (const bucket of TOKEN_BUCKETS) {
       const quantity = counts[bucket];
       if (!quantity) continue;
@@ -110,6 +114,9 @@ export function storedProjectUsage(db: Database, provider: "claude" | ProjectFac
     for (const type of ["in_uncached", "cache_read", "cache_write", "out"] as const) group.byType[type] += byType[type];
     group.calls = safeCount(group.calls + calls, "priced call sum");
     group.actual += actual;
+    const modelSum = group.models.get(model || "?") ?? { tokens: 0, calls: 0, actual: 0n };
+    modelSum.tokens += group.tokens - tokensBefore; modelSum.calls += calls; modelSum.actual += actual;
+    group.models.set(model || "?", modelSum);
     group.standard = group.standard === null || standard === null ? null : group.standard + standard;
   };
   /** A row the sums cannot split, from its own calls the account owns (the stored valuation of each). */
@@ -124,7 +131,7 @@ export function storedProjectUsage(db: Database, provider: "claude" | ProjectFac
         addUnpriced(account, call.model, call.act_reason, safeCount(TOKEN_BUCKETS.reduce((sum, bucket) => sum + counts[bucket], 0), "call tokens"), 1);
         continue;
       }
-      addPriced(groupOf(account, subject, day), counts, 1, call.act_key!, limbsFemto(call.act_usd, call.act_nano, call.act_femto),
+      addPriced(groupOf(account, subject, day), call.model, counts, 1, call.act_key!, limbsFemto(call.act_usd, call.act_nano, call.act_femto),
         call.std_reason === null ? limbsFemto(call.std_usd, call.std_nano, call.std_femto) : null);
     }
   };
@@ -161,7 +168,7 @@ export function storedProjectUsage(db: Database, provider: "claude" | ProjectFac
     }
     const tokens = decodeTokens(row.tokens);
     const counts = Object.fromEntries(TOKEN_BUCKETS.map(bucket => [bucket, Number(tokens[bucket] ?? 0)])) as Record<TokenBucket, number>;
-    addPriced(groupOf(account, subject, row.day), counts, priced, key!, femtoOf(actual!.pricedSubtotal),
+    addPriced(groupOf(account, subject, row.day), dim.model, counts, priced, key!, femtoOf(actual!.pricedSubtotal),
       Number(standard?.unpricedEvents ?? 0) > 0 ? null : femtoOf(standard?.pricedSubtotal ?? "0"));
   }
   Object.assign(usage, ownedAccounts(provider, owned, active));
@@ -174,7 +181,8 @@ export function storedProjectUsage(db: Database, provider: "claude" | ProjectFac
       tokens_by_type: group.types, api_usd: usdOf(group.actual),
       api_usd_by_type: { in_uncached: usdOf(group.byType.in_uncached), cache_read: usdOf(group.byType.cache_read),
         cache_write: usdOf(group.byType.cache_write), out: usdOf(group.byType.out) },
-      standard_usd: group.standard === null ? null : usdOf(group.standard) });
+      standard_usd: group.standard === null ? null : usdOf(group.standard),
+      models: Object.fromEntries([...group.models].map(([model, sum]) => [model, { tokens: sum.tokens, calls: sum.calls, api_usd: usdOf(sum.actual) }])) });
   }
   usage.unpriced = [...unpriced.values()].sort((a, b) =>
     a.account.localeCompare(b.account) || a.model.localeCompare(b.model) || a.reason.localeCompare(b.reason));

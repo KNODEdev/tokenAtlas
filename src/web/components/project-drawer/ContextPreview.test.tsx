@@ -29,7 +29,7 @@ test("the drawer's own history request lazily fetches its companion only while O
   try {
     setContextPreview(false);
     await act(async () => root.render(<ContextReportScreen.Provider value="projects"><ProjectDrawer subject={{ kind: "project", id: "context-fixture", name: "Context fixture", group: null,
-      tokens: 10, calls: 1, active_seconds: 0, repos: [] }} cost={null} rangeDays={1} idleGap={15} onClose={()=>{}} /></ContextReportScreen.Provider>));
+      tokens: 10, calls: 1, active_seconds: 0, repos: [] }} cost={null} rangeDays={1} idleGap={15} onClose={()=>{}} initialTab="timeline" /></ContextReportScreen.Provider>));
     expect(dom.host.textContent).toContain("preview total 1");
     await act(async () => setContextPreview(true)); expect(dom.host.textContent).toContain("preview total 2");
     await act(async () => setContextPreview(false)); expect(dom.host.textContent).toContain("preview total 1");
