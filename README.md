@@ -1,23 +1,54 @@
 # tokenAtlas
 
-Choose the local database folder during setup or in Settings. The installation saves that
-choice in private `tokenatlas.local.json`; machine identity and local preferences live in
-`local-state/` beside the selected database. Moving the database through Settings also copies
-that state and keeps the original as recovery evidence. Existing managed `.env` selections
-are migrated automatically; manual environment setup is not required.
-
 Desktop analytics for AI coding usage: compare models, projects, subscriptions,
 billing cycles and observed limits from one local history.
 
+Explore the product and illustrated guide at [tokenatlas.dev](https://tokenatlas.dev/).
+
 This is the initial public source snapshot, under active development. See
 [VERIFICATION.md](VERIFICATION.md) for the locally checked scope and limitations.
+
+## What you can explore
+
+- Usage by model and project, including token counts and cache usage.
+- Subscription costs, billing cycles and observed usage limits.
+- API-equivalent costs alongside allocated subscription costs.
+- Model speed and time to first token, where the source provides verified measurements.
 
 tokenAtlas keeps provider originals in an archive and calculates a local SQLite
 register incrementally. The dashboard reads prepared results. API-equivalent
 cost, allocated subscription cost and provider-reported percentages are distinct
 measures; missing evidence is not treated as zero or an invoice.
 
-- Website and illustrated guide: [tokenatlas.dev](https://tokenatlas.dev/)
+## Existing integrations
+
+The source includes integrations for Codex, Claude Code, OpenCode, Grok and
+Gemini / Antigravity. Integration coverage varies by tool and available source data;
+inclusion does not mean that every metric or quota reader is available.
+
+Gemini / Antigravity and Grok already have import and limit-reading components,
+with further work planned below. Gemini CLI account discovery does not currently
+have a connected quota reader. Verified time-to-first-token measurements are
+currently available for Codex; other sources remain unmeasured for this metric.
+
+## Planned development
+
+We are developing tokenAtlas into a shared place to compare usage across AI tools:
+
+- **Refine Gemini / Antigravity and Grok integrations:** improve data collection,
+  limit readings and measurement coverage.
+- **Expand integrations:** bring in measurements from additional tools and providers,
+  and extend coverage of their models.
+- **Extend performance measurements:** broaden speed and time-to-first-token
+  coverage where sources provide reliable evidence.
+
+These are development directions, with no committed release dates. Integrations
+will expand incrementally as provider data becomes available and can be verified.
+Suggest a source or describe a missing measurement in
+[GitHub Issues](https://github.com/KNODEdev/tokenAtlas/issues).
+
+## Project information
+
 - License: [Apache-2.0](LICENSE), with attribution in [NOTICE](NOTICE)
 - Data handling: [PRIVACY.md](PRIVACY.md)
 - Private vulnerability reports: [SECURITY.md](SECURITY.md)
@@ -49,6 +80,12 @@ checked with the versions recorded in [VERIFICATION.md](VERIFICATION.md).
 An existing `.env` is not required. `.env.example` documents optional overrides.
 OneDrive is optional. Keep the database on local storage, outside the source
 archive. Never import another user's account declarations or database.
+
+Choose the local database folder during setup or in Settings. The installation saves that
+choice in private `tokenatlas.local.json`; machine identity and local preferences live in
+`local-state/` beside the selected database. Moving the database through Settings also copies
+that state and keeps the original as recovery evidence. Existing managed `.env` selections
+are migrated automatically; manual environment setup is not required.
 
 Do not expose the local API to a public network. Provider sessions and archives
 can contain conversation text and credentials; review [PRIVACY.md](PRIVACY.md)
