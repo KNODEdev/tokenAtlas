@@ -51,9 +51,17 @@ function cost(): ProjectCostResponse {
   } as unknown as ProjectCostResponse;
 }
 
+function weekly(): RepoHistory {
+  return {
+    subject: { kind: "project", id: "selected-private-id" }, granularity: "week", since: null,
+    points: [{ bucket: "2026-09-28", api_usd: 16, active_seconds: 33.25, by_sub: { PRIVATE_CODEX: { api_usd: 10, billed_usd: 2 }, "claude-PRIVATE": { api_usd: 4, billed_usd: null },
+      "codex-PRIVATE-2": { api_usd: 1.5, billed_usd: null }, "codex?": { api_usd: 0.5, billed_usd: null }, "codex-NEW": { api_usd: 0, billed_usd: null } } }],
+  } as unknown as RepoHistory;
+}
+
 test("the drawer summary compares subscription cost with API value under per-vendor letters", () => {
   const all = publicBuildPeriod(history(), "selected-private-id", "2026-10-26");
-  const result = publicDrawerSummary(cost(), "selected-private-id", all);
+  const result = publicDrawerSummary(cost(), "selected-private-id", all, weekly());
   expect(result).toMatchObject({ since: "2026-10-01", until: "2026-10-26", paidUsd: 2.5, paidComplete: false, apiUsd: 16, tokens: 300, calls: 9, activeSeconds: 33.25 });
   expect(result.subscriptions).toEqual([
     { vendor: "codex", label: "A", paidUsd: 2, paidComplete: true, apiUsd: 10, tokens: 100 },
@@ -61,9 +69,12 @@ test("the drawer summary compares subscription cost with API value under per-ven
     { vendor: "codex", label: "B", paidUsd: null, paidComplete: false, apiUsd: 1.5, tokens: 50 },
     { vendor: "codex", label: null, paidUsd: null, paidComplete: false, apiUsd: 0.5, tokens: 30 },
   ]);
-  for (const secret of ["PRIVATE", "selected-private-id", "codex?"]) expect(JSON.stringify(result)).not.toContain(secret);
+  expect(result.weeks).toEqual([{ week: "2026-09-28", apiUsd: 16, activeSeconds: 33, bySub: { "codex:A": 10, "claude:A": 4, "codex:B": 1.5, "codex:?": 0.5 } }]);
+  for (const secret of ["PRIVATE", "selected-private-id", "codex?", "NEW"]) expect(JSON.stringify(result)).not.toContain(secret);
   const ranged = cost(); (ranged as { since: string | null }).since = "2026-10-01";
-  expect(() => publicDrawerSummary(ranged, "selected-private-id", all)).toThrow("all-time");
+  expect(() => publicDrawerSummary(ranged, "selected-private-id", all, weekly())).toThrow("all-time");
   const wrong = cost(); wrong.subjects[0]!.api_usd = 99;
-  expect(() => publicDrawerSummary(wrong, "selected-private-id", all)).toThrow("reconcile");
+  expect(() => publicDrawerSummary(wrong, "selected-private-id", all, weekly())).toThrow("reconcile");
+  const daily = weekly(); (daily as { granularity: string }).granularity = "day";
+  expect(() => publicDrawerSummary(cost(), "selected-private-id", all, daily)).toThrow("weekly");
 });

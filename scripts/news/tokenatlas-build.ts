@@ -61,10 +61,12 @@ export interface DrawerSummary {
   calls: number;
   activeSeconds: number;
   subscriptions: DrawerSubscription[];
+  /** The drawer's timeline: API value per subscription key ("vendor:letter", "vendor:?" when unidentified) and active time, per UTC week. */
+  weeks: Array<{ week: string; apiUsd: number; bySub: Record<string, number>; activeSeconds: number }>;
 }
 
 /** The project drawer's all-time summary: subscription cost against API value. Accounts become per-vendor letters. */
-export function publicDrawerSummary(cost: ProjectCostResponse, projectId: string, all: BuildPeriod): DrawerSummary {
+export function publicDrawerSummary(cost: ProjectCostResponse, projectId: string, all: BuildPeriod, weekly: RepoHistory): DrawerSummary {
   const subject = cost.subjects.find(item => item.kind === "project" && item.id === projectId);
   if (!subject || cost.since != null) throw new Error("Expected the selected project's all-time cost");
   const vendorOf = new Map(cost.subscriptions.map(item => [item.id, item.vendor]));
@@ -75,19 +77,37 @@ export function publicDrawerSummary(cost: ProjectCostResponse, projectId: string
       if (!Number.isFinite(value) || value < 0) throw new Error("Invalid subscription aggregate");
     }
     // An unidentified account ("codex?") keeps its traffic but gets no letter.
-    return { known: !id.endsWith("?"), vendor, paidUsd: slice.billed_usd, paidComplete: slice.billed_complete !== false && slice.billed_usd != null, apiUsd: slice.api_usd, tokens: slice.tokens };
+    return { id, known: !id.endsWith("?"), vendor, paidUsd: slice.billed_usd, paidComplete: slice.billed_complete !== false && slice.billed_usd != null, apiUsd: slice.api_usd, tokens: slice.tokens };
   }).filter(row => row.apiUsd > 0 || row.tokens > 0).sort((a, b) => b.apiUsd - a.apiUsd || b.tokens - a.tokens);
-  const letters = new Map<string, number>();
-  const subscriptions = rows.map(({ known, ...row }) => {
+  const letters = new Map<string, number>(), keyOf = new Map<string, string>();
+  const subscriptions = rows.map(({ id, known, ...row }) => {
     const index = known ? letters.get(row.vendor) ?? 0 : -1;
     if (known) letters.set(row.vendor, index + 1);
+    keyOf.set(id, `${row.vendor}:${known ? String.fromCharCode(65 + index) : "?"}`);
     return { vendor: row.vendor, label: known ? String.fromCharCode(65 + index) : null, paidUsd: row.paidUsd, paidComplete: row.paidComplete, apiUsd: row.apiUsd, tokens: row.tokens };
   });
   for (const value of [subject.api_usd, subject.tokens, subject.calls]) if (!Number.isFinite(value) || value < 0) throw new Error("Invalid project cost");
   if (subject.billed_usd != null && (!Number.isFinite(subject.billed_usd) || subject.billed_usd < 0)) throw new Error("Invalid subscription cost");
   if (Math.abs(subscriptions.reduce((sum, row) => sum + row.apiUsd, 0) - subject.api_usd) > 0.05) throw new Error("Subscription values do not reconcile with the project");
+  if (weekly.subject.kind !== "project" || weekly.subject.id !== projectId || weekly.granularity !== "week" || weekly.since != null) {
+    throw new Error("Expected the selected project's all-time weekly history");
+  }
+  const weeks = weekly.points.map(point => {
+    const bySub: Record<string, number> = {};
+    for (const [id, part] of Object.entries(point.by_sub)) {
+      if (!Number.isFinite(part.api_usd) || part.api_usd < 0) throw new Error("Invalid weekly value");
+      if (!part.api_usd) continue;
+      // A subscription outside the all-time report (new since it was read) stays unidentified rather than unlabelled.
+      const vendor = vendorOf.get(id) ?? (id.startsWith("codex") ? "codex" : id.startsWith("claude") ? "claude" : null);
+      if (!vendor) throw new Error("Unexpected weekly subscription");
+      const key = keyOf.get(id) ?? `${vendor}:?`;
+      bySub[key] = Math.round(((bySub[key] ?? 0) + part.api_usd) * 100) / 100;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(point.bucket) || !Number.isFinite(point.active_seconds) || point.active_seconds < 0) throw new Error("Invalid weekly bucket");
+    return { week: point.bucket, apiUsd: point.api_usd, bySub, activeSeconds: Math.round(point.active_seconds) };
+  });
   return {
     since: all.since, until: all.until, paidUsd: subject.billed_usd, paidComplete: subject.billed_complete === true,
-    apiUsd: subject.api_usd, tokens: subject.tokens, calls: subject.calls, activeSeconds: all.activeSeconds, subscriptions,
+    apiUsd: subject.api_usd, tokens: subject.tokens, calls: subject.calls, activeSeconds: all.activeSeconds, subscriptions, weeks,
   };
 }

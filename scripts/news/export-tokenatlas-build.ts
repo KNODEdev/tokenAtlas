@@ -34,7 +34,11 @@ export async function exportTokenAtlasBuild(output: string, now = Date.now()) {
       // The project drawer's all-time figures come from the same cost report the app shows.
       const costResponse = handleProjectCost(ctx, new URL("http://local/api/project-cost"));
       if (!costResponse.ok) throw new Error(`Project cost unavailable (${costResponse.status})`);
-      const drawer = publicDrawerSummary(await costResponse.json() as ProjectCostResponse, project.id, periods.all);
+      const weeklyUrl = new URL("http://local/api/repo-history");
+      for (const [key, value] of [["project", project.id], ["by", "none"], ["granularity", "week"], ["idle_gap", "15"], ["until", until]]) weeklyUrl.searchParams.set(key!, value!);
+      const weeklyResponse = await handleRepoHistory(ctx, weeklyUrl);
+      if (!weeklyResponse.ok) throw new Error(`Project timeline unavailable (${weeklyResponse.status})`);
+      const drawer = publicDrawerSummary(await costResponse.json() as ProjectCostResponse, project.id, periods.all, await weeklyResponse.json() as RepoHistory);
       return {
         version: 1 as const, project: "tokenAtlas" as const, generatedAt: new Date(now).toISOString(),
         method: { source: "repo-history", dayBasis: "UTC", modelShare: "tokens", idleGapMinutes: 15,
