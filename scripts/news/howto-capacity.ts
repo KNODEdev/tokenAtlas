@@ -99,6 +99,8 @@ export function publicBillingCycle(cycle: BillingCycle, catalog: PlansCatalog, p
     usedPctWithoutEarly: percent(total - bankedWindows - automaticWindows - otherWindows),
     // Used % of the old window at the moment of an early reset (what the reset discarded is the rest); derived from stored readings.
     earlyResets: { automatic: early.automatic, banked: early.banked, other: early.other },
+    // Banked resets granted in the cycle (the stored count); null without reset-credit readings, never a zero.
+    bankedGranted: cycle.banked_granted ? { count: cycle.banked_granted.count, complete: cycle.banked_granted.complete } : null,
     // Current cycle: the share of the minimal projected capacity used so far (a ceiling of use), and how much of the cycle's time has passed.
     projectionUsedPct: cycle.projection?.used_pct ?? null,
     flags: cycle.flags,
