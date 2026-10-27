@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import type { RepoHistory } from "../../src/server/repo-history";
-import { publicBuildPeriod } from "./tokenatlas-build";
+import type { ProjectCostResponse } from "../../src/server/project-cost";
+import { publicBuildPeriod, publicDrawerSummary } from "./tokenatlas-build";
 
 function history(): RepoHistory {
   return {
@@ -38,4 +39,31 @@ test("known zero stays zero and a partial allocation stays partial", () => {
   const result = publicBuildPeriod(input, "selected-private-id", "2026-10-26");
   expect(result.apiUsd).toBe(0); expect(result.apiComplete).toBe(true);
   expect(result.allocatedUsd).toBe(0); expect(result.allocatedComplete).toBe(false);
+});
+
+function cost(): ProjectCostResponse {
+  const slice = (api_usd: number, billed_usd: number | null, tokens: number, billed_complete = true) => ({ api_usd, billed_usd, billed_complete, tokens });
+  return {
+    since: null, until: null,
+    subscriptions: [{ id: "PRIVATE_CODEX", vendor: "codex" }, { id: "claude-PRIVATE", vendor: "claude" }, { id: "codex-PRIVATE-2", vendor: "codex" }],
+    subjects: [{ subject: "p:selected-private-id", kind: "project", id: "selected-private-id", tokens: 300, calls: 9, api_usd: 16, billed_usd: 2.5, billed_complete: false,
+      by_sub: { PRIVATE_CODEX: 10 }, subscriptions: { PRIVATE_CODEX: slice(10, 2, 100), "claude-PRIVATE": slice(4, 0.5, 120, false), "codex-PRIVATE-2": slice(1.5, null, 50), "codex?": slice(0.5, null, 30) } }],
+  } as unknown as ProjectCostResponse;
+}
+
+test("the drawer summary compares subscription cost with API value under per-vendor letters", () => {
+  const all = publicBuildPeriod(history(), "selected-private-id", "2026-10-26");
+  const result = publicDrawerSummary(cost(), "selected-private-id", all);
+  expect(result).toMatchObject({ since: "2026-10-01", until: "2026-10-26", paidUsd: 2.5, paidComplete: false, apiUsd: 16, tokens: 300, calls: 9, activeSeconds: 33.25 });
+  expect(result.subscriptions).toEqual([
+    { vendor: "codex", label: "A", paidUsd: 2, paidComplete: true, apiUsd: 10, tokens: 100 },
+    { vendor: "claude", label: "A", paidUsd: 0.5, paidComplete: false, apiUsd: 4, tokens: 120 },
+    { vendor: "codex", label: "B", paidUsd: null, paidComplete: false, apiUsd: 1.5, tokens: 50 },
+    { vendor: "codex", label: null, paidUsd: null, paidComplete: false, apiUsd: 0.5, tokens: 30 },
+  ]);
+  for (const secret of ["PRIVATE", "selected-private-id", "codex?"]) expect(JSON.stringify(result)).not.toContain(secret);
+  const ranged = cost(); (ranged as { since: string | null }).since = "2026-10-01";
+  expect(() => publicDrawerSummary(ranged, "selected-private-id", all)).toThrow("all-time");
+  const wrong = cost(); wrong.subjects[0]!.api_usd = 99;
+  expect(() => publicDrawerSummary(wrong, "selected-private-id", all)).toThrow("reconcile");
 });

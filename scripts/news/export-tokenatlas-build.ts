@@ -4,10 +4,11 @@ import { Database } from "../../src/db/sqlite";
 import { activeDatabasePath } from "../../src/db";
 import { withReadSnapshotAsync } from "../../src/db/analysis";
 import { loadProjects } from "../../src/projects/remap";
-import { handleRepoHistory } from "../../src/server/api-projects";
+import { handleProjectCost, handleRepoHistory } from "../../src/server/api-projects";
+import type { ProjectCostResponse } from "../../src/server/project-cost";
 import type { RepoHistory } from "../../src/server/repo-history";
 import { readonlyContext } from "./export-howto-snapshot";
-import { publicBuildPeriod, type BuildPeriod } from "./tokenatlas-build";
+import { publicBuildPeriod, publicDrawerSummary, type BuildPeriod } from "./tokenatlas-build";
 
 export async function exportTokenAtlasBuild(output: string, now = Date.now()) {
   const project = loadProjects().projects.find(item => item.id === "tokenatlas" && item.name === "tokenAtlas");
@@ -30,12 +31,16 @@ export async function exportTokenAtlasBuild(output: string, now = Date.now()) {
         if (!response.ok) throw new Error(`Project history unavailable (${response.status})`);
         periods[key] = publicBuildPeriod(await response.json() as RepoHistory, project.id, until);
       }
+      // The project drawer's all-time figures come from the same cost report the app shows.
+      const costResponse = handleProjectCost(ctx, new URL("http://local/api/project-cost"));
+      if (!costResponse.ok) throw new Error(`Project cost unavailable (${costResponse.status})`);
+      const drawer = publicDrawerSummary(await costResponse.json() as ProjectCostResponse, project.id, periods.all);
       return {
         version: 1 as const, project: "tokenAtlas" as const, generatedAt: new Date(now).toISOString(),
         method: { source: "repo-history", dayBasis: "UTC", modelShare: "tokens", idleGapMinutes: 15,
           allocation: "Shared project history: dated subscription plan costs allocated by API-value usage; not invoice evidence.",
           scope: "Recorded history assigned to the configured tokenAtlas project; not a claim of complete development history." },
-        periods,
+        periods, drawer,
       };
     });
     const changes = db.query("SELECT total_changes() AS n").get() as { n: number };
@@ -46,7 +51,7 @@ export async function exportTokenAtlasBuild(output: string, now = Date.now()) {
     console.log(JSON.stringify({ generatedAt: data.generatedAt, periods: Object.fromEntries(Object.entries(data.periods).map(([key, period]) => [key, {
       since: period.since, until: period.until, apiUsd: period.apiUsd, allocatedUsd: period.allocatedUsd,
       allocatedComplete: period.allocatedComplete, apiComplete: period.apiComplete, calls: period.calls, models: period.models.length,
-    }])), writes: 0 }));
+    }])), drawer: { paidUsd: data.drawer.paidUsd, apiUsd: data.drawer.apiUsd, subscriptions: data.drawer.subscriptions.length }, writes: 0 }));
     return data;
   } finally { db.close(); }
 }
