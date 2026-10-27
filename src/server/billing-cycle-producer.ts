@@ -4,7 +4,7 @@ import { normEraKey, normEraVendor } from "./eras";
 import { PLAN_PERIODS, loadPeriods } from "../db/period-store";
 import { BILLING_ALL_ACCOUNTS, BILLING_BEGINNING, hasBillingCycles, markBillingCyclesDirty } from "../db/billing-cycles";
 import { ANSWER_SCOPE_ALL, ANSWER_SCOPE_NONE } from "../db/window-answers";
-import { cycleIdentity, deriveBillingCycles, type BillingCycleCapacity, type BillingCycleResets, type BillingCycleWindow, type CatalogCyclePrice, type CyclePlanRow,
+import { cycleIdentity, deriveBillingCycles, type BillingCycleBankedGrants, type BillingCycleCapacity, type BillingCycleResets, type BillingCycleWindow, type CatalogCyclePrice, type CyclePlanRow,
   type CycleFx, type DerivedCycle, type FxLookup } from "../shared/billing-cycles";
 import { storedFxLookup } from "../db/fx-rates";
 import { readWindowEndCauses, type WindowEndCauseRow } from "../db/window-end-causes";
@@ -43,8 +43,9 @@ import { resolvePlanFacts, type PlansCatalog } from "../shared/plan-catalog";
  * 16: each cycle reads the main counter of its plan (Free or paid), not the account's longest counter; calibration matches
  * plans by catalog plan id, so "prolite" windows calibrate "pro-5x" cycles (user decisions 21.10).
  * 17: global plan facts price Free at zero while retaining its capacity cycles.
+ * 18: Codex cycles store the banked resets granted in them, from the reset-credit readings (banked-grants.ts).
  */
-export const BILLING_CYCLES_VERSION = 17;
+export const BILLING_CYCLES_VERSION = 18;
 const RULES_KEY = "billing_cycles_rules";
 const MARKS_KEY = "billing_cycles_marks";
 /** How often every account's cycles are derived again to catch the clock and moved evidence. */
@@ -92,6 +93,8 @@ export interface CycleDetail {
   resets?: BillingCycleResets | null;
   /** The cycle's main-counter windows with their end causes, points used and capacity parts (served to one account only). */
   main_windows?: BillingCycleWindow[] | null;
+  /** Banked resets granted in the cycle (Codex); null without reset-credit readings inside it. */
+  banked_granted?: BillingCycleBankedGrants | null;
   /** The price in USD and the conversion behind it (rule 13). */
   price_usd?: number | null;
   fx?: CycleFx | null;
@@ -115,6 +118,7 @@ export function catalogCyclePrice(catalog: PlansCatalog, provider: string): Cata
 
 import { countersOf, isFreePlan, mainCounterFor, mainCounterOf, mainCountersOf, type Counter } from "./main-counter";
 import { pairingBounds } from "./subscription-window-comparison";
+import { bankedGrants, creditReadings } from "./banked-grants";
 import type { ProbeLimitWindow } from "./probe-limit-windows";
 export { mainCounterOf };
 
@@ -246,6 +250,11 @@ class AccountInputs {
     const rows = readWindowPointValues(this.db, this.key.provider, this.key.account, counter);
     this.points.set(counter, rows);
     return rows;
+  }
+  /** Banked resets granted in [start, end) (Codex only); readings from a day before anchor the count. */
+  bankedGrants(start: number, end: number): BillingCycleBankedGrants | null {
+    if (this.key.provider !== "codex" || !(start < end)) return null;
+    return bankedGrants(creditReadings(this.db, this.key.account, start - 86_400_000, end), start, end);
   }
   /** Windows without % of the account (Claude's declared schedule): `declared:<kind>` rows of window usage. */
   unmetered(kind: string, start: number, end: number): CycleDetail["unmetered"] {
@@ -434,6 +443,7 @@ function aggregate(inputs: AccountInputs, cycle: DerivedCycle, now: number): { u
     capacity, used_units: units,
     // Units of the bonuses only with a capacity: the calibration alone is no capacity (a window without a factor).
     resets: resets.resets,
+    banked_granted: inputs.bankedGrants(cycle.start, Math.min(cycle.end, now)),
     main_windows: mainWindows,
     price_usd: cycle.amountUsd, fx: cycle.fx,
   } };

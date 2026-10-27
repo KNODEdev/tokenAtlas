@@ -31,6 +31,7 @@ export function billingCycleOf(row: StoredCycleRow, windows = false): BillingCyc
     used_pp: row.used_pp === null ? null : round(row.used_pp, 2), used_pct: pct(row.used_pp, capacity),
     api_usd: row.api_usd === null ? null : round(row.api_usd, 2), capacity_usd: row.capacity_usd,
     capacity: detail.capacity ?? null, used_units: detail.used_units ?? null, resets: detail.resets ?? null,
+    banked_granted: detail.banked_granted ?? null,
     to_date: detail.to_date === null ? null : { windows: round(detail.to_date, 4), used_pct: pct(row.used_pp, detail.to_date) },
     projection: detail.projection === null ? null : { windows_min: round(detail.projection, 4), used_pct: pct(row.used_pp, detail.projection) },
     per_window_point: amount === null || capacity <= 0 ? null : round(amount / (capacity * 100), 4),

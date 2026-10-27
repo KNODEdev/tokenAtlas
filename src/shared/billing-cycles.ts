@@ -394,6 +394,12 @@ export interface BillingCycleResetBonus {
 export type BillingCycleResets = Partial<Record<"open" | "scheduled" | "plan_change" | "not_reset" | "banked" | "provider" | "provider_probable" | "single" | "unknown",
   BillingCycleResetBonus>>;
 /**
+ * Banked resets the account was granted in the cycle (Codex, from its reset-credit readings, recorded from 02.09): `count` grants
+ * seen from `from` (the reading counting starts at) to the cycle's end or now. `complete` when a reading at most a day before the
+ * cycle anchors the count; otherwise grants before `from` are unknown and `count` is a lower bound.
+ */
+export interface BillingCycleBankedGrants { count: number; from: string; complete: boolean }
+/**
  * One main-counter window of a cycle, reset to reset (approved 11.10): how it ended (the stored end cause; null before it
  * is stored), the points it used before its end and its part of the cycle's capacity.
  */
@@ -451,6 +457,8 @@ export interface BillingCycle {
   used_units: BillingCycleUnits | null;
   /** The ends of its main-counter windows by cause, with the reset bonuses; null before the causes are stored. */
   resets: BillingCycleResets | null;
+  /** Banked resets granted in the cycle; null without reset-credit readings inside it (other providers, or before 02.09). */
+  banked_granted?: BillingCycleBankedGrants | null;
   /** Its main-counter windows; only in the view of one account (`?provider=&account=`), absent from the unfiltered one. */
   main_windows?: BillingCycleWindow[] | null;
   /** Current cycle only: the elapsed part of its windows and the minimal projection to its end. */
