@@ -94,7 +94,7 @@ export async function handleCodexTimelineMarkers(sqlite: Database, req: Request,
     const automatic: TimelineMarker[] = models.filter(m => isAccountingDay(m.first_ts.slice(0, 10))).map(m => ({
       id: `model:${m.model}`, observed_at: m.first_ts, day: m.first_ts.slice(0, 10), label: m.model.replace(/^gpt-/, ""),
       note: `Pierwsza obserwacja w całym zaindeksowanym archiwum ${adapter?.label ?? "Codex"}: ${m.first_ts}. Nie jest to potwierdzona data premiery.`,
-      color: m.model.includes("astra") ? "accent" : "violet", visible: adapter ? true : ["gpt-6-astra", "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.5"].includes(m.model),
+      color: m.model.includes("astra") ? "accent" : "violet", visible: adapter ? true : ["gpt-6-astra", "gpt-6.1-terra", "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.5"].includes(m.model),
     }));
     const prices: TimelineMarker[] = adapter ? Object.entries(card?.vendors[adapter.rateVendor]?.models ?? {}).flatMap(([model, rate]) => {
       if (!rate.until || !rate.after || !isAccountingDay(rate.until)) return [];

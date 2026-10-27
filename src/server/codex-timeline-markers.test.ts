@@ -33,6 +33,8 @@ test("marker settings persist; whole-archive model discovery, overrides and stal
     for (const model of ["gpt-5.6-luna", "gpt-5.6-terra"]) {
       expect(withUtilityModels.automatic.find(m => m.id === `model:${model}`)?.visible).toBe(true);
     }
+    db.exec("INSERT INTO events VALUES ('gpt-6.1-terra','2026-10-26T21:59:22.940Z')");
+    expect((await get()).automatic.find(m => m.id === "model:gpt-6.1-terra")).toMatchObject({ day: "2026-10-26", visible: true });
     expect((await post({ revision: revised.revision, marker: { ...marker, day: "2026-02-30" } })).status).toBe(400);
     expect((await post({ revision: revised.revision, marker: { ...marker, id: "../../escape" } })).status).toBe(400);
     expect((await post({ revision: revised.revision, remove: marker.id })).status).toBe(200);

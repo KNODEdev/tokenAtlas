@@ -28,8 +28,8 @@
       "API estimates use configured speed and default non-regional text pricing; tools and residency uplifts are excluded.",
       "API input includes cache reads and writes. Positive writes require a dated write price; their credit valuation remains unconfirmed.",
       "Historical coverage was explicitly requested on 2026-09-09. Backfilled rules use first observed UTC model days in the local two-machine archive, not a claim about the public launch date or past provider invoices. Historical rules have confidence=user; their numeric reference rates are from the linked current official sources.",
-      "First observed: GPT-6.1 Sol 2026-09-30; GPT-6 Sol/Luna 2026-09-23; GPT-6 Astra 2026-09-04; GPT-5.6 Sol/Terra/Luna 2026-07-09; GPT-5.5 2026-04-24; GPT-5.4 2026-03-07. verified_at is the verification date, not the effective start.",
-      "GPT-6 Sol and Luna rules start at their 2026-09-22 launch; OpenAI announced these launch prices as permanent, so no earlier vector is reconstructed. GPT-6.1 Sol rules start at its 2026-09-29 launch (API changelog).",
+      "First observed: GPT-6.1 Terra 2026-10-26; GPT-6.1 Sol 2026-09-30; GPT-6 Sol/Luna 2026-09-23; GPT-6 Astra 2026-09-04; GPT-5.6 Sol/Terra/Luna 2026-07-09; GPT-5.5 2026-04-24; GPT-5.4 2026-03-07. verified_at is the verification date, not the effective start.",
+      "GPT-6 Sol and Luna rules start at their 2026-09-22 launch; OpenAI announced these launch prices as permanent, so no earlier vector is reconstructed. GPT-6.1 Sol rules start at its 2026-09-29 launch (API changelog). GPT-6.1 Terra rules start at its 2026-10-26 launch (API changelog), confirmed by the owner on 2026-10-27.",
       "All GPT-6 and GPT-5.6 models have separate Standard/Fast API rules and per-request long-context rates. Other unsupported API model/basis pairs remain unpriced.",
       "2026-09-11 audit: historical reference vectors split on 2026-07-30 (Terra/Luna API and credits) and 2026-08-21 (Sol API). Earlier vectors are reconstructed from documented reductions; historical mode/long-context premiums and Sol cache pricing remain reference assumptions (confidence=user). Day boundaries use UTC because official notices do not give an exact change time.",
       "Sol credit pricing: current 100/10/500 is confirmed, but its historical change date and prior vector are not established here. The existing retrospective credit reference is retained, not certified as historically billed. The Sol promotion has no confirmed end date; at least November 21 is not an end boundary."
@@ -146,6 +146,44 @@
           "in_uncached": 50,
           "in_cache_read": 2.5,
           "out_total": 250
+        },
+        "multiplier": 2.5
+      },
+      {
+        "id": "gpt-6.1-terra-credits-standard-20261026",
+        "model": "gpt-6.1-terra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-10-26",
+        "verified_at": "2026-10-27",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 25,
+          "in_cache_read": 1.25,
+          "out_total": 125
+        },
+        "multiplier": 1
+      },
+      {
+        "id": "gpt-6.1-terra-credits-fast-20261026",
+        "model": "gpt-6.1-terra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-10-26",
+        "verified_at": "2026-10-27",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing",
+          "https://learn.chatgpt.com/docs/agent-configuration/speed"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 25,
+          "in_cache_read": 1.25,
+          "out_total": 125
         },
         "multiplier": 2.5
       },
@@ -575,6 +613,67 @@
           }
         },
         "note": "The pricing page lists Fast short-context rates only; the model page prices Fast at 2x Standard, so the long-context Fast rates are 2x the long-context Standard rates."
+      },
+      {
+        "id": "gpt-6.1-terra-api-standard-20261026",
+        "model": "gpt-6.1-terra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-10-26",
+        "verified_at": "2026-10-27",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 1,
+          "in_cache_read": 0.05,
+          "in_cache_write": 1.25,
+          "out_total": 5
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 2,
+            "in_cache_read": 0.1,
+            "in_cache_write": 2.5,
+            "out_total": 7.5
+          }
+        },
+        "note": "Cache write is the 30-minute retention rate, as for GPT-6.1 Sol; 12-hour retention costs 2x."
+      },
+      {
+        "id": "gpt-6.1-terra-api-fast-20261026",
+        "model": "gpt-6.1-terra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-10-26",
+        "verified_at": "2026-10-27",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 2,
+          "in_cache_read": 0.1,
+          "in_cache_write": 2.5,
+          "out_total": 10
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 4,
+            "in_cache_read": 0.2,
+            "in_cache_write": 5,
+            "out_total": 15
+          }
+        }
       },
       {
         "id": "gpt-6-luna-api-standard-20260922",
@@ -2076,7 +2175,7 @@
       "verified": false,
       "source": "Official Astra and GPT-5.6 API references verified 2026-09-09. Other legacy models retain their individual provenance. Historical dated-rule coverage uses user-authorized first observed model dates.",
       "notes": [
-        "OpenAI cache reads bill at 10% of the input rate for every model checked except GPT-6.1 Sol, which bills them at 5%.",
+        "OpenAI cache reads bill at 10% of the input rate for every model checked except GPT-6.1 Sol and GPT-6.1 Terra, which bill them at 5%.",
         "Cache WRITE: Astra API lists a 1.25x input rate. The indexed counter overlap with input is not established, so the dated accounting calculator leaves positive write counters unpriced.",
         "Codex reports input_tokens INCLUSIVE of cached_input_tokens; fresh input must be computed as in_tok - cached_in before pricing.",
         "Reasoning tokens are billed as output.",
@@ -2257,6 +2356,22 @@
           "verified_at": "2026-10-06",
           "note": "Standard API reference rates since the 2026-09-29 launch; cached input is 5% of input, not 10%. >272K input: input/cache x2, output x1.5 per request."
         },
+        "gpt-6.1-terra": {
+          "in_uncached": 1,
+          "in_cache_read": 0.05,
+          "in_cache_write": 1.25,
+          "out_total": 5,
+          "fast": {
+            "in_uncached": 2,
+            "in_cache_read": 0.1,
+            "in_cache_write": 2.5,
+            "out_total": 10
+          },
+          "confidence": "official-standard-reference",
+          "source": "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
+          "verified_at": "2026-10-27",
+          "note": "Standard API reference rates since the 2026-10-26 launch (owner-confirmed 2026-10-27); cached input is 5% of input; cache write is the 30-minute retention rate. >272K input: input/cache x2, output x1.5 per request."
+        },
         "gpt-6-luna": {
           "in_uncached": 0.1,
           "in_cache_read": 0.01,
@@ -2282,8 +2397,8 @@
         "Antigravity NIE podaje wlasnej ceny generacji - w odroznieniu od groka, ktory zwraca costUsdTicks.",
         "Dolary tego vendora sa wiec API-eq: nasz cennik zastosowany do zmierzonych tokenow. Mowia, ile ten ruch kosztowalby bez abonamentu, nie ile abonament kosztuje.",
         "Flash cache read is the official context caching price (0.1x input for every Flash model listed); storage per hour is not priced. Pro and default entries keep the earlier 0.25x assumption. Antigravity raportuje cache ROZLACZNIE z inputem (bywa od niego wiekszy), wiec obie pozycje sa liczone osobno i nie wolno ich sumowac przed wycena.",
-        "Warianty nazw ('gemini-3-flash-a', 'gemini-3-flash-medium-control') dopasowuja sie po najdluzszym prefiksie - patrz rateFor() w src/ingest/gemini.ts.",
-        "claude-opus-4-6-thinking pojawia sie w magazynie Antigravity, bo konto ma druga grupe limitu 'Claude and GPT models'. Jego stawki NIE sa tutaj - siedza pod vendorem anthropic i tam trzeba je brac.",
+        "Wspolny rejestr wycen dopasowuje identyfikatory dokladnie (adapter gemini nie uzywa stawek rodziny), wiec kazdy wariant nazwy Antigravity potrzebuje wlasnego wpisu PROXY.",
+        "claude-opus-4-6-thinking i claude-sonnet-4-6 pojawiaja sie w magazynie Antigravity, bo konto ma druga grupe limitu 'Claude and GPT models'. Antigravity nie publikuje dla nich stawek za token; wspolny rejestr szuka ich w tym cenniku, wiec decyzja wlasciciela 2026-10-27: PROXY po cenniku API Anthropic (tokeny myslenia licza sie jak output). gpt-oss-120b-medium i gemini-pro-b nie maja oficjalnej ceny - celowo bez ceny (UNKNOWN), nie koszt zero.",
         "Flash dates (changelog): 3 Flash Preview launched 2025-12-17, 3.6 Flash GA 2026-07-21, 3.7 Flash GA 2026-08-13 at an introductory price through 2026-12-31, 3.8 Flash GA 2026-09-02. The pricing page states one price per model plus the 2027-01-01 step for 3.6/3.7/3.8; no earlier official price was found, so the current official price applies from each model's first local use (3.8 Flash calls from 2026-08-30 precede its GA date and use the GA price). Vendor entries have no valid_from; only until/after is encoded.",
         "gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash: $0.75 input / $0.075 context caching / $3.75 output through 2026-12-31, then $1.50 / $0.15 / $7.50.",
         "gemini-3-flash prices the gemini-3-flash-* Antigravity variants at the official gemini-3-flash-preview rate: $0.50 input / $0.05 context caching / $3.00 output (text, image, video), with no announced change date."
@@ -2451,6 +2566,78 @@
           "in_cache_write_5m": null,
           "in_cache_write_1h": null,
           "out_total": 10.0
+        },
+        "claude-opus-4-6-thinking": {
+          "in_uncached": 5.0,
+          "in_cache_read": 0.5,
+          "in_cache_write_5m": 6.25,
+          "in_cache_write_1h": 10.0,
+          "out_total": 25.0,
+          "confidence": "PROXY",
+          "proxy_for": "anthropic/claude-opus-4-6",
+          "source": "https://platform.claude.com/docs/en/models/opus-4-6/overview",
+          "verified_at": "2026-10-27",
+          "note": "Antigravity publishes no per-token price. Priced at the Anthropic API list price for Claude Opus 4.6; thinking tokens bill as output (owner decision 2026-10-27)."
+        },
+        "claude-sonnet-4-6": {
+          "in_uncached": 3.0,
+          "in_cache_read": 0.3,
+          "in_cache_write_5m": 3.75,
+          "in_cache_write_1h": 6.0,
+          "out_total": 15.0,
+          "confidence": "PROXY",
+          "proxy_for": "anthropic/claude-sonnet-4-6",
+          "source": "https://platform.claude.com/docs/en/models/sonnet-4-6/overview",
+          "verified_at": "2026-10-27",
+          "note": "Antigravity publishes no per-token price. Priced at the Anthropic API list price for Claude Sonnet 4.6 (owner decision 2026-10-27)."
+        },
+        "gemini-3-flash-a": {
+          "in_uncached": 0.5,
+          "in_cache_read": 0.05,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3,
+          "confidence": "PROXY",
+          "proxy_for": "gemini-3-flash",
+          "note": "Antigravity variant of gemini-3-flash (seen 2026-06-16..07-13); no separate public price. The shared ledger matches exact ids, so the variant needs its own entry."
+        },
+        "gemini-3-flash-e": {
+          "in_uncached": 0.5,
+          "in_cache_read": 0.05,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3,
+          "confidence": "PROXY",
+          "proxy_for": "gemini-3-flash",
+          "note": "Antigravity variant of gemini-3-flash (seen 2026-07-17); no separate public price."
+        },
+        "gemini-3-flash-medium-control": {
+          "in_uncached": 0.5,
+          "in_cache_read": 0.05,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 3,
+          "confidence": "PROXY",
+          "proxy_for": "gemini-3-flash",
+          "note": "Antigravity experiment variant of gemini-3-flash (seen 2026-07-18..19); no separate public price."
+        },
+        "gpt-oss-120b-medium": {
+          "in_uncached": null,
+          "in_cache_read": null,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": null,
+          "confidence": "UNKNOWN",
+          "note": "Open-weight model served by Antigravity; no official per-token price. Intentionally unpriced, not zero cost (owner decision 2026-10-27)."
+        },
+        "gemini-pro-b": {
+          "in_uncached": null,
+          "in_cache_read": null,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": null,
+          "confidence": "UNKNOWN",
+          "note": "Antigravity variant that no official source maps to a specific Gemini Pro model. Intentionally unpriced, not zero cost (owner decision 2026-10-27)."
         }
       }
     },
@@ -2574,6 +2761,11 @@
         "input": 50,
         "cached_input": 2.5,
         "output": 250
+      },
+      "gpt-6.1-terra": {
+        "input": 25,
+        "cached_input": 1.25,
+        "output": 125
       },
       "gpt-6-luna": {
         "input": 2.5,
