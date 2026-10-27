@@ -8,6 +8,10 @@ import { tableExists } from "./project-cost-schema";
 import type { Rational } from "../db/price-ledger-exact";
 import { resolveCodexSubId } from "./capacity-equivalents";
 import { codexProjectReportLedgerRange } from "./codex-ledger-report-dependencies";
+import { isCodexInternalReview } from "../shared/codex-internal";
+
+/** Internal action-review overhead is outside the user-work allocation, and keeps its unknown API price. */
+export const codexPlanAllocationEligible = (model: string | null): boolean => !isCodexInternalReview(model);
 
 /** The one Codex variant the project report values: its API equivalent at Standard (with its token-bucket split). */
 const API_STANDARD_ONLY = ["api_standard"] as const;
@@ -18,7 +22,7 @@ type CodexOwnedRow = ReturnType<typeof readCodexLedgerOwnedSeries<typeof API_STA
  * The Codex ledger groups the project report reads (owner resolved, Standard API value only), or null without
  * Codex history. A ledger still being prepared raises SubscriptionFactsPending: this read never reprices.
  */
-export function readProjectCodexRows(sqlite: Database, rateCards: RateCard, range: { since?: string; until?: string }):
+export function readProjectCodexRows(sqlite: Database, rateCards: RateCard, range: { since?: string; until?: string; fromMs?: number; toMs?: number }):
   { rows: CodexOwnedRow[]; ledger: ReturnType<typeof codexLedgerReadContext> } | null {
   const nativeRange = { ...range, dependencyBases: ["api_equivalent_usd"] as const };
   const codexAttributable = !!readCodexLedgerState(sqlite) || tableExists(sqlite, "events")

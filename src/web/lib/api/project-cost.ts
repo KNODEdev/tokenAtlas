@@ -59,8 +59,8 @@ export interface SubjectSubscriptionSlice {
   tokens_by_type: TokenTypeBreakdown;
   usd_by_type: TokenTypeBreakdown | null;
   billed_usd: number | null;
-  /** False when the amount is a known subtotal (sent by servers with dated plan periods). */
   billed_complete?: boolean;
+  plan_periods?: import("../../../shared/project-plan-periods").ProjectPlanPeriod[];
   billing_unavailable_reasons?: BillingUnavailableReason[];
   share: number;
   calls: number;

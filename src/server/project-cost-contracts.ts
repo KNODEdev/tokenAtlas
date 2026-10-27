@@ -25,6 +25,9 @@ export interface SubjectSubscriptionSlice {
   tokens_by_type: TokenTypeBreakdown;
   usd_by_type: TokenTypeBreakdown | null;
   billed_usd: number | null;
+  /** False when the amount is a known subtotal across dated plan periods. */
+  billed_complete?: boolean;
+  plan_periods?: import("../shared/project-plan-periods").ProjectPlanPeriod[];
   billing_unavailable_reasons?: BillingUnavailableReason[];
   share: number;
   calls: number;
@@ -192,6 +195,8 @@ export interface DailyUnpriced extends DailyTokenCalls {
 }
 
 export interface ProjectCostDailyAggregate {
+  incompleteSubscriptions?: Set<string>;
+  periodRows?: Map<string, import("./project-cost-periods").PeriodUsageRow[]>;
   buckets: Map<string, Map<string, Map<string, DailyBucket>>>;
   bucketOrder: DailyBucket[];
   unpriced: Map<string, Map<string, DailyUnpriced>>;

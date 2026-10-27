@@ -44,6 +44,7 @@ export interface ProjectUsage {
   unpriced: ProjectUnpricedGroup[];
   evidence: Array<ClaudeProjectEvidence | ProviderProjectEvidence>;
   conflicts: Array<ClaudeConflictingIdentities | ProviderProjectConflict>;
+  period_rows?: Map<string, import("./project-cost-periods").PeriodUsageRow[]>;
 }
 
 export class UnsafeProjectSum extends Error {}
@@ -75,7 +76,7 @@ const zeroExact = () => ({ in_uncached: 0n, cache_read: 0n, cache_write: 0n, out
 export function storedProjectUsage(db: Database, provider: "claude" | ProjectFactProvider, rates: RateCard,
   options: { since?: string; until?: string; resolver?: AccountResolver; declarations?: readonly IdentityDeclaration[] } = {}): ProjectUsage {
   const owned = ownedRegisterRows(db, provider, rates, options);
-  const usage: ProjectUsage = { provider, accounts: [], days_by_account: [], groups: [], unpriced: [], evidence: owned.evidence, conflicts: [] };
+  const usage: ProjectUsage = { provider, accounts: [], days_by_account: [], groups: [], unpriced: [], evidence: owned.evidence, conflicts: [], period_rows: new Map() };
   if (!owned.accounts.length) return checkedTotals(usage);
   const ledger = provider as UsageLedgerProvider;
   const dims = readUsageLedgerPlaces(db, ledger), rules = currentProjectRules(db), plans = new Map(owned.plans.map(plan => [plan.account, plan]));
@@ -152,6 +153,11 @@ export function storedProjectUsage(db: Database, provider: "claude" | ProjectFac
   let callsDay: string | null = null, dayCalls = new Map<number, LedgerValuedCall[]>();
   for (const { row, account, calls, actual, standard, priced, unpricedCalls, key, needsCalls } of rows) {
     const dim = dims.get(row.dim)!, subject = placeSubject(rules, provider, dim, row.day);
+    const dated = usage.period_rows!.get(account) ?? [];
+    dated.push({ subject: subject ?? "", day: row.day,
+      tokens: Number(actual?.pricedTokens ?? 0), calls: priced, amount: actual?.pricedSubtotal ?? "0",
+      incomplete: unpricedCalls > 0 || Number(decodeQuality(row.quality).conflicts ?? 0) > 0 });
+    usage.period_rows!.set(account, dated);
     (active.get(account) ?? active.set(account, new Set()).get(account)!).add(row.day);
     if (needsCalls) {
       if (callsDay !== row.day) {

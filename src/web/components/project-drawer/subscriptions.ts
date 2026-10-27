@@ -10,6 +10,10 @@ export interface SplitLine extends ReceiptLine {
   planHistory: string | null;
   /** The plan periods in the range, one per line (the plan chip's tooltip). */
   planTooltip?: string | null;
+  vendor?: string;
+  billedComplete?: boolean;
+  planPeriods?: import("../../../shared/project-plan-periods").ProjectPlanPeriod[];
+  lastActivityDay?: string | null;
 }
 
 export function planHistoryLine(spend: SubscriptionSpend | null): string | null {
@@ -61,7 +65,7 @@ export function planPeriodsTooltip(spend: SubscriptionSpend | null): string | nu
   };
   const lines = [
     translate("plan from account periods", "plan z okresów kont"),
-    ...spend.plan_periods.map((p) => `${dayRangeLabel(p.from, p.until)} · ${subscriptionPlan(spend.vendor, p.plan, p.from) ?? "—"} · ${p.cycle ? cyclePrice(p.cycle)
+    ...[...spend.plan_periods].reverse().map((p) => `${dayRangeLabel(p.from, p.until)} · ${subscriptionPlan(spend.vendor, p.plan, p.from) ?? "—"} · ${p.cycle ? cyclePrice(p.cycle)
       : `${p.usd_per_month != null ? formatMoney(p.usd_per_month) : "—"} · ${source(p)}`}`),
   ];
   if (spend.usd_per_month != null) {

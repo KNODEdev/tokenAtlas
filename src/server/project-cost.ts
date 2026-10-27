@@ -11,7 +11,7 @@ import { historicalProjectWeeks } from "./project-plan";
 import { buildSubscriptionCapacities, computeSeatTime, computeEquivalentsAndProvenance, round4 } from "./capacity-equivalents";
 import { codexSubjectNormalized } from "./codex-accounting";
 import { planLabelOf } from "./plans";
-import { round2, allocatePaidAcrossSubjects } from "./pricing";
+import { round2 } from "./pricing";
 import type { ProjectCostResponse, Bucket, ModelSlice, TokenTypeBreakdown, SubscriptionSpend, SubjectCost, ProjectCostCoverage } from "./project-cost-contracts";
 import { dailyAggregate } from "./project-cost-daily";
 import { addModels, zeroTypes, addTypes, daySelected, daysBetween, roundTypes, aggregateBilled } from "./project-cost-values";
@@ -21,6 +21,9 @@ import { tableExists } from "./project-cost-schema";
 import { accountEvidenceNote, conflictNote } from "./project-cost-evidence";
 import { assertCodexProjectReady } from "./project-cost-codex";
 import { planGapReason, type BillingUnavailableReason } from "../shared/plan-price-coverage";
+import { allocatePlanPeriods, readPlanPeriodsUsage } from "./project-cost-periods";
+import type { ProjectPlanPeriod } from "../shared/project-plan-periods";
+import { planCostOf } from "./plans";
 
 interface ProjectCostInputs {
   claude?: ProjectUsage;
@@ -54,6 +57,7 @@ function computeProjectCost(
   let geminiCalls = 0;
   /** Subscription id -> why its bill cannot be allocated across its subjects. */
   const unallocatable = new Map<string, string>();
+  for (const account of aggregate.incompleteSubscriptions ?? []) unallocatable.set(account, "missing_rate");
   const add = (
     subId: string,
     vendor: string,
@@ -234,6 +238,7 @@ function computeProjectCost(
   const subTotals = new Map<string, { api_usd: number; paid_usd: number | null }>();
   const monthlyBySub = new Map<string, number | null>();
   const unavailableBySub = new Map<string, BillingUnavailableReason[]>();
+  const periodsBySub = new Map<string, Map<string, ProjectPlanPeriod[]>>();
   // Plan history comes from the account periods, each plan priced by its Plans catalog version.
   const pricingInputs = planPricingInputs(sqlite, opts.plansCatalog);
   for (const [subId, inner] of bySub) {
@@ -242,8 +247,16 @@ function computeProjectCost(
     const known = span.get(subId) ?? null;
     const s = known ?? { first: null, last: null };
     const days = known ? daysBetween(known.first, known.last) + 1 : 0;
-    const { declared: declaredMonthly, periods, gaps, paid, monthly } =
+    const { declared: declaredMonthly, stretches, periods, gaps, paid, monthly } =
       subscriptionPlanPricing(sqlite, rateCards, pricingInputs, { id: subId, vendor: meta.vendor }, known, resolver);
+    const sharedUsage = [claude, ...providerUsage].find(usage => usage.provider === meta.vendor);
+    const periodRows = meta.vendor === "codex" ? aggregate.periodRows?.get(subId)
+      : sharedUsage?.conflicts.some(conflict => conflict.account === subId) ? undefined : sharedUsage?.period_rows?.get(subId);
+    const periodUsage = stretches.length > 1 ? readPlanPeriodsUsage(sqlite, rateCards, resolver, { id: subId, vendor: meta.vendor }, stretches, periodRows) : [];
+    periodsBySub.set(subId, allocatePlanPeriods(stretches, [...new Set([...inner.keys(), ""])], (_, index) =>
+      stretches.length === 1
+        ? { groups: inner, incomplete: unallocatable.has(subId) }
+        : periodUsage[index]!));
     monthlyBySub.set(subId, monthly);
     const reasons = new Set(gaps.map(planGapReason));
     if (periods.length === 0) reasons.add("no_pricing_span");
@@ -256,7 +269,7 @@ function computeProjectCost(
       if (key !== "") attributed += b.api_usd;
     }
     totalApi += subApi;
-    if (paid != null) totalPaid += paid;
+    totalPaid += paid ?? planCostOf(periods.filter(period => period.usd_per_month !== null)) ?? 0;
     subTotals.set(subId, { api_usd: subApi, paid_usd: paid });
     for (const [key, b] of inner) {
       if (key === "") {
@@ -330,21 +343,23 @@ function computeProjectCost(
     const subTot = subTotals.get(subId) ?? { api_usd: 0, paid_usd: null };
     const subCap = capacities.get(subId);
     const monthly = monthlyBySub.get(subId) ?? null;
-    // The fee itself stays published on the subscription; only its split is withheld,
-    // because the api_usd weights would be missing this account's unpriced traffic.
-    const allocatable = subTot.paid_usd != null && !unallocatable.has(subId);
-    const billedBySubject = allocatable
-      ? allocatePaidAcrossSubjects(
-          Array.from(inner.entries()).map(([k, b]) => [k, b.api_usd]),
-          subTot.paid_usd!
-        )
-      : new Map<string, number>();
+    // Missing prices or traffic withhold only the affected dated allocations.
+    const dated = periodsBySub.get(subId);
+    const unassignedPeriods = dated?.get("") ?? [];
+    if (!inner.has("")) {
+      const unassigned = aggregateBilled(unassignedPeriods.map(period => period.billed_usd));
+      unassignedBilledAllocated += unassigned.billed_usd ?? 0;
+      if (!unassigned.billed_complete) unassignedBilledComplete = false;
+    }
     inner.forEach((b, key) => {
-      const billed = allocatable ? (billedBySubject.get(key) ?? 0) : null;
+      const planPeriods = dated?.get(key) ?? [];
+      const bill = planPeriods.length ? aggregateBilled(planPeriods.map(period => period.billed_usd))
+        : { billed_usd: dated?.get(key)?.length ? 0 : null, billed_complete: !!dated?.get(key)?.length };
+      const billed = bill.billed_usd;
       const share = subTot.api_usd > 0 ? b.api_usd / subTot.api_usd : 0;
       if (key === "") {
         unassignedBilledAllocated += billed ?? 0;
-        if (billed == null) unassignedBilledComplete = false;
+        if (!bill.billed_complete) unassignedBilledComplete = false;
         return;
       }
       if (b.api_usd <= 0 && billed === 0 && b.calls === 0) return;
@@ -370,7 +385,10 @@ function computeProjectCost(
         tokens_by_type: b.tt,
         usd_by_type: b.tu ? roundTypes(b.tu, 4) : null,
         billed_usd: billed,
-        billing_unavailable_reasons: billed === null ? unavailableBySub.get(subId) ?? [] : [],
+        billed_complete: bill.billed_complete,
+        plan_periods: planPeriods,
+        billing_unavailable_reasons: bill.billed_complete ? [] : planPeriods.length
+          ? [...new Set(planPeriods.flatMap(period => period.billing_unavailable_reasons))] : unavailableBySub.get(subId) ?? [],
         share: round4(share),
         calls: b.calls,
         seat_time: billed == null ? null : computeSeatTime(billed, monthly),
@@ -387,6 +405,7 @@ function computeProjectCost(
     row.api_usd = round2(row.api_usd);
     row.billed_usd = billedAgg.billed_usd;
     row.billed_complete = billedAgg.billed_complete;
+    if (Object.values(row.subscriptions).some(slice => slice.billed_complete === false)) row.billed_complete = false;
     row.priced_spend_usd = pricedSpend;
     row.share_of_priced_spend_pct =
       row.billed_usd == null || pricedSpend <= 0 ? null : round4((row.billed_usd / pricedSpend) * 100);
@@ -406,22 +425,22 @@ function computeProjectCost(
   });
   const priceless = subscriptions.filter((s) => s.paid_usd == null).map((s) => s.id);
   const notes: string[] = [
-    "billed_usd to udzial w RACHUNKU, liczony osobno w kazdej subskrypcji i sumowany. api_usd to ceny cennika API - ile ten sam ruch kosztowalby bez abonamentu. To dwie rozne liczby i nie wolno ich mieszac.",
+    "billed_usd to suma udzialow w koszcie kazdego datowanego okresu planu; udzial ruchu i cena dotycza tego samego okresu. billed_complete=false oznacza sume znanych czesci. api_usd to ekwiwalent cennika API.",
     "Mianownikiem udzialu jest CALY ruch subskrypcji, wiec udzialy projektow nie sumuja sie do rachunku. Reszta stoi w unassigned_billed_usd.",
     "gemini nie jest reprezentowany: gemini_events wiezie nazwe workspace'u, nie katalog roboczy, wiec zadne zdarzenie nie ma przypisania do projektu.",
-    "Rachunek rozlicza sie proporcjonalnie do dni (usd_per_month * dni / 30.44), tak samo jak /api/leverage.",
+    "Koszt cyklu jest proporcjonalny do jego rzeczywistego czasu; poza cyklami obowiazuje datowana cena planu * dni / 30.44.",
   ];
   const withHistory = subscriptions.filter((s) => s.plan_periods.some((p) => p.source !== "rate-card"));
   if (withHistory.length > 0) {
     notes.push(
       `Plan z okresow kont (cena z katalogu Planow) obowiazuje dla: ${withHistory
         .map((s) => `${s.id} (${s.plan ?? "?"})`)
-        .join(", ")}. Dni bez okresu planu licza sie cena z rate-cards.json.`
+        .join(", ")}. Luki historii pozostaja nieznane; rate-cards.json jest uzywany tylko bez zadnej datowanej historii konta.`
     );
   }
   if (priceless.length > 0) {
     notes.push(
-      `Bez pelnej ceny planu (okresy planu z katalogu Planow albo rate-cards.json): ${priceless.join(", ")}. Ruch tych subskrypcji liczy sie do api_usd, ale do rachunku nie wchodzi.`
+      `Bez pelnej ceny planu: ${priceless.join(", ")}. Znane okresy pozostaja w koszcie; nieznane czesci sa jawne w plan_periods.`
     );
   }
   const tmpRow = subjects.get("p:_tmp");

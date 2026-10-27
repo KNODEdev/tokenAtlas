@@ -25,9 +25,9 @@ export function noCalibrationLabel(): string {
 // Keep these Polish primitives for legacy callers. UI-facing values below are dynamic.
 export const DECLARED_PLAN_COST_LABEL = "koszt planów wg deklaracji, proporcjonalnie";
 export const DECLARED_PLAN_COST_HINT =
-  "Koszt z zapisanych cykli, proporcjonalnie do ich rzeczywistej długości. Poza cyklami: datowana cena katalogowa planu × dni / 30,44. Kwota jest dzielona udziałem w ruchu konta. Brak historii planu lub kursu pozostaje nieznany. To nie jest faktura ani dowód zapłaty.";
+  "Koszt z zapisanych cykli, proporcjonalnie do ich rzeczywistej długości. Poza cyklami: datowana cena katalogowa planu × dni / 30,44. Koszt każdego okresu planu jest dzielony udziałem projektu w ruchu konta w tym samym okresie, a wyniki sumowane. Brak historii planu lub kursu pozostaje nieznany; ≥ oznacza sumę znanych części. To nie jest faktura ani dowód zapłaty.";
 export function calendarPlanCostHint(t: (en: string, pl: string) => string = translate): string {
-  return t("Cost from stored billing cycles, prorated over their actual duration. Outside cycles: the dated catalog price × days / 30.44. The amount is allocated by the account's traffic shares. Missing plan history or exchange rates remain unknown. This is not an invoice or proof of payment.", DECLARED_PLAN_COST_HINT);
+  return t("Cost from stored billing cycles, prorated over their actual duration. Outside cycles: the dated catalog price × days / 30.44. Each plan period is allocated by the project's traffic share in that same period, then summed. Missing plan history or exchange rates remain unknown; ≥ marks the known subtotal. This is not an invoice or proof of payment.", DECLARED_PLAN_COST_HINT);
 }
 export const MONEY_LABEL: Record<MoneyKind, string> = {
   get billed() {

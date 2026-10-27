@@ -10,7 +10,7 @@ import { codexLedgerApiTokenAmounts, ledgerPresentationNumber, codexLedgerReadCo
 import { rational, add } from "../db/price-ledger-exact";
 import { readLedgerSums, requireUsageLedgerSums, sumTokens } from "./ledger-sums";
 import { addModels, addTypes, zeroTypes } from "./project-cost-values";
-import { readProjectCodexRows, codexPlanRow } from "./project-cost-codex";
+import { readProjectCodexRows, codexPlanRow, codexPlanAllocationEligible } from "./project-cost-codex";
 import { readCodexLedgerState } from "../db/codex-ledger-state";
 import { SubscriptionFactsPending } from "../db/subscription-facts";
 import { analysisHash } from "../db/analysis";
@@ -60,6 +60,8 @@ function buildDailyAggregate(
   const tmpByDay = new Map<string, DailyTokenCalls>();
   const unassignedByDay = new Map<string, DailyTokenCalls>();
   const daysBySub = new Map<string, Set<string>>();
+  const incompleteSubscriptions = new Set<string>();
+  const periodRows: NonNullable<ProjectCostDailyAggregate["periodRows"]> = new Map();
   const addBucket = (
     day: string,
     subId: string,
@@ -140,7 +142,17 @@ function buildDailyAggregate(
       markDay(subId, row.day);
       const rowTok = Number(group.tokensReported), calls = Number(group.calls);
       const value = planned.value;
+      const allocationEligible = codexPlanAllocationEligible(row.model);
+      const dated = periodRows.get(subId) ?? [];
+      if (allocationEligible) dated.push({ subject: row.subject ?? "", day: row.day,
+        tokens: value === null ? 0 : rowTok, calls: value === null ? 0 : calls,
+        amount: value ?? rational(0n), incomplete: value === null });
+      periodRows.set(subId, dated);
+      if (!allocationEligible) {
+        markUnpriced(row.day, row.model, rowTok, calls); continue;
+      }
       if (value === null) {
+        incompleteSubscriptions.add(subId);
         markUnpriced(row.day, row.model, rowTok, calls); continue;
       }
       if (row.subject === "p:_tmp") addTokenCalls(tmpByDay, row.day, rowTok, calls);
@@ -184,6 +196,8 @@ function buildDailyAggregate(
     markUnpriced(group.day, group.model, group.tokens, group.calls);
   }
   return {
+    incompleteSubscriptions,
+    periodRows,
     buckets,
     bucketOrder,
     unpriced,

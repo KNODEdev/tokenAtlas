@@ -9,10 +9,10 @@ import { convert, planUnits } from "../../lib/planUnits";
 import { projectConflictHint } from "../../lib/project-coverage";
 import type { RosterCard } from "../../lib/roster";
 import { subscriptionColor } from "../mix";
-import { projectShares } from "./shares";
 import { subjectKey } from "./format";
 import { type SplitLine, planHistoryLine, currentPlan, planPeriodsTooltip } from "./subscriptions";
 import type { WhatIfRow } from "./WhatIfTable";
+import { projectShares } from "./shares";
 
 interface CostInput {
   subject: SubjectRow;
@@ -62,13 +62,12 @@ export function useProjectDrawerCost(
             : MONEY_HINT.billed;
   const subSlices = useMemo(() => {
     const entries = Object.entries(subjectCost?.subscriptions ?? {}) as Array<[string, SubjectSubscriptionSlice]>;
+    const dates = new Map((effectiveCost?.subscriptions ?? []).map(subscription => [subscription.id, subscription.last_day ?? ""]));
     entries.sort(
-      (a, b) =>
-        (b[1].billed_usd ?? Number.NEGATIVE_INFINITY) -
-        (a[1].billed_usd ?? Number.NEGATIVE_INFINITY),
+      ([a], [b]) => (dates.get(b) ?? "").localeCompare(dates.get(a) ?? "") || a.localeCompare(b),
     );
     return entries;
-  }, [subjectCost]);
+  }, [subjectCost, effectiveCost]);
   const catalog = usePlanCatalog();
   const units = useMemo(() => planUnits(cards, effectiveCost?.subscriptions ?? []), [cards, effectiveCost, language, t, catalog]);
   const spendOfSub = useMemo(() => {
@@ -93,7 +92,7 @@ export function useProjectDrawerCost(
     for (const s of effectiveCost?.subscriptions ?? []) set.add(s.id);
     return Array.from(set);
   }, [subSlices, effectiveCost]);
-  const leverage = apiUsd != null && billedUsd != null && billedUsd > 0 ? apiUsd / billedUsd : null;
+  const leverage = billedComplete && apiUsd != null && billedUsd != null && billedUsd > 0 ? apiUsd / billedUsd : null;
   const receiptLines = useMemo<SplitLine[]>(
     () =>
       subSlices.map(([subId, slice]) => ({
@@ -104,6 +103,10 @@ export function useProjectDrawerCost(
         tokens: slice.tokens,
         color: subscriptionColor(subId),
         billedUsd: slice.billed_usd,
+        billedComplete: slice.billed_complete,
+        planPeriods: slice.plan_periods,
+        vendor: spendOfSub.get(subId.toLowerCase())?.vendor,
+        lastActivityDay: spendOfSub.get(subId.toLowerCase())?.last_day,
         billingUnavailableReasons: slice.billing_unavailable_reasons,
         costAtFullUseUsd: slice.cost_at_full_use_usd,
         apiUsd: slice.api_usd,

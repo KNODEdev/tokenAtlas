@@ -7,14 +7,17 @@ import {
   MONEY_HINT,
   RECEIPT_HINT,
   utilisationVerdict,
+  dayRangeLabel,
 } from "../../lib/mixFormat";
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { billingUnavailable } from "../../lib/plan-cost-status";
 import { compact, full } from "../../lib/format";
 import { CalibrationChip } from "../mix";
 import { Table, TableRow, Td, Th } from "../ui";
 import { type SplitLine, currentPlan, usedHint, windowMeasurementHint } from "./subscriptions";
 import { SubscriptionName } from "./SubscriptionName";
+import { subscriptionPlan } from "../../lib/subscription-plan";
+import type { ProjectPlanPeriod } from "../../../shared/project-plan-periods";
 
 function tokenTypeColumns(): Array<{ key: keyof TokenTypeBreakdown; label: string; hint: string }> {
   return [
@@ -63,8 +66,11 @@ export function SubscriptionSplitTable({
   moreColumns?: boolean;
 }) {
   const { t } = useI18n();
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const latest = (line: SplitLine) => line.lastActivityDay ?? line.planPeriods?.reduce((last, period) => period.until_ts > last ? period.until_ts : last, "") ?? "";
+  const orderedLines = [...lines].sort((a, b) => latest(b).localeCompare(latest(a)) || a.subId.localeCompare(b.subId));
   const types = tokenTypeColumns();
-  const anyBilled = lines.some((l) => l.billedUsd != null);
+  const anyBilled = lines.some((l) => l.billedUsd != null && (l.billedUsd > 0 || l.billedComplete !== false));
   const anyFull = lines.some((l) => l.costAtFullUseUsd != null);
   const totalBilled = anyBilled ? lines.reduce((a, l) => a + (l.billedUsd ?? 0), 0) : null;
   const totalFull = anyFull ? lines.reduce((a, l) => a + (l.costAtFullUseUsd ?? 0), 0) : null;
@@ -87,7 +93,9 @@ export function SubscriptionSplitTable({
       allTypeUsd = false;
     }
   }
-  const totalVerdict = utilisationVerdict(totalBilled, totalFull);
+  const mixedPlans = (line: SplitLine) => new Set((line.planHistory ?? line.plan ?? "").split("→").map(plan => plan.trim()).filter(Boolean)).size > 1
+    || new Set((line.planPeriods ?? []).map(period => period.plan)).size > 1;
+  const totalVerdict = lines.some(line => line.billedComplete === false || mixedPlans(line)) ? null : utilisationVerdict(totalBilled, totalFull);
   const noSum = t("Windows from different plans have no common unit, so these two columns cannot be summed.", "Okna różnych planów nie mają wspólnej jednostki, więc te dwie kolumny nie mają sumy.");
   const tokenTypesHint = t(
     "Tokens by type; the next column shows the cost of that type at API list price, its tooltip the effective price per 1M.",
@@ -138,23 +146,45 @@ export function SubscriptionSplitTable({
         </TableRow>
       </thead>
       <tbody>
-        {lines.map((l) => {
-          const verdict = utilisationVerdict(l.billedUsd, l.costAtFullUseUsd);
-          const plan = currentPlan(l);
+        {orderedLines.flatMap(line => [
+          { line, period: null as ProjectPlanPeriod | null },
+          ...(expanded.has(line.subId) ? [...(line.planPeriods ?? [])].sort((a, b) => Date.parse(b.from_ts) - Date.parse(a.from_ts)).map(period => ({ period, line: {
+            ...line, plan: subscriptionPlan(line.vendor ?? "", period.plan, period.from_ts.slice(0, 10)), planHistory: null,
+            planTooltip: null, planPeriods: undefined, tokens: period.tokens, apiUsd: period.api_usd,
+            billedUsd: period.billed_usd, billedComplete: period.billed_usd !== null,
+            billingUnavailableReasons: period.billing_unavailable_reasons, costAtFullUseUsd: null,
+            seatTime: null, tokensByType: undefined, usdByType: undefined,
+            equivalents: { full_5h_sessions: { value: null, absent: "no_capacity" }, weekly_cycles: { value: null, absent: "no_capacity" },
+              monthly_subscriptions: { value: null, absent: "no_capacity" } },
+          } satisfies SplitLine })) : []),
+        ]).map(({ line: l, period }) => {
+          const verdict = l.billedComplete === false || mixedPlans(l) ? null : utilisationVerdict(l.billedUsd, l.costAtFullUseUsd);
+          const plan = mixedPlans(l) ? t("plan history", "historia planów") : currentPlan(l);
+          const expandable = !period && (l.planPeriods?.length ?? 0) > 0;
+          const name = period ? dayRangeLabel(period.from_ts.slice(0, 10), new Date(Date.parse(period.until_ts) - 1).toISOString().slice(0, 10)) : nameOf(l.subId);
+          const costHint = period ? `${period.from_ts} – ${period.until_ts} · ${t("subscription cost", "koszt abonamentu")}: ${formatMoney(period.subscription_cost_usd)} × ${t("project share", "udział projektu")}: ${(period.share * 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`
+            : l.billedComplete === false ? billingUnavailable(l.billingUnavailableReasons).hint : MONEY_HINT.billed;
           return (
-            <TableRow key={l.subId}>
-              <Td>
-                <SubscriptionName color={l.color} name={nameOf(l.subId)} plan={plan} tooltip={l.planTooltip ?? l.planHistory} />
+            <TableRow key={period ? `${l.subId}:${period.from_ts}` : l.subId}>
+              <Td style={period ? { paddingInlineStart: "var(--s-9)" } : undefined}>
+                {expandable ? <button type="button" className="ui-disclosure" aria-expanded={expanded.has(l.subId)}
+                  aria-label={`${expanded.has(l.subId) ? t("Collapse plan history", "Zwiń historię planów") : t("Expand plan history", "Rozwiń historię planów")}: ${name}`}
+                  onClick={() => setExpanded(previous => { const next = new Set(previous); if (next.has(l.subId)) next.delete(l.subId); else next.add(l.subId); return next; })}>
+                  <span aria-hidden="true">{expanded.has(l.subId) ? "▾" : "▸"} </span>
+                  <SubscriptionName color={l.color} name={name} plan={plan} tooltip={l.planTooltip ?? l.planHistory} />
+                </button> : <SubscriptionName color={l.color} name={name} plan={plan} tooltip={l.planTooltip ?? l.planHistory} />}
               </Td>
               <Td align="right" mono title={full(l.tokens)} style={{ color: "var(--muted)" }}>{compact(l.tokens)}</Td>
               <Td align="right" mono title={MONEY_HINT.api} style={{ color: "var(--muted)" }}>{formatMoney(l.apiUsd)}</Td>
               <Td
                 align="right"
                 mono
-                title={l.billedUsd == null ? billingUnavailable(l.billingUnavailableReasons).hint : l.seatTime != null && Number.isFinite(l.seatTime.months) ? `= ${smallQty(l.seatTime.weeks)} ${t("weeks", "tyg.")} / ${smallQty(l.seatTime.months)} ${t("months", "mies.")} ${t("of plan", "planu")}` : MONEY_HINT.billed}
+                title={l.billedUsd == null ? billingUnavailable(l.billingUnavailableReasons).hint : costHint}
                 style={{ color: "var(--text)", fontWeight: "var(--fw-semibold)" }}
               >
-                {l.billedUsd == null ? billingUnavailable(l.billingUnavailableReasons).label : formatMoney(l.billedUsd)}
+                {l.billedUsd == null || l.billedUsd === 0 && l.billedComplete === false
+                  ? billingUnavailable(l.billingUnavailableReasons).label
+                  : `${l.billedComplete === false ? "≥ " : ""}${formatMoney(l.billedUsd)}`}
               </Td>
               {usedCell(verdict)}
               {moreColumns && (
@@ -194,7 +224,7 @@ export function SubscriptionSplitTable({
                     );
                   })}
                   <Td>
-                    <CalibrationChip provenance={l.provenance} />
+                    {period ? "—" : <CalibrationChip provenance={l.provenance} />}
                   </Td>
                 </>
               )}
@@ -208,7 +238,7 @@ export function SubscriptionSplitTable({
           <Td align="right" mono title={full(totalTokens)} style={{ ...TOTAL_CELL, color: "var(--muted)" }}>{compact(totalTokens)}</Td>
           <Td align="right" mono title={MONEY_HINT.api} style={{ ...TOTAL_CELL, color: "var(--muted)" }}>{formatMoney(totalApi)}</Td>
           <Td align="right" mono style={{ ...TOTAL_CELL, fontWeight: "var(--fw-semibold)", color: totalBilled == null ? "var(--faint)" : "var(--text)" }}>
-            {totalBilled == null ? billingUnavailable().label : `${lines.some(l => l.billedUsd == null) ? "≥ " : ""}${formatMoney(totalBilled)}`}
+            {totalBilled == null ? billingUnavailable().label : `${lines.some(l => l.billedUsd == null || l.billedComplete === false) ? "≥ " : ""}${formatMoney(totalBilled)}`}
           </Td>
           {usedCell(totalVerdict, TOTAL_CELL)}
           {moreColumns && (
