@@ -73,6 +73,9 @@ test("a billing cycle splits its windows by how each started, weights the last b
   expect(record.earlyResets.automatic.usedPct).toEqual([57, 79, 100, 82]);
   expect(record.earlyResets.automatic.n).toBe(4);
   expect(record.earlyResets.banked.usedPct).toEqual([100, 100]);
+  expect(record.bankedGranted).toBeNull();
+  const granted = publicBillingCycle(billing({ banked_granted: { count: 3, from: "2026-09-08T23:00:00.000Z", complete: true } }), catalog, "codex", false);
+  expect(granted.bankedGranted).toEqual({ count: 3, complete: true });
   const use = resetUse([{ id: "codex-A", provider: "codex", label: "A", cycles: [record] }]);
   expect(use.automatic).toMatchObject({ resets: 4, withReading: 4, medianUsedPct: 81 });
   expect(use.banked.medianUsedPct).toBe(100);
