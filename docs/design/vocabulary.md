@@ -21,3 +21,13 @@ Checked 2026-10-25 against the active source. The design contract is `paper-atla
 The model table, its input definitions and the token composition are shared. Provider
 adapters supply quantities and valuation availability. Calibration remains in Data
 and calibration. Other screens and the application shell are outside this change.
+
+2026-10-26: screen scope is the Project drawer's subscription split, using the owner's
+attached table as the reference. Account rows expand into dated plan rows in the same
+columns (the owner's explicit exception to the drawer-only detail convention).
+`SubscriptionSplitTable.tsx`, its view model and period contracts own this change.
+Reuse `TableRow`, `Td`, `SubscriptionName`, `Pill` and `.ui-disclosure`; indentation
+uses `--s-9`. No new CSS, tokens, variants or primitives.
+Owner decision, 2026-10-26: newest entries always appear first. Account rows use
+latest activity; expanded plan periods and their tooltip history run newest first,
+including multiple changes during the same day. Cost does not determine ordering.
