@@ -37,7 +37,8 @@ import { observedPoolDays, windowPoolSeries } from "../../src/web/lib/pool-serie
 import { isCanonicalMedianSample } from "../../src/web/lib/canonical-median";
 import { capacityFull, capacityIsLowerBound, capacityMedianSample, capacityPlanKey } from "../../src/web/lib/codex-capacity";
 import { handleProjectCost } from "../../src/server/api-projects";
-import { publicCompare, publicProjects } from "./howto-home";
+import { publicCapacityEvents, publicCompare, publicProjects, publicWindowCompare } from "./howto-home";
+import { publishDisplayPlanCatalog } from "../../src/web/lib/plan-catalog";
 import { publicBilling, resetUse, changeEvents, planTrends, markPlanChange, planChangeFragments } from "./howto-capacity";
 import { handleBillingCycles } from "../../src/server/api-projects";
 import type { BillingCycle, BillingCyclesAccount } from "../../src/shared/billing-cycles";
@@ -218,6 +219,10 @@ function cycleRecord(window: CodexComparisonWindow, open = false) {
   return {
     start: window.start, end: window.end, plan, planStatus: window.plan_detail?.status ?? "unknown",
     observedPp: num(window.observed_pp, 1), events: window.usage.events, tokens: window.usage.tokens,
+    // The meter's reading at the cycle's first and last sample, and the Cycles list's two warnings.
+    startPercent: num(window.start_percent, 1), endPercent: num(window.end_percent, 1),
+    uncertainBoundary: window.cycle_start === null || window.cycle_end_basis === "uncertain",
+    gapHours: window.max_gap_hours >= 2 ? num(window.max_gap_hours, 1) : null,
     // What the cycle's traffic is worth at API rates (the figure capacity is derived from), not a charge.
     apiUsd: window.usage.events > 0 && window.usage.events > window.usage.unpriced_events ? num(window.usage.api_normalized ?? window.usage.api_standard) : null,
     capacityUsd: value === null ? null : round(value, 2), capacityReason: value === null ? missingCapacityReason(window) : null,
@@ -385,6 +390,8 @@ export function publicHowtoSnapshot(inputs: HowtoInputs, now: number) {
   const cards = buildRoster(inputs.roster, now);
   const providers = publicProviders(inputs.weekly, inputs.catalog, now);
   const example = pickCardExample(cards);
+  // The screens name plans from the catalog the app publishes once it is loaded; the window comparison reads them the same way.
+  publishDisplayPlanCatalog(inputs.catalog);
   return {
     version: HOWTO_SNAPSHOT_VERSION, generatedAt: new Date(now).toISOString(),
     method: { duplicateCyclesRemoved: duplicateCycles(inputs.weekly), promotionCyclesExcluded: true, dayBasis: "UTC", minObservedPp: MIN_OBSERVED_PP, bucketDays: BUCKET_DAYS, weeksPerMonth: round(WEEKS_PER_MONTH, 4), unit: "API-equivalent USD per 100% of a weekly window" },
@@ -396,11 +403,16 @@ export function publicHowtoSnapshot(inputs: HowtoInputs, now: number) {
     capacityHistory5h: inputs.fiveHour ? publicCapacityHistory(inputs.fiveHour) : null,
     providers,
     capacity: capacitySection(inputs, now, providers),
-    // Inputs of the landing's home-page instruments: the compare band and ranked anonymous projects.
+    // Inputs of the landing's home-page instruments: the compare band, the window comparison and ranked anonymous projects.
     home: {
       compare: inputs.cardWindows && example ? publicCompare(inputs.cardWindows, now, anonymousSubscriptions(inputs.weekly)
         .find(item => item.provider === example.vendor && item.account.toLowerCase() === example.id.toLowerCase())?.label ?? null) : null,
       projects: inputs.projects ? publicProjects(inputs.projects.week, inputs.projects.month) : null,
+      // The WindowCompare screen of the Claude account the window card shows.
+      windowCompare: inputs.claude ? publicWindowCompare(inputs.claude.windows, now, anonymousSubscriptions(inputs.weekly)
+        .find(item => item.provider === "claude" && item.account.toLowerCase() === inputs.claude!.windows.account.toLowerCase())?.label ?? null) : null,
+      // Global resets and announcements the Capacity screen draws over the cycles.
+      capacityEvents: publicCapacityEvents(now),
     },
   };
 }

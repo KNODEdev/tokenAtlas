@@ -1,6 +1,10 @@
 import type { WindowsResponse } from "../../src/web/lib/api/usage";
-import { buildWindowInsights } from "../../src/web/lib/window-insights";
+import { buildWindowInsights, sampleCurveAt } from "../../src/web/lib/window-insights";
+import { comparedWindows, medianCourse, windowCounters, windowEndHours, windowHoursCourse, windowPlanKey, windowPlanLabel, type HoursPoint } from "../../src/web/lib/window-archive";
+import type { RailWindow } from "../../src/web/lib/windows";
 import { typicalBand, shapeAt } from "../../src/web/lib/window-status";
+import { COMPLETED_PROVIDER_RESETS } from "../../src/shared/completed-provider-resets";
+import { CODEX_PROMOTIONS } from "../../src/shared/codex-promotions";
 
 /**
  * Parts of the snapshot that feed the landing's home-page instruments. Same rules as the rest of the export: existing reads, nothing
@@ -37,6 +41,54 @@ export function publicCompare(windows: WindowsResponse, now: number, subscriptio
   };
 }
 
+const planOf = (window: RailWindow) => windowPlanLabel(window.counterKey?.split(":")[0] ?? "", windowPlanKey(window), window.startIso?.slice(0, 10));
+const course = (points: readonly HoursPoint[]) => points.map(([hours, percent]) => [round(hours, 3), round(percent, 2)] as const);
+
+/**
+ * The app's WindowCompare screen for the weekly counter, read the way the screen reads it: the current window, the newest closed
+ * windows, the typical course of windows with the same plan and cadence, and each window at the current moment. Times and percentages
+ * only; machines, traffic and identities stay out. Null when the account has no weekly window with readings.
+ */
+export function publicWindowCompare(windows: WindowsResponse, now: number, subscription: string | null) {
+  const counter = windowCounters(windows.windows, "shortest").find(item => !item.isSublimit && item.windowHours === 168
+    && item.rows.some(row => row.isCurrent || (row.percentBasis === "measured" && row.shape)));
+  if (!counter) return null;
+  const current = counter.rows.find(row => row.isCurrent && row.usedPercent != null) ?? null;
+  const reference = current ?? counter.rows.find(row => row.percentBasis === "measured" && row.shape) ?? null;
+  const insight = current ? buildWindowInsights(counter.rows, now).find(item => !item.isSublimit && item.current.windowKey === current.key) ?? null : null;
+  const hours = reference?.windowHours ?? counter.windowHours ?? 168;
+  const nowHours = current ? windowEndHours(current) : null;
+  const elapsed = current?.elapsedPercent ?? null;
+  const typicalWindows = insight && !insight.buildingHistory
+    ? insight.comparableWindows.flatMap(item => counter.rows.find(row => row.key === item.windowKey) ?? []) : [];
+  const median = medianCourse(typicalWindows.map(windowHoursCourse), hours / 48);
+  const typicalEnd = insight?.typicalEndPercent ?? null;
+  return {
+    subscription, plan: reference ? planOf(reference) : null, hours: round(hours, 3),
+    nowHours: nowHours === null ? null : round(nowHours, 3), elapsed: elapsed === null ? null : round(elapsed, 2),
+    current: current && nowHours !== null ? {
+      startIso: current.startIso, resetIso: current.resetIso, usedPercent: round(current.usedPercent!, 2), exact: current.percentBasis === "measured",
+      course: course(windowHoursCourse(current)), forecast: insight?.forecastPercent ?? null,
+    } : null,
+    closed: comparedWindows(counter.rows, reference).map(({ window, comparable }) => {
+      const points = windowHoursCourse(window), last = points.at(-1);
+      const sample = elapsed === null ? null : sampleCurveAt(window.shape, elapsed, window.activityShape);
+      return {
+        startIso: window.startIso, resetIso: window.resetIso, usedPercent: window.usedPercent === null ? null : round(window.usedPercent, 2), comparable,
+        // Grey windows say why: another plan (named) or another cadence.
+        other: comparable ? null : reference && windowPlanKey(window) !== windowPlanKey(reference) ? { kind: "plan" as const, plan: planOf(window) } : { kind: "cadence" as const },
+        course: course(points),
+        end: last ? { hours: round(last[0], 3), percent: round(last[1], 2), mark: last[1] >= 100 ? "exhausted" as const : "ended" as const } : null,
+        at: sample ? { value: round(sample.value, 2), exact: sample.basis === "measured" } : null,
+      };
+    }),
+    typical: typicalEnd !== null && insight ? {
+      end: typicalEnd, at: insight.typicalAtElapsed, count: insight.baselineCount, course: median.length > 1 ? course(median) : [],
+    } : null,
+    building: insight?.buildingHistory ? Math.min(insight.baselineCount, 2) : null,
+  };
+}
+
 export interface ProjectSubject { kind: string; api_usd: number }
 /**
  * The three largest projects of the last 30 days, ranked, with their value in the last 7 and 30 days. Names, paths and ids are never read
@@ -54,4 +106,24 @@ export function publicProjects(cost7: { subjects: Array<ProjectSubject & { subje
     // How much of all project spend the three shown cover, so the instrument never implies they are everything.
     topShareOfMonth: total > 0 ? round(top.reduce((sum, item) => sum + item.api_usd, 0) / total * 100, 1) : null,
   };
+}
+
+/**
+ * The public dated events the app's Capacity screen draws over the cycles (CapacityAnnotations): completed global resets and Codex
+ * plan and promotion announcements, from the catalogs shipped with the app. Each keeps the app's caveat kind: an announcement
+ * is not an account transition and a reset confirmation is not proof of receipt.
+ */
+export function publicCapacityEvents(now: number) {
+  const resets = COMPLETED_PROVIDER_RESETS.filter(reset => Date.parse(reset.at) <= now).map(reset => ({
+    id: `reset:${reset.id}`, provider: reset.provider, at: reset.at, kind: "reset" as const, title: null, plans: [] as string[], source: reset.source,
+  }));
+  const announcements = CODEX_PROMOTIONS.filter(promotion => ["allowance", "discount", "window", "policy"].includes(promotion.kind)).flatMap(promotion => {
+    const dates: Array<{ suffix: string; at: string; kind: "policy" | "promotion" | "promotion_end" }> = [{ suffix: "announcement", at: promotion.announced_at ?? `${promotion.announced}T00:00:00Z`, kind: promotion.kind === "policy" ? "policy" : "promotion" }];
+    if (promotion.until) dates.push({ suffix: "end", at: new Date(Date.parse(promotion.until) + 86_400_000).toISOString(), kind: "promotion_end" });
+    return dates.filter(date => Date.parse(date.at) <= now).map(date => ({
+      id: `promotion:${promotion.id}:${date.suffix}`, provider: "codex" as const, at: date.at, kind: date.kind,
+      title: { en: promotion.title.en, pl: promotion.title.pl }, plans: [...promotion.plans], source: promotion.source,
+    }));
+  });
+  return [...resets, ...announcements].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }

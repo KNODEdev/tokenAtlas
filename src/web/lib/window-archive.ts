@@ -4,7 +4,7 @@
  * unused window from an early reset, and usage courses in hours since the window started.
  */
 import type { RailSublimit, RailWindow } from "./windows";
-import { windowCounterKey } from "./window-insights";
+import { windowCounterKey, windowRegimeKey } from "./window-insights";
 import { subscriptionPlan } from "./subscription-plan";
 import { translate } from "./i18n";
 
@@ -218,4 +218,18 @@ export function comparedCycles(cycles: ReadonlyArray<{ index: number; isActive: 
 export function toggleCompared(selected: number[], index: number): number[] {
   if (selected.includes(index)) return selected.length > 1 ? selected.filter((other) => other !== index) : selected;
   return selected.length < COMPARE_LIMIT - 1 ? [...selected, index] : selected;
+}
+
+const SHOWN_CLOSED = 4;
+
+/**
+ * Closed windows worth drawing next to the current one: the newest with readings. Windows of another
+ * plan or cadence stay in grey and out of the typical course (UI audit decision 13).
+ */
+export function comparedWindows(rows: RailWindow[], reference: RailWindow | null): Array<{ window: RailWindow; comparable: boolean }> {
+  const regime = reference ? windowRegimeKey(reference) : null;
+  return rows
+    .filter((row) => row !== reference && !row.isCurrent && row.percentBasis === "measured" && (row.shape?.length ?? 0) > 0)
+    .slice(0, SHOWN_CLOSED)
+    .map((window) => ({ window, comparable: regime != null && windowRegimeKey(window) === regime }));
 }

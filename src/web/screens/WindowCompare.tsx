@@ -1,30 +1,18 @@
 import { useMemo, useState } from "react";
-import { buildWindowInsights, sampleCurveAt, windowRegimeKey } from "../lib/window-insights";
+import { buildWindowInsights, sampleCurveAt } from "../lib/window-insights";
 import type { RailWindow } from "../lib/windows";
-import { medianCourse, windowCounters, windowEndHours, windowHoursCourse, windowPlanKey, windowPlanLabel } from "../lib/window-archive";
+import { comparedWindows, medianCourse, windowCounters, windowEndHours, windowHoursCourse, windowPlanKey, windowPlanLabel } from "../lib/window-archive";
 import { COMPARED_COLORS, CourseChart, SameMomentTable, type CourseLine, type SameMomentRow } from "../components/CourseCompare";
 import { Card, EmptyState, Pill, Tabs, HelpDot } from "../components/ui";
 import { clockTime, dayMonth, dayTime, duration, pct } from "../lib/format";
 import { useI18n } from "../lib/i18n";
 import "./History.css";
 
-const SHOWN_CLOSED = 4;
+export { comparedWindows };
 
 /** Plan of a window as a short label; the provider is the counter key's prefix. */
 function planOf(window: RailWindow): string {
   return windowPlanLabel(window.counterKey?.split(":")[0] ?? "", windowPlanKey(window), window.startIso?.slice(0, 10));
-}
-
-/**
- * Closed windows worth drawing next to the current one: the newest with readings. Windows of another
- * plan or cadence stay in grey and out of the typical course (UI audit decision 13).
- */
-export function comparedWindows(rows: RailWindow[], reference: RailWindow | null): Array<{ window: RailWindow; comparable: boolean }> {
-  const regime = reference ? windowRegimeKey(reference) : null;
-  return rows
-    .filter((row) => row !== reference && !row.isCurrent && row.percentBasis === "measured" && (row.shape?.length ?? 0) > 0)
-    .slice(0, SHOWN_CLOSED)
-    .map((window) => ({ window, comparable: regime != null && windowRegimeKey(window) === regime }));
 }
 
 /**
