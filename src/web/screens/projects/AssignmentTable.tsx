@@ -71,7 +71,7 @@ export function AssignmentTable({
       <input
         value={query}
         onChange={(e) => onQuery(e.target.value)}
-        placeholder={t("search path: repos clients, mesflow, OneDrive…", "szukaj w ścieżce: repos clients, mesflow, OneDrive…")}
+        placeholder={t("search path: repos clients, example, OneDrive…", "szukaj w ścieżce: repos clients, example, OneDrive…")}
         aria-label={t("Search directory paths", "Szukaj w ścieżkach katalogów")}
         className="ui-input"
         style={{ width: 380, maxWidth: "100%" }}

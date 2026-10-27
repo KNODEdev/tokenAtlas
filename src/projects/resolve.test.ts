@@ -27,17 +27,17 @@ function prng(seed: number): () => number {
   };
 }
 const CONFIG: ProjectsConfig = { projects: [
-  { id: "dated", name: "Dated", matches: [{ cwd: "H:/_Dev/repos/products/alpha", from: "2026-09-12", until: "2026-09-14" }] },
-  { id: "alpha", name: "Alpha", matches: [{ cwd: "H:/_Dev/repos/products/alpha" }] },
+  { id: "dated", name: "Dated", matches: [{ cwd: "C:/example/repos/products/alpha", from: "2026-09-12", until: "2026-09-14" }] },
+  { id: "alpha", name: "Alpha", matches: [{ cwd: "C:/example/repos/products/alpha" }] },
   { id: "globbed", name: "Globbed", matches: [{ cwd: "*/clients/*/web*" }] },
   { id: "by-repo", name: "By repo", matches: [{ repo: "BETA" }] },
   { id: "by-name", name: "By name", matches: [{ project: "Gamma" }] },
-  { id: "store-bound", name: "Store bound", matches: [{ store: "mirror", cwd: "H:/_Dev/repos/products" }] },
+  { id: "store-bound", name: "Store bound", matches: [{ store: "mirror", cwd: "C:/example/repos/products" }] },
   { id: "codex-account", name: "Codex account", matches: [{ store: "acct-c", project: "alpha" }] },
   { id: "late", name: "Late", matches: [{ cwd: "C:\\Work\\Delta\\", from: "2026-09-13" }] },
 ], repo: { roots: ["repos"], nested_groups: ["clients"] } };
-const DIRS = ["H:/_Dev/repos/products/alpha", "h:\\_dev\\repos\\products\\alpha\\sub", "H:/_Dev/repos/products/alphabet", "H:/_Dev/repos/clients/acme/website",
-  "H:/_Dev/repos/clients/acme/WebShop", "H:/_Dev/repos/products/beta", "H:/_Dev/repos/products/Beta/x", "C:/Work/Delta", "c:/work/delta/deep", "D:/other/gamma", null, ""];
+const DIRS = ["C:/example/repos/products/alpha", "c:\\example\\repos\\products\\alpha\\sub", "C:/example/repos/products/alphabet", "C:/example/repos/clients/acme/website",
+  "C:/example/repos/clients/acme/WebShop", "C:/example/repos/products/beta", "C:/example/repos/products/Beta/x", "C:/Work/Delta", "c:/work/delta/deep", "D:/other/gamma", null, ""];
 
 test("the resolver equals the remap for every distinct key and raw day", () => {
   const { directory, dbPath } = createTestDatabase();

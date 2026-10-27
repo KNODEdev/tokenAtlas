@@ -18,7 +18,7 @@ import os from "node:os";
 const transcript = { store: "live", call_id: "msg_1", ts: "2026-10-21T07:00:02.500Z", path: "claude/PC/teleport/a.jsonl",
   cwd: "H:/TMP/teleport-clone", project: "teleport-clone", entrypoint: "claude-desktop", session_id: "local",
   in_uncached: 2, in_cache_read: 100, in_cache_write: 5, out_total: 1484, out_thinking: 154 };
-const cloud = { ...transcript, path: "claude/PC-cloud/session_x.events.jsonl", cwd: "H:/repos/TactShift", project: "TactShift",
+const cloud = { ...transcript, path: "claude/PC-cloud/session_x.events.jsonl", cwd: "C:/example/projects/SampleApp", project: "SampleApp",
   entrypoint: CLAUDE_CLOUD_ENTRYPOINT, session_id: "s-1", out_total: 0, out_thinking: 0 };
 
 function database() {

@@ -12,32 +12,32 @@ const source = (url: string) => ({ type: "git_repository", url });
 
 describe("repositoryKey", () => {
   test("HTTPS, SSH and .git forms name the same repository", () => {
-    expect(repositoryKey("https://github.com/KNODEdev/TactShift")).toBe("github.com/knodedev/tactshift");
-    expect(repositoryKey("https://github.com/KNODEdev/TactShift.git")).toBe("github.com/knodedev/tactshift");
-    expect(repositoryKey("git@github.com:KNODEdev/TactShift.git")).toBe("github.com/knodedev/tactshift");
+    expect(repositoryKey("https://github.com/example-org/SampleApp")).toBe("github.com/example-org/sampleapp");
+    expect(repositoryKey("https://github.com/example-org/SampleApp.git")).toBe("github.com/example-org/sampleapp");
+    expect(repositoryKey("git@github.com:example-org/SampleApp.git")).toBe("github.com/example-org/sampleapp");
     expect(repositoryKey("not a url")).toBeNull();
   });
 });
 
 describe("cloudPlaces", () => {
   const clones = new Map([
-    ["github.com/knodedev/tactshift", ["H:/repos/products/TactShift-feature", "H:/repos/products/TactShift"]],
-    ["github.com/knodedev/agentroad", ["H:/repos/products/Agentroad"]],
+    ["github.com/example-org/sampleapp", ["C:/example/repos/products/SampleApp-feature", "C:/example/repos/products/SampleApp"]],
+    ["github.com/example-org/secondapp", ["C:/example/repos/products/SecondApp"]],
   ]);
   test("maps the container checkout to the clone named like the repository", () => {
-    expect(cloudPlaces([source("https://github.com/KNODEdev/TactShift")], clones)).toEqual([
-      { repository: "https://github.com/KNODEdev/TactShift", remote: "/home/user/TactShift", local: "H:/repos/products/TactShift" }]);
+    expect(cloudPlaces([source("https://github.com/example-org/SampleApp")], clones)).toEqual([
+      { repository: "https://github.com/example-org/SampleApp", remote: "/home/user/SampleApp", local: "C:/example/repos/products/SampleApp" }]);
   });
   test("owners differ only in case still need the exact URL; unknown repositories stay unresolved", () => {
-    expect(cloudPlaces([source("https://github.com/Kaltorre/_SKILS"), source("https://github.com/KNODEdev/_skils")], clones)
-      .map(place => [place.remote, place.local])).toEqual([["/home/user/_SKILS", null], ["/home/user/_skils", null]]);
+    expect(cloudPlaces([source("https://github.com/legacy-org/EXAMPLE-TOOLS"), source("https://github.com/example-org/example-tools")], clones)
+      .map(place => [place.remote, place.local])).toEqual([["/home/user/EXAMPLE-TOOLS", null], ["/home/user/example-tools", null]]);
   });
   test("aliases follow a repository moved between owners; explicit paths win", () => {
-    const config = { aliases: { "https://github.com/Kaltorre/Agentroad": "https://github.com/KNODEdev/Agentroad" },
-      paths: { "https://github.com/KNODEdev/claude-mcp-plugins": "H:\\repos\\plugins\\" } };
-    expect(cloudPlaces([source("https://github.com/Kaltorre/Agentroad"), source("https://github.com/KNODEdev/claude-mcp-plugins"),
+    const config = { aliases: { "https://github.com/legacy-org/SecondApp": "https://github.com/example-org/SecondApp" },
+      paths: { "https://github.com/example-org/example-plugin": "C:\\example\\repos\\plugins\\" } };
+    expect(cloudPlaces([source("https://github.com/legacy-org/SecondApp"), source("https://github.com/example-org/example-plugin"),
       { type: "other", url: "x" }], clones, config).map(place => place.local))
-      .toEqual(["H:/repos/products/Agentroad", "H:/repos/plugins"]);
+      .toEqual(["C:/example/repos/products/SecondApp", "C:/example/repos/plugins"]);
   });
 });
 
@@ -45,15 +45,15 @@ describe("localRepositories", () => {
   test("reads remotes of literal rule directories, including a worktree's common config", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-cloud-places-"));
     roots.push(root);
-    const main = path.join(root, "TactShift"), worktree = path.join(root, "TactShift-feature");
+    const main = path.join(root, "SampleApp"), worktree = path.join(root, "SampleApp-feature");
     fs.mkdirSync(path.join(main, ".git", "worktrees", "feature"), { recursive: true });
-    fs.writeFileSync(path.join(main, ".git", "config"), '[remote "origin"]\n\turl = https://github.com/KNODEdev/TactShift.git\n');
+    fs.writeFileSync(path.join(main, ".git", "config"), '[remote "origin"]\n\turl = https://github.com/example-org/SampleApp.git\n');
     fs.writeFileSync(path.join(main, ".git", "worktrees", "feature", "commondir"), "../..\n");
     fs.mkdirSync(worktree);
     fs.writeFileSync(path.join(worktree, ".git"), `gitdir: ${path.join(main, ".git", "worktrees", "feature")}\n`);
-    expect(gitRemoteUrls(worktree)).toEqual(["https://github.com/KNODEdev/TactShift.git"]);
-    const clones = localRepositories({ projects: [{ id: "tactshift", name: "TactShift", matches: [
+    expect(gitRemoteUrls(worktree)).toEqual(["https://github.com/example-org/SampleApp.git"]);
+    const clones = localRepositories({ projects: [{ id: "sampleapp", name: "SampleApp", matches: [
       { cwd: main }, { cwd: worktree }, { cwd: `${root}/*` }, { repo: "x" }] }] });
-    expect(clones.get("github.com/knodedev/tactshift")).toEqual([main, worktree].map(dir => dir.replace(/\\/g, "/")));
+    expect(clones.get("github.com/example-org/sampleapp")).toEqual([main, worktree].map(dir => dir.replace(/\\/g, "/")));
   });
 });

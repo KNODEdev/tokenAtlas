@@ -535,7 +535,7 @@ describe("probe call sites", () => {
       const invalidAccounting = await transportFetch!(accountingRequest, transport) as Response;
       expect(invalidAccounting.status).toBe(400);
       expect(timeoutsForRequests).toEqual([[accountingRequest, 0]]);
-      const historyRequest = new Request("http://localhost/api/repo-history?project=mesflow&since=invalid");
+      const historyRequest = new Request("http://localhost/api/repo-history?project=sampleapp&since=invalid");
       const invalidHistory = await transportFetch!(historyRequest, transport) as Response;
       expect(invalidHistory.status).toBe(400);
       expect(timeoutsForRequests).toEqual([[accountingRequest, 0], [historyRequest, 0]]);

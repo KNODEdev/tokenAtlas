@@ -25,7 +25,7 @@ function provider(initial: { events: number; updatedAt: string }) {
     if (u.pathname === "/v1/sessions") return { status: 200, text: JSON.stringify({ has_more: false, data: [
       { id: "session_cloud1", environment_kind: "anthropic_cloud", updated_at: remote.updatedAt, title: "t",
         session_context: { cwd: "", environment_variables: { SECRET: "x" }, mcp_config: { token: "y" },
-          sources: [{ type: "git_repository", url: "https://github.com/Owner/TactShift" }] } },
+          sources: [{ type: "git_repository", url: "https://github.com/Owner/SampleApp" }] } },
       { id: "session_bridge", environment_kind: "bridge", updated_at: remote.updatedAt },
     ] }) };
     expect(headers["X-Trusted-Device-Token"]).toBe("device");
@@ -54,7 +54,7 @@ function fixture() {
       return { directory, dispose: () => fs.rmSync(directory, { recursive: true, force: true }) };
     },
     projects: () => ({ projects: [] }),
-    repositories: () => ({ paths: { "https://github.com/owner/tactshift": "H:/repos/products/TactShift" } }),
+    repositories: () => ({ paths: { "https://github.com/owner/sampleapp": "C:/example/projects/SampleApp" } }),
   });
   const events = path.join(profile.archiveDir, "session_cloud1.events.jsonl");
   const session = path.join(profile.archiveDir, "session_cloud1.session.jsonl");
@@ -97,8 +97,8 @@ describe("syncClaudeCloudSessions", () => {
     expect(f.lines(f.events).map(e => e.sequence_num)).toEqual(["1", "2", "3"]);
     const declaration = f.lines(f.session);
     expect(declaration).toHaveLength(1);
-    expect(declaration[0].places).toEqual([{ repository: "https://github.com/Owner/TactShift", remote: "/home/user/TactShift",
-      local: "H:/repos/products/TactShift" }]);
+    expect(declaration[0].places).toEqual([{ repository: "https://github.com/Owner/SampleApp", remote: "/home/user/SampleApp",
+      local: "C:/example/projects/SampleApp" }]);
     expect(declaration[0].owner).toEqual({ account_key: "claude:00000000-0000-4000-8000-000000000001:00000000-0000-4000-8000-0000000000aa" });
     expect(JSON.stringify(declaration)).not.toContain("SECRET");
     expect(JSON.stringify(declaration)).not.toContain("mcp_config");

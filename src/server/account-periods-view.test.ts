@@ -101,8 +101,8 @@ test("sources come from periods, recorded calls and declarations, with their com
   const ctx = workspace();
   try {
     recordPeriodReading(ctx.sqlite, ACCOUNT_PERIODS, { provider: "claude", subject: "claude/example-laptop-a", ts: "2026-09-11T09:52:10.405Z", value: "claude-sm" });
-    recorded(ctx.sqlite, { vendor: "claude", store: "live", path: `${ARCHIVE}/claude/EXAMPLE-MAIN/H---Dev/a.jsonl`, day: "2026-07-20", calls: 4, first: "2026-07-20T08:00:00Z", last: "2026-07-20T09:00:00Z" });
-    recorded(ctx.sqlite, { vendor: "anthropic", store: "live", path: `${ARCHIVE}/claude/EXAMPLE-MAIN/H---Dev/b.jsonl`, day: "2026-07-22", calls: 6, first: "2026-07-22T08:00:00Z", last: "2026-07-22T10:00:00Z" });
+    recorded(ctx.sqlite, { vendor: "claude", store: "live", path: `${ARCHIVE}/claude/EXAMPLE-MAIN/C--example/a.jsonl`, day: "2026-07-20", calls: 4, first: "2026-07-20T08:00:00Z", last: "2026-07-20T09:00:00Z" });
+    recorded(ctx.sqlite, { vendor: "anthropic", store: "live", path: `${ARCHIVE}/claude/EXAMPLE-MAIN/C--example/b.jsonl`, day: "2026-07-22", calls: 6, first: "2026-07-22T08:00:00Z", last: "2026-07-22T10:00:00Z" });
     recorded(ctx.sqlite, { vendor: "claude", store: "desktop", path: `${ARCHIVE}/claude/EXAMPLE-MAIN-desktop/c.jsonl`, day: "2026-06-25", calls: 2, first: "2026-06-25T08:00:00Z", last: "2026-06-25T08:30:00Z" });
     recorded(ctx.sqlite, { vendor: "codex", store: `${ARCHIVE}/codex/EXAMPLE-MAIN-sample_a`, path: "rollout-1.jsonl", day: "2026-08-01", calls: 9, first: "2026-08-01T07:00:00Z", last: "2026-08-01T11:00:00Z" });
     // A live local mirror is outside the archive and names no source.
@@ -190,9 +190,9 @@ test("a preview counts the events of the source in range and lists the observed 
   try {
     recordPeriodReading(ctx.sqlite, ACCOUNT_PERIODS, { provider: "claude", subject: "claude/example-main", ts: "2026-09-09T15:48:11.251Z", value: "claude-sm" });
     for (const day of ["2026-07-19", "2026-07-20", "2026-07-22", "2026-07-29", "2026-08-01"]) {
-      recorded(ctx.sqlite, { vendor: "claude", store: "live", path: `${ARCHIVE}/claude/EXAMPLE-MAIN/H---Dev/${day}.jsonl`, day, calls: 3, first: `${day}T08:00:00Z`, last: `${day}T09:00:00Z` });
+      recorded(ctx.sqlite, { vendor: "claude", store: "live", path: `${ARCHIVE}/claude/EXAMPLE-MAIN/C--example/${day}.jsonl`, day, calls: 3, first: `${day}T08:00:00Z`, last: `${day}T09:00:00Z` });
     }
-    recorded(ctx.sqlite, { vendor: "claude", store: "live", path: `${ARCHIVE}/claude/EXAMPLE-LAPTOP-A/H---Dev/x.jsonl`, day: "2026-07-21", calls: 50, first: "2026-07-21T08:00:00Z", last: "2026-07-21T09:00:00Z" });
+    recorded(ctx.sqlite, { vendor: "claude", store: "live", path: `${ARCHIVE}/claude/EXAMPLE-LAPTOP-A/C--example/x.jsonl`, day: "2026-07-21", calls: 50, first: "2026-07-21T08:00:00Z", last: "2026-07-21T09:00:00Z" });
     prepare(ctx);
 
     // `until` at midnight stops the day before; the other source's day is not counted.

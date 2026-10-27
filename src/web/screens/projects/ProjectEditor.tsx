@@ -149,7 +149,7 @@ export function ProjectEditor({
             onChange={(v) => setMatches(matches.map((x, j) => (j === i ? withValue(x, kindOf(x), v) : x)))}
             width={360}
             invalid={!valueOf(m).trim()}
-            placeholder="H:/_Dev/repos/…"
+            placeholder="C:/projects/example"
           />
           <TextInput
             value={m.store ?? ""}

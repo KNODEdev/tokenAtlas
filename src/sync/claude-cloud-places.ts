@@ -32,7 +32,7 @@ export function repositoryKey(url: string): string | null {
   const match = REPOSITORY_URL.exec(url.trim());
   return match ? `${match[1]}/${match[2]}/${match[3]}`.toLowerCase() : null;
 }
-/** The checkout directory name keeps the URL's case (`TactShift`, not `tactshift`). */
+/** The checkout directory name keeps the URL's case (`SampleApp`, not `sampleapp`). */
 const repositoryName = (url: string) => REPOSITORY_URL.exec(url.trim())?.[3] ?? null;
 
 /** Remote URLs from a checkout's Git config (a worktree reads its common directory). */
