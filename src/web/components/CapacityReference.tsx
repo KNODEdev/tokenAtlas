@@ -143,7 +143,6 @@ export function CapacityReferenceLine({ model, label, color, lane = 0, second = 
     <span ref={badge} className={badgeRight ? "capacity-reference-badge capacity-reference-badge-right" : "capacity-reference-badge"} style={badgePosition === null ? undefined : { top: `${badgePosition * 100}%` }}>
       <small className="capacity-reference-date">{pinLabel || t("Free line · no pinned period", "Swobodna linia · bez przypiętego okresu")}</small>
       <strong>{label} · 100%: {full(line.value)}</strong>
-      <span>1%: {per(line.value / 100)}</span>
       {pinnedRow?.cycle_end_basis === "scheduled" && <small>{t("Scheduled end", "Planowany koniec")}</small>}
       {pinnedRow?.cycle_end_basis === "uncertain" && <small>{t("Uncertain end", "Niepewny koniec")}</small>}
     </span>
