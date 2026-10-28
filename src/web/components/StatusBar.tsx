@@ -18,6 +18,9 @@ import { creditNoticeAlert, creditNoticeLine, creditNoticeSuffix, useCreditNotic
 import { AppActivityDetails, viewName } from "./AppActivity";
 import "./StatusBar.css";
 import { ClaudeConnect } from "./ClaudeConnect";
+import { CloudSessionsHelp } from "./CloudSessionsHelp";
+import { cloudSessionProblems, useCloudSessions } from "../lib/cloud-sessions";
+import type { CloudSessionsResponse } from "../../shared/cloud-sessions";
 import { GhostButton } from "./ui";
 import { BOOTSTRAP_STAGES, bootstrapStageIndex, bootstrapStageLabel, DetailsChevron, LiveMark, RemapActivity,
   StartupActivity, SYNC_ACTIVITY_HEIGHT, SyncSources, SyncSummaryContent, useElapsed, useSyncView } from "./SyncActivity";
@@ -52,7 +55,7 @@ function time(value: string): string {
  * here: the bar then shows the synchronization itself, with its sources and counts.
  */
 
-export function statusLine({ sync, syncUnavailable, rebuild, waitingForSubscriptions, activity, staleAt, missingRates, probeNotices, creditNotices, overall = null, tasks = [], now = Date.now(), t }: {
+export function statusLine({ sync, syncUnavailable, rebuild, waitingForSubscriptions, activity, staleAt, missingRates, probeNotices, creditNotices, cloudSessions, cloudSessionsError, overall = null, tasks = [], now = Date.now(), t }: {
   sync: SyncStatus | null; syncUnavailable: boolean; rebuild: Rebuild; waitingForSubscriptions: boolean;
   activity: { data: ActivitySnapshot | null; unavailable: boolean }; staleAt: number | null;
   /** Models in traffic without a price; an otherwise current state says so instead of "Data up to date". */
@@ -61,6 +64,8 @@ export function statusLine({ sync, syncUnavailable, rebuild, waitingForSubscript
   probeNotices?: readonly ProbeNotice[] | null;
   /** Open package notices: a warning takes the line after a missing price; arrivals extend "Data up to date". */
   creditNotices?: readonly CreditNoticeView[] | null;
+  cloudSessions?: CloudSessionsResponse | null;
+  cloudSessionsError?: string | null;
   /** Share of the background work done (`overallFraction`), shown after the task count. */
   overall?: number | null;
   /** Background tasks of the current stretch (`backgroundTasks`). */
@@ -125,6 +130,11 @@ export function statusLine({ sync, syncUnavailable, rebuild, waitingForSubscript
   if (run?.status === "failure") return { tone: "error", title: t("Last synchronization failed", "Ostatnia synchronizacja nie powiodła się"),
     detail: `${finished ? `${time(finished)} · ` : ""}${browserSafeDiagnostic(run.error ?? t("no details", "brak szczegółów"))}`, progress: null };
   const partial = run?.status === "partial_success";
+  if (cloudSessionsError && sync) return { tone: "warn", title: t("Cloud import status unavailable", "Status importu chmury niedostępny"),
+    detail: t("Cloud import details in events", "Szczegóły importu chmury w zdarzeniach"), progress: null };
+  if (cloudSessionProblems(cloudSessions).length && sync) return { tone: "warn",
+    title: t("Claude cloud history incomplete", "Niepełna historia Claude z chmury"),
+    detail: t("Cloud import details in events", "Szczegóły importu chmury w zdarzeniach"), progress: null };
   // A reading not taken while a sign-in is expired is lost for good (a missing price applies later too), so it
   // comes first among the warnings; the details list every account and computer.
   const notices = probeNoticeLines(probeNotices);
@@ -197,6 +207,9 @@ export function StatusBar(props: StatusBarProps) {
   const missingRates = useMissingRates();
   const credit = useCreditNotices();
   const probeNotices = useProbeNotices();
+  const cloudRead = useCloudSessions();
+  const cloudSessions = cloudRead.data;
+  const cloudProblems = [...(cloudRead.error ? [cloudRead.error] : []), ...cloudSessionProblems(cloudSessions)];
   // Scopes of the current stretch of background work; it ends when no producer reports any.
   const seen = useRef(new Map<string, number>()).current;
   const names = useRef(new Map<string, string>()).current;
@@ -205,7 +218,7 @@ export function StatusBar(props: StatusBarProps) {
   const overall = background.length ? overallFraction(background, seen) : null;
   const tasks = background.length ? backgroundTasks(background, seen, names) : [];
   const now = Date.now();
-  const line = statusLine({ ...props, activity, staleAt, missingRates, probeNotices, creditNotices: credit.notices, overall, tasks, now, t });
+  const line = statusLine({ ...props, activity, staleAt, missingRates, probeNotices, creditNotices: credit.notices, cloudSessions, cloudSessionsError: cloudRead.error, overall, tasks, now, t });
   const alert = missingRateAlert(missingRates);
   const notices = probeNoticeLines(probeNotices);
   // The details panel closes when its button leaves for Settings, so it does not cover the opened tab.
@@ -219,7 +232,7 @@ export function StatusBar(props: StatusBarProps) {
   const events = (
     <div className="status-details-events" data-status-events>
       <h3>{t("Events", "Zdarzenia")}</h3>
-      {!notices.length && !alert && !credit.notices?.length && rebuild.job?.state !== "error"
+      {!notices.length && !alert && !credit.notices?.length && !cloudProblems.length && rebuild.job?.state !== "error"
         && <p className="status-details-empty">{t("No new events", "Brak nowych zdarzeń")}</p>}
       {rebuild.job?.state === "error" && <div className="status-event">
         <div className="status-event-head">
@@ -237,6 +250,13 @@ export function StatusBar(props: StatusBarProps) {
           </div>
           <span className="status-event-meta mono">{notice.tail}</span>
         </div>)}
+      </div>}
+      {cloudProblems.length > 0 && <div className="status-event" data-cloud-import-warning>
+        <div className="status-event-head">
+          <strong className="is-warn">{cloudRead.error ? t("Cloud import status unavailable", "Status importu chmury niedostępny")
+            : t("Claude cloud history incomplete", "Niepełna historia Claude z chmury")}</strong>
+          <div className="status-event-actions"><CloudSessionsHelp problems={cloudProblems} /></div>
+        </div>
       </div>}
       {alert && missingRates && <div ref={alertRef} data-missing-rate-alert className="status-event">
         <div className="status-event-head">
@@ -309,9 +329,13 @@ function StatusShell({ label, expand, stickyTop, summary, state, events }: { lab
   const details = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const onDown = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest("dialog[open]")) return;
       if (details.current?.open && !details.current.contains(event.target as Node)) details.current.open = false;
     };
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && details.current?.open) details.current.open = false; };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.target instanceof Element && event.target.closest("dialog[open]")) return;
+      if (event.key === "Escape" && details.current?.open) details.current.open = false;
+    };
     window.addEventListener("pointerdown", onDown);
     window.addEventListener("keydown", onKey);
     return () => { window.removeEventListener("pointerdown", onDown); window.removeEventListener("keydown", onKey); };

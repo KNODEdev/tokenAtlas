@@ -1,4 +1,10 @@
 {
+  "sort ascending": "trier par ordre croissant",
+  "sort descending": "trier par ordre décroissant",
+  "Newest": "Les plus récents",
+  "Default: newer model versions first": "Par défaut : versions de modèles les plus récentes en premier",
+  "Select one subscription to edit its timeline points": "Sélectionnez un abonnement pour modifier ses points de chronologie",
+  "No recorded traffic in this range.": "Aucun trafic enregistré sur cette période.",
   "Cache · whole conversation": "Cache · conversation entière",
   "Input size · tokens": "Volume d’entrée · tokens",
   "Cache read · % of input": "Lecture du cache · % de l’entrée",

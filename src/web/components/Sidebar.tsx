@@ -28,7 +28,7 @@ export function Sidebar({
   const item = (n: NavSection, badge?: string) => {
     const label = navText(n.label, language);
     return (
-      <button key={n.id} type="button" onClick={() => goto(sectionScreen(n))} aria-label={label} aria-current={active === n.id ? "page" : undefined}
+      <button key={n.id} data-privacy-public type="button" onClick={() => goto(sectionScreen(n))} aria-label={label} aria-current={active === n.id ? "page" : undefined}
         title={collapsed ? label : undefined} className="shell-nav-item">
         <span className="shell-nav-icon">{n.icon}</span>
         {!collapsed && <span>{label}</span>}

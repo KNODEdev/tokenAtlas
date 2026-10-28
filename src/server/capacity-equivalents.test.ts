@@ -1373,27 +1373,35 @@ describe("Integration & Regression against SQLite fixtures", () => {
                  ('2026-05-10T12:00:00Z', 'c:/users/test/.codex', 'my-repo', 'my-app', 'no-rate-model', 1000, 0, 0, 100, 0, 'sess-3')`);
         return db;
       };
-      const read = (periods: Parameters<typeof dbWithSpan>[0]) => {
+      const read = (periods: Parameters<typeof dbWithSpan>[0], granularity: "day" | "week" | "month" = "month") => {
         const cost = buildProjectCost(withSubjects(periods), periodOnly as any, homeToSubId, { ...range, plansCatalog: shippedCatalog });
-        const history = buildRepoHistory(withSubjects(periods), { repo: null, projectId: "my-app", granularity: "month", by: "none",
+        const history = buildRepoHistory(withSubjects(periods), { repo: null, projectId: "my-app", granularity, by: "none",
           idleGapMinutes: 15, ...range, rateCards: periodOnly as any, homeToSubId, plansCatalog: shippedCatalog });
         return { cost, history, slice: cost.subjects.find((s) => s.id === "my-app")?.subscriptions.codex1 };
       };
       const covered = read([{ value: "plus", from: "2026-01-01", until: "2026-04-01" }, { value: "pro", from: "2026-04-01", until: null }]);
       expect(covered.slice?.billed_usd).toBeGreaterThan(0);
+      expect(covered.history.totals.billed_usd).toBe(37.67);
       expect(covered.history.totals.by_sub.codex1?.billed_usd).toBe(covered.slice!.billed_usd);
       expect(covered.history.totals.billed_usd).toBe(covered.cost.subjects.find((s) => s.id === "my-app")!.billed_usd);
-      expect(covered.history.totals.billed_complete).toBe(true);
+      expect(covered.history.totals.billed_complete).toBe(covered.cost.subjects.find((s) => s.id === "my-app")!.billed_complete);
+      expect(covered.history.totals.billed_complete).toBe(false);
       const cents = covered.history.points.reduce((sum, p) => sum + Math.round(p.billed_usd! * 100), 0);
       expect(cents).toBe(Math.round(covered.history.totals.billed_usd! * 100));
-      // An unpriced Codex model leaves its bucket's API value a subtotal; the fee is still split, as in the cost.
+      // The later unknown model withholds that dated split, while the earlier known subtotal survives.
       expect(covered.history.points.find((p) => p.bucket === "2026-05")?.api_complete).toBe(false);
-      // A stretch the catalog cannot price leaves the bill unknown in both reads: null, never a silent zero.
+      for (const granularity of ["day", "week"] as const) {
+        const history = read([{ value: "plus", from: "2026-01-01", until: "2026-04-01" }, { value: "pro", from: "2026-04-01", until: null }], granularity).history;
+        expect(history.totals.billed_usd).toBe(37.67);
+        expect(round2(history.points.reduce((sum, point) => sum + (point.billed_usd ?? 0), 0))).toBe(37.67);
+        expect(history.totals.billed_complete).toBe(false);
+      }
+      // Empty known periods contribute zero; missing prices remain explicit, with an incomplete subtotal.
       const unknown = read([{ value: "no-such-plan", from: "2026-02-01", until: "2026-03-01" }]);
-      expect(unknown.slice?.billed_usd).toBeNull();
-      expect(unknown.history.totals.by_sub.codex1?.billed_usd).toBeNull();
-      expect(unknown.history.totals.billed_usd).toBeNull();
-      expect(unknown.history.points.every((p) => p.billed_usd === null && p.billed_complete === false)).toBe(true);
+      expect(unknown.slice?.billed_usd).toBe(0);
+      expect(unknown.slice?.plan_periods?.some(period => period.billed_usd === null)).toBe(true);
+      expect(unknown.history.totals.by_sub.codex1?.billed_usd).toBe(unknown.slice!.billed_usd);
+      expect(unknown.history.totals.billed_complete).toBe(false);
     });
     it("publishes cost at full use as the monthly equivalent times the effective price", () => {
       const res = buildProjectCost(dbWithSpan(), rateCards as any, homeToSubId, range);
@@ -1527,7 +1535,7 @@ describe("Integration & Regression against SQLite fixtures", () => {
       id: "repo-a",
     });
   });
-  it("buildProjectCost preserves byte-compatible pre-existing baseline while adding provenance extensions", () => {
+  it("buildProjectCost preserves the numeric baseline while adding provenance extensions", () => {
     const db = createTestDb();
     db.run(`
       INSERT INTO events (ts, home, repo, project_id, model, in_tok, cached_in, cache_write, out_tok, reasoning_out, path)
@@ -1539,7 +1547,11 @@ describe("Integration & Regression against SQLite fixtures", () => {
     `);
     const res = buildPreparedProjectCost(db, rateCards as any, homeToSubId, { since: "2026-08-01", until: "2026-08-31" });
     const projected = projectPreReqCostFields(res);
-    expect(JSON.stringify(projected)).toBe(PRE_REQ_PROJECT_COST_BASELINE_JSON);
+    const { notes: currentNotes, ...numeric } = projected;
+    const { notes: priorNotes, ...baseline } = JSON.parse(PRE_REQ_PROJECT_COST_BASELINE_JSON);
+    expect(JSON.stringify(numeric)).toBe(JSON.stringify(baseline));
+    expect(currentNotes).toEqual(res.notes);
+    expect(currentNotes[0]).toContain("datowanego okresu planu");
     const app = res.subjects.find((s) => s.id === "my-app");
     expect(app?.tokens).toBe(2_200_000);
     expect(app?.billed_complete).toBe(true);
@@ -1678,19 +1690,11 @@ describe("Integration & Regression against SQLite fixtures", () => {
     `);
     db.run(`
       INSERT INTO events (ts, home, repo, project_id, model, in_tok, cached_in, cache_write, out_tok, reasoning_out, path)
-      VALUES ('2026-08-11T12:00:00Z', 'c:/users/test/.codex', 'my-repo', 'my-app', 'unpriced-spark', 50000, 0, 0, 5000, 0, 'sess-2');
-    `);
-    db.run(`
-      INSERT INTO events (ts, home, repo, project_id, model, in_tok, cached_in, cache_write, out_tok, reasoning_out, path)
       VALUES ('2026-08-14T12:00:00Z', 'c:/users/test/.codex', 'tmp-repo', '_tmp', 'gpt-4o', 100000, 0, 0, 10000, 0, 'sess-3');
     `);
     db.run(`
       INSERT INTO events (ts, home, repo, project_id, model, in_tok, cached_in, cache_write, out_tok, reasoning_out, path)
       VALUES ('2026-08-15T12:00:00Z', 'c:/users/test/.codex', null, null, 'gpt-4o', 50000, 0, 0, 5000, 0, 'sess-4');
-    `);
-    db.run(`
-      INSERT INTO events (ts, home, repo, project_id, model, in_tok, cached_in, cache_write, out_tok, reasoning_out, path)
-      VALUES ('2026-08-15T13:00:00Z', 'c:/users/test/.codex', null, null, 'unpriced-spark', 20000, 0, 0, 2000, 0, 'sess-5');
     `);
     db.run(`
       INSERT INTO gemini_events (ts, fresh_in, cached_in, out_total, conversation_id, store)
@@ -1699,13 +1703,11 @@ describe("Integration & Regression against SQLite fixtures", () => {
     const res = buildProjectCost(db, rateCards as any, homeToSubId, { since: "2026-08-01", until: "2026-08-31" });
     const independentGroundTruthTokens =
       (1000000 + 100000) +
-      (50000 + 5000) +
       (100000 + 10000) +
       (50000 + 5000) +
-      (20000 + 2000) +
       (200000 + 20000);
-    expect(independentGroundTruthTokens).toBe(1562000);
-    const independentGroundTruthCalls = 6;
+    expect(independentGroundTruthTokens).toBe(1485000);
+    const independentGroundTruthCalls = 4;
     const independentGroundTruthApiUsd = 4.03;
     const independentGroundTruthPaidUsd = 39.42;
     expect(res.totals.tokens).toBe(independentGroundTruthTokens);
@@ -1726,6 +1728,32 @@ describe("Integration & Regression against SQLite fixtures", () => {
     expect(res.coverage.tmp_bucket.billed_usd).toBe(3.43);
     expect(res.coverage.unassigned.billed_usd).toBe(1.71);
     expect(res.totals.unassigned_billed_usd).toBe(1.71);
+  });
+  for (const sample of ["missing-rate", "internal-review", "zero-value"] as const) it(`single-period history preserves ${sample} evidence without writes`, () => {
+    const db = createTestDb();
+    try {
+      const cards = sample === "zero-value" ? { ...rateCards, subscriptions: { codex1: { plan: "pro" } } } : rateCards;
+      db.query(`INSERT INTO events(ts,home,repo,project_id,model,in_tok,cached_in,cache_write,out_tok,reasoning_out,path)
+        VALUES('2026-08-10T12:00:00Z','c:/users/test/.codex','my-repo','my-app','gpt-4o',?,0,0,?,0,'known')`)
+        .run(sample === "zero-value" ? 0 : 1_000_000, sample === "zero-value" ? 0 : 100_000);
+      if (sample !== "zero-value") db.exec(`INSERT INTO events(ts,home,repo,project_id,model,in_tok,cached_in,cache_write,out_tok,reasoning_out,path)
+        VALUES('2026-08-10T13:00:00Z','c:/users/test/.codex','my-repo','my-app','codex-auto-review',1000,0,0,100,0,'review')`);
+      if (sample === "missing-rate") db.exec(`INSERT INTO events(ts,home,repo,project_id,model,in_tok,cached_in,cache_write,out_tok,reasoning_out,path)
+        VALUES('2026-08-10T14:00:00Z','c:/users/test/.codex','my-repo','my-app','missing-rate',1000,0,0,100,0,'missing')`);
+      const range = { since: "2026-08-01", until: "2026-08-31" };
+      const cost = buildProjectCost(db, cards as RateCard, homeToSubId, range);
+      const opts = { repo: null, projectId: "my-app", granularity: "day" as const, by: "none" as const, idleGapMinutes: 15,
+        ...range, rateCards: fixtureCodexCard(cards as RateCard), homeToSubId, machineOf: () => "FIXTURE" };
+      buildRepoHistory(db, opts);
+      const before = db.query("SELECT total_changes() n").get();
+      const history = readRepoHistory(db, opts);
+      expect(db.query("SELECT total_changes() n").get()).toEqual(before);
+      const expected = sample === "internal-review" ? 6.57 : null;
+      expect(cost.subjects.find(subject => subject.id === "my-app")!.billed_usd).toBe(expected);
+      expect(history.totals.billed_usd).toBe(expected);
+      expect(history.totals.billed_complete).toBe(sample === "internal-review");
+      if (sample === "zero-value") expect(history.totals.calls).toBe(1);
+    } finally { db.close(); }
   });
   it("unassigned billed_usd is the independently allocated share, not paid minus assigned", () => {
     const db = createTestDb();

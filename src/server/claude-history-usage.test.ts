@@ -196,8 +196,10 @@ test("a duplicate copy with different metadata is one call under the canonical s
     // The mirror copy claims p:delta, session s9 and repo-z; none of it may appear.
     expect(point(history, "2026-09-14")?.calls).toBe(3);
     expect(fixture.history({ projectId: "delta" }).totals).toMatchObject({ tokens: 0, calls: 0, api_usd: 0 });
-    // A duplicate copy adds no activity either: 480 s from a0 plus 600 s from a1 to a2.
-    expect(point(history, "2026-09-14")?.active_seconds).toBe(1080);
+    // Session time assigns the preceding gap to a1; wall time clips it before the range
+    // and places a5's 23:50-midnight interval on the previous UTC day.
+    expect(point(history, "2026-09-14")?.session_seconds).toBe(1080);
+    expect(point(history, "2026-09-14")?.active_seconds).toBe(600 + 600);
   } finally { fixture.teardown(); }
 });
 
@@ -206,20 +208,23 @@ test("activity is bridged only inside one account and one session, and only up t
   try {
     const history = fixture.history();
     // 09-14: 480 s across the selected range start plus 600 s between a1 and a2.
-    expect(point(history, "2026-09-14")?.active_seconds).toBe(1080);
+    expect(point(history, "2026-09-14")?.session_seconds).toBe(1080);
     // 09-15: 600 s across midnight on A, 900 s (exactly the cap) between b1 and b2 on B.
     // The two sessions share an id and must not bridge into each other.
-    expect(point(history, "2026-09-15")?.active_seconds).toBe(1500);
+    expect(point(history, "2026-09-15")?.session_seconds).toBe(1500);
     // 09-16: a9 follows a8 by 1800 s in one session, capped at 900; a10 opens a session.
     expect(point(history, "2026-09-16")?.active_seconds).toBe(900);
-    expect(history.totals.active_seconds).toBe(1080 + 1500 + 900);
+    expect(history.totals.session_seconds).toBe(1080 + 1500 + 900);
+    expect(history.points.map(row => row.active_seconds)).toEqual([1200, 900, 900]);
+    expect(history.totals.active_seconds).toBe(3000);
     // r:beta gets the capped 3000 s gap that ends on its own call, not on p:alpha's.
     const beta = fixture.history({ projectId: null, repo: "beta" });
     expect(beta.totals).toMatchObject({ tokens: 50_000, calls: 1, active_seconds: CAP });
     // Cutting the range at the second day removes the bridge that starts before it.
     const later = fixture.history({ since: "2026-09-15" });
-    expect(point(later, "2026-09-15")?.active_seconds).toBe(1500);
-    expect(later.totals.active_seconds).toBe(1500 + 900);
+    expect(point(later, "2026-09-15")?.session_seconds).toBe(1500);
+    expect(point(later, "2026-09-15")?.active_seconds).toBe(900);
+    expect(later.totals.active_seconds).toBe(900 + 900);
   } finally { fixture.teardown(); }
 });
 
@@ -232,7 +237,7 @@ test("active time is split by the computer of its source and the parts add up to
     expect(seen.size).toBeGreaterThan(0);
     for (const p of history.points) {
       expect(sum(p.active_by_machine)).toBeCloseTo(p.active_seconds, 9);
-      for (const key of Object.keys(p.active_by_machine)) expect(key === "?" || key.startsWith("pc:")).toBe(true);
+      for (const key of Object.keys(p.active_by_machine)) expect(key === "?" || key.startsWith("PC:")).toBe(true);
     }
     expect(sum(history.totals.active_by_machine)).toBeCloseTo(history.totals.active_seconds, 9);
     // One computer for every source: the whole range on it.
@@ -303,7 +308,7 @@ test("the account and model split names the verified subscription, not the store
   try {
     const byAccount = fixture.history({ by: "account" });
     expect(point(byAccount, "2026-09-15")?.split).toEqual({
-      [ACCOUNTS.a]: { tokens: 160_000, calls: 3, active_seconds: 600 },
+      [ACCOUNTS.a]: { tokens: 160_000, calls: 3, active_seconds: 0 },
       [ACCOUNTS.b]: { tokens: 240_000, calls: 2, active_seconds: 900 },
     });
     const byModel = fixture.history({ by: "model" });
@@ -313,7 +318,7 @@ test("the account and model split names the verified subscription, not the store
       "claude/m-gone": { tokens: 7_000, calls: 1, active_seconds: 0 },
     });
     expect(point(fixture.history({ by: "vendor" }), "2026-09-14")?.split)
-      .toEqual({ claude: { tokens: 130_000, calls: 3, active_seconds: 1080 } });
+      .toEqual({ claude: { tokens: 130_000, calls: 3, active_seconds: 1200 } });
   } finally { fixture.teardown(); }
 });
 
@@ -323,7 +328,7 @@ test("week and month buckets agree with the day sums", () => {
     // 2026-09-14 is a Monday, so the whole selection is one calendar week.
     const week = fixture.history({ granularity: "week" });
     expect(week.points.map(row => row.bucket)).toEqual(["2026-09-14"]);
-    expect(week.totals).toMatchObject({ tokens: 543_000, calls: 11, api_usd: 3.77, active_seconds: 3480 });
+    expect(week.totals).toMatchObject({ tokens: 543_000, calls: 11, api_usd: 3.77, active_seconds: 3000, session_seconds: 3480 });
     const month = fixture.history({ granularity: "month" });
     expect(month.points.map(row => row.bucket)).toEqual(["2026-09"]);
     expect(month.totals.api_usd).toBe(week.totals.api_usd);
@@ -364,7 +369,7 @@ test("the selector and the history report the same prepared numbers", () => {
   try {
     const subjects = fixture.subjects();
     const alpha = subjects.find(row => row.id === "alpha")!;
-    expect(alpha).toMatchObject({ kind: "project", group: "grp-1", tokens: 543_000, calls: 11, active_seconds: 3480 });
+    expect(alpha).toMatchObject({ kind: "project", group: "grp-1", tokens: 543_000, calls: 11, active_seconds: 3000, session_seconds: 3480 });
     expect(alpha.repos).toEqual(["repo-a"]);
     const history = fixture.history();
     expect([alpha.tokens, alpha.calls, alpha.active_seconds])
@@ -391,7 +396,7 @@ test("an unprepared fact index asks for background preparation; a published one 
     expect(point(fixture.history(), "2026-09-14")?.calls).toBe(3);
     fixture.prepareFacts();
     // 600 s more activity: the late call follows a2 by ten minutes inside session s1.
-    expect(point(fixture.history(), "2026-09-14")).toMatchObject({ calls: 4, active_seconds: 1680 });
+    expect(point(fixture.history(), "2026-09-14")).toMatchObject({ calls: 4, session_seconds: 1680, active_seconds: 1800 });
   } finally { fixture.teardown(); }
 });
 
@@ -436,11 +441,14 @@ test("a correction moves activity and subjects and preserves the registered valu
 test("a corrected previous day corrects the next day's boundary contribution", () => {
   const fixture = createFixture();
   try {
-    expect(point(fixture.history(), "2026-09-15")?.active_seconds).toBe(1500);
+    expect(point(fixture.history(), "2026-09-15")?.session_seconds).toBe(1500);
+    expect(point(fixture.history(), "2026-09-14")?.active_seconds).toBe(1200);
     // a4 moves five minutes later, so the midnight gap to a5 shrinks from 600 s to 300 s.
     fixture.db.exec("UPDATE claude_events SET ts='2026-09-14T23:55:00.000Z' WHERE call_id='a4'");
     fixture.prepareFacts();
-    expect(point(fixture.history(), "2026-09-15")?.active_seconds).toBe(1200);
+    expect(point(fixture.history(), "2026-09-15")?.session_seconds).toBe(1200);
+    expect(point(fixture.history(), "2026-09-15")?.active_seconds).toBe(900);
+    expect(point(fixture.history(), "2026-09-14")?.active_seconds).toBe(900);
   } finally { fixture.teardown(); }
 });
 

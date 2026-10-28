@@ -4,6 +4,7 @@
  */
 import type { TimeRangeDays } from "../../shared/time-range-presets";
 import { firstTokenSummary, mergeFirstToken, type FirstTokenSamples } from "../../shared/first-token";
+import { executionKey, type ModelExecution } from "../../shared/model-execution";
 
 export interface ModelSpeedPoint {
   first_token?: FirstTokenSamples;
@@ -12,10 +13,18 @@ export interface ModelSpeedPoint {
   long_calls: number; long_out: number; long_ms: number; long_speed: number | null;
   coverage: number | null;
 }
-export interface ModelSpeedSeries { model: string | null; total: ModelSpeedPoint; points: ModelSpeedPoint[] }
+export interface ModelSpeedSeries extends Partial<ModelExecution> { model: string | null; total: ModelSpeedPoint; points: ModelSpeedPoint[] }
+export const speedSeriesKey = (series: ModelSpeedSeries): string => series.speed === undefined ? series.model ?? "" : executionKey(series.model, series);
+export function executionSuffix(series: ModelSpeedSeries, unknown: string, mixed: string, unknownEffort: string): string {
+  if (series.speed === undefined) return "";
+  const speed = series.speed === "mixed" ? mixed : series.speed.startsWith("unknown:") ? `${unknown} (${series.speed.slice(8)})`
+    : series.speed === "unknown" ? unknown : series.speed;
+  return ` · ${speed} · ${series.effort ?? unknownEffort}`;
+}
 export interface ModelSpeedResponse {
   account: string; provider: SpeedProvider; grain: "day" | "hour"; since: string | null; until: string | null;
   first_token_pending?: boolean;
+  speed_pending?: boolean;
   long_out_min: number; models: ModelSpeedSeries[];
 }
 export type SpeedKind = "long" | "all";
@@ -252,10 +261,10 @@ const entryKey = (account: string, model: string, split: boolean) => split ? `${
  * from the summed tokens and time, never an average of their speeds), or with `split` one entry per subscription and model.
  */
 export function mergeSpeedParts(parts: readonly SpeedPart[], split: boolean): SpeedEntry[] {
-  const entries = new Map<string, { model: string; accounts: Set<string>; total: ModelSpeedPoint; points: Map<string, ModelSpeedPoint> }>();
+  const entries = new Map<string, { model: string; speed?: string; effort?: string | null; accounts: Set<string>; total: ModelSpeedPoint; points: Map<string, ModelSpeedPoint> }>();
   for (const part of parts) for (const series of speedModels(part.models)) {
-    const key = entryKey(part.account, series.model!, split);
-    const entry = entries.get(key) ?? { model: series.model!, accounts: new Set<string>(), total: emptyPoint("total"), points: new Map() };
+    const key = entryKey(part.account, speedSeriesKey(series), split);
+    const entry = entries.get(key) ?? { model: series.model!, ...(series.speed !== undefined ? { speed: series.speed, effort: series.effort ?? null } : {}), accounts: new Set<string>(), total: emptyPoint("total"), points: new Map() };
     entries.set(key, entry);
     if (series.total.calls > 0 || series.total.first_token?.turns) entry.accounts.add(part.account);
     for (const field of ADDITIVE) entry.total[field] += series.total[field];
@@ -268,7 +277,7 @@ export function mergeSpeedParts(parts: readonly SpeedPart[], split: boolean): Sp
     }
   }
   return [...entries].map(([key, entry]) => ({ key, model: entry.model, accounts: [...entry.accounts],
-    series: { model: entry.model, total: finish(entry.total),
+    series: { model: entry.model, ...(entry.speed !== undefined ? { speed: entry.speed, effort: entry.effort } : {}), total: finish(entry.total),
       points: [...entry.points.values()].sort((a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0).map(finish) } }))
     .sort((a, b) => b.series.total.calls - a.series.total.calls || a.key.localeCompare(b.key));
 }
@@ -365,6 +374,7 @@ export function setAccounts(selection: SpeedSelection, accounts: readonly string
 export function selectedParts(parts: readonly SpeedPart[], selection: SpeedSelection, inactive: ReadonlySet<string> = NONE): SpeedPart[] {
   return parts.filter(part => accountSelected(selection, part.account, inactive))
     .map(part => ({ account: part.account,
-      models: part.models.filter(series => series.model !== null && modelSelected(selection, part.account, series.model, inactive)) }))
+      models: part.models.filter(series => series.model !== null && modelSelected(selection, part.account, series.model, inactive)
+        && modelSelected(selection, part.account, speedSeriesKey(series), inactive)) }))
     .filter(part => part.models.length > 0);
 }

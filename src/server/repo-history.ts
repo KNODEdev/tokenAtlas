@@ -31,18 +31,17 @@ import { readAccountsV2 } from "../config/accounts-document";
 import { loadAccountResolver, type AccountReadPlan, type AccountResolver } from "./account-resolver";
 import { codexLedgerReadContext, codexLedgerPendingReason, readCodexLedgerOwnedSeries,
   ledgerPresentationNumber } from "../db/codex-ledger-adapters";
-import { codexSourceHomes, rateCardMonthlyOf } from "./capacity-equivalents";
-import { loadGrokGauge } from "./grok-gauge-spans";
 import { SubscriptionFactsPending } from "../db/subscription-facts";
 import { add, rational, type Rational } from "../db/price-ledger-exact";
 import { archiveFolderOf } from "./event-source";
 import type { IdentityDeclaration } from "./account-resolver";
-import { accountPlanCost } from "./plans";
-import { pricedCycleIndex, pricedPlanIndex, subscriptionFirstCallOn } from "./project-cost";
+import { planPricingInputs, subscriptionPlanPricing } from "./project-cost-plan-pricing";
 import { loadPlansCatalog, type PlansCatalog } from "./plans-catalog";
 import { loadRateCard } from "./rate-cards-file";
 import { sourceMachineResolver } from "./account-periods-view";
 import { activityByDay, intervalSeconds, readProjectActivity } from "./project-active-time";
+import { allocatePlanPeriods, readPlanPeriodsUsage, sumPlanPeriodRows, type PeriodUsageRow } from "./project-cost-periods";
+import { codexPlanAllocationEligible } from "./project-cost-codex";
 export type Granularity = "day" | "week" | "month";
 export type Breakdown = "none" | "vendor" | "model" | "account";
 /**
@@ -58,8 +57,9 @@ export type Breakdown = "none" | "vendor" | "model" | "account";
  * only for uncovered days) with the same withholding rule, so the buckets add up to the subject's cost share.
  * 9: buckets and totals carry `active_by_machine`, the same active seconds split by the computer of their ledger source.
  * 10: active time unions prepared intervals per computer across agents/providers; session_seconds retains the additive measure.
+ * 11: allocate each dated plan's bill before distributing its cents over calendar buckets.
  */
-export const REPO_HISTORY_ALGORITHM = 10;
+export const REPO_HISTORY_ALGORITHM = 11;
 /**
  * The whole contract a cached repo-history or subject list depends on. An outer data-view
  * cache must pin this, so a changed Claude fact, activity, conflict or valuation rule can
@@ -551,23 +551,20 @@ function* repoHistorySteps(sqlite: Database, opts: RepoHistoryOpts, inputs: Repo
     yield `sources:${provider}`;
   }
   const subBucketProjApi = new Map<string, Map<string, number>>();
-  const globalSubSubjectApi = new Map<string, Map<string, number>>();
+  const globalPeriodRows = new Map<string, PeriodUsageRow[]>();
   const globalSubSpan = new Map<string, { first: string; last: string }>();
   /** Account -> the provider its plan periods are filed under. */
   const subVendor = new Map<string, string>();
-  const addAllApi = (vendor: string, subId: string, usd: number, day?: string, subject?: string | null) => {
+  const noteAccountDay = (vendor: string, subId: string, day: string) => {
     if (!subVendor.has(subId)) subVendor.set(subId, vendor);
-    if (day) {
-      const cur = globalSubSpan.get(subId) ?? { first: day, last: day };
-      if (day < cur.first) cur.first = day;
-      if (day > cur.last) cur.last = day;
-      globalSubSpan.set(subId, cur);
-    }
-    if (!Number.isFinite(usd) || usd <= 0) return;
-    const inner = globalSubSubjectApi.get(subId) ?? new Map<string, number>();
-    const key = subject ?? "";
-    inner.set(key, (inner.get(key) ?? 0) + usd);
-    globalSubSubjectApi.set(subId, inner);
+    const cur = globalSubSpan.get(subId) ?? { first: day, last: day };
+    if (day < cur.first) cur.first = day;
+    if (day > cur.last) cur.last = day;
+    globalSubSpan.set(subId, cur);
+  };
+  const addPeriodRow = (subId: string, row: PeriodUsageRow) => {
+    const rows = globalPeriodRows.get(subId) ?? [];
+    rows.push(row); globalPeriodRows.set(subId, rows);
   };
   const addProjApi = (bucket: string, subId: string, usd: number) => {
     if (!Number.isFinite(usd) || usd <= 0) return;
@@ -589,8 +586,13 @@ function* repoHistorySteps(sqlite: Database, opts: RepoHistoryOpts, inputs: Repo
       const key = JSON.stringify([bucket, row.day, subId, row.subject, selected]);
       const sum = sums.get(key) ?? { bucket, day: row.day, subId, subject: row.subject, selected, amount: rational(0n) };
       sum.amount = add(sum.amount, group.variants.api_standard.pricedSubtotal); sums.set(key, sum);
-      // The project cost splits a Codex fee over its priced traffic and reports the rest as unpriced;
-      // the history follows it, so the bucket keeps api_complete=false but the fee is still split.
+      // Use the same allocation population as project cost, preserving unknown weights and zero calls.
+      if (codexPlanAllocationEligible(row.model)) {
+        const value = group.variants.api_standard.value;
+        addPeriodRow(subId, { subject: row.subject ?? "", day: row.day,
+          calls: value === null ? 0 : Number(group.calls), tokens: value === null ? 0 : Number(group.tokensReported),
+          amount: value ?? rational(0n), incomplete: value === null });
+      }
       if (selected && group.variants.api_standard.unpricedEvents > 0n) apiIncomplete.add(bucket);
       // Calls priced at nothing still keep the account in this bucket's by_sub, so an unknown fee reads null, not 0.
       if (selected && group.calls > 0n) {
@@ -601,7 +603,7 @@ function* repoHistorySteps(sqlite: Database, opts: RepoHistoryOpts, inputs: Repo
     }
     for (const sum of sums.values()) {
       const usd = ledgerPresentationNumber(sum.amount);
-      addAllApi("codex", sum.subId, usd, sum.day, sum.subject);
+      noteAccountDay("codex", sum.subId, sum.day);
       if (sum.selected) addProjApi(sum.bucket, sum.subId, usd);
     }
   }
@@ -611,7 +613,9 @@ function* repoHistorySteps(sqlite: Database, opts: RepoHistoryOpts, inputs: Repo
   // under a literal 'claude' bucket, and nothing here prices a raw event again.
   for (const row of claude().rows) {
     const bucket = bucketOfDay(row.day, opts.granularity);
-    addAllApi("claude", row.account, row.api_usd, row.day, row.subject);
+    noteAccountDay("claude", row.account, row.day);
+    addPeriodRow(row.account, { subject: row.subject ?? "", day: row.day, calls: row.calls, tokens: row.tokens,
+      amount: String(row.api_usd), incomplete: row.unpriced_calls > 0 });
     if (!claudeRowSelected(row, opts)) continue;
     addProjApi(bucket, row.account, row.api_usd);
     // A verified account that made canonical calls here stays in by_sub even when its whole
@@ -634,7 +638,9 @@ function* repoHistorySteps(sqlite: Database, opts: RepoHistoryOpts, inputs: Repo
     const usage = providerUsage(provider);
     for (const row of usage.rows) {
       const bucket = bucketOfDay(row.day, opts.granularity);
-      addAllApi(provider, row.account, row.api_usd, row.day, row.subject);
+      noteAccountDay(provider, row.account, row.day);
+      addPeriodRow(row.account, { subject: row.subject ?? "", day: row.day, calls: row.calls, tokens: row.tokens,
+        amount: String(row.api_usd), incomplete: row.unpriced_calls > 0 });
       if (!providerRowSelected(row, opts)) continue;
       addProjApi(bucket, row.account, row.api_usd);
       if (row.calls > 0) {
@@ -649,6 +655,8 @@ function* repoHistorySteps(sqlite: Database, opts: RepoHistoryOpts, inputs: Repo
   }
   yield "dollars:providers";
   const totalBySub = new Map<string, { api_usd: number; billed_usd: number | null }>();
+  const incompleteBilledBuckets = new Set<string>();
+  let billedComplete = true;
   const bucketList = Array.from(merged.keys()).sort();
   const subIds = new Set<string>();
   for (const m of subBucketProjApi.values()) {
@@ -660,56 +668,65 @@ function* repoHistorySteps(sqlite: Database, opts: RepoHistoryOpts, inputs: Repo
   // The bill each account splits is the project cost's: its plan periods priced by the Plans catalog over the
   // days the account was used in the range, the rate-card price only for days no plan period covers.
   // The same index as the project cost, so a billing cycle inferred after a declared end is priced here too.
-  const planIndex = pricedPlanIndex(sqlite);
-  const cycles = pricedCycleIndex(sqlite);
-  const plansCatalog = opts.plansCatalog ?? loadPlansCatalog();
-  // The project cost's monthly fallback too (own rate card, then the Grok gauge / GLM entries), so a project's
-  // history never says "unknown" where its cost is known.
-  const grokGauge = loadGrokGauge();
+  const pricing = planPricingInputs(sqlite, opts.plansCatalog ?? loadPlansCatalog());
   for (const subId of subIds) {
-    const span = globalSubSpan.get(subId) ?? { first: null, last: null };
+    const span = globalSubSpan.get(subId) ?? null;
     const vendor = subVendor.get(subId) ?? subId;
-    const { paid } = accountPlanCost(planIndex, plansCatalog, { provider: vendor, subject: subId },
-      span, rateCardMonthlyOf(sqlite, rateCards, subId, { grokGauge }), cycles,
-      { firstCallOn: subscriptionFirstCallOn(sqlite, rateCards, { id: subId, vendor }, resolver) });
+    const { stretches } = subscriptionPlanPricing(sqlite, rateCards, pricing, { id: subId, vendor }, span, resolver);
     const present = bucketList.filter((bucket) =>
       (subBucketProjApi.get(bucket)?.get(subId) ?? 0) > 0 || claimed.get(bucket)?.has(subId));
     if (present.length === 0) continue;
     const apis = present.map((bucket) => subBucketProjApi.get(bucket)?.get(subId) ?? 0);
     const focusKey = opts.projectId ? `p:${opts.projectId}` : opts.repo ? `r:${opts.repo}` : null;
-    const billedBySubject =
-      paid != null && paid > 0
-        ? allocatePaidAcrossSubjects(globalSubSubjectApi.get(subId) ?? new Map(), paid)
-        : new Map<string, number>();
-    const projectTarget =
-      focusKey != null
-        ? (billedBySubject.get(focusKey) ?? 0)
-        : Array.from(billedBySubject.entries())
-            .filter(([k]) => k !== "")
-            .reduce((sum, [, n]) => sum + n, 0);
-    const projApi = apis.reduce((sum, n) => sum + n, 0);
-    const billeds = apis.map((pApi) => (projApi > 0 ? (pApi / projApi) * projectTarget : 0));
     const apiAlloc = allocateCents(apis);
-    // Part of this account's own traffic has no known price, so the api_usd weights do not
-    // describe the whole subscription: the fee stays published, its split is withheld.
-    const splittable = paid != null && !unallocatable.has(subId);
-    const billedAlloc: Array<number | null> = splittable ? allocateCents(billeds) : present.map(() => null);
+    const rows = globalPeriodRows.get(subId) ?? [];
+    const usage = stretches.length === 1 ? [sumPlanPeriodRows(rows)]
+      : readPlanPeriodsUsage(sqlite, rateCards, resolver, { id: subId, vendor }, stretches, rows);
+    if (stretches.length === 1 && unallocatable.has(subId)) usage[0]!.incomplete = true;
+    const subjects = [...new Set([...usage.flatMap(period => [...period.groups.keys()]), "", ...(focusKey ? [focusKey] : [])])];
+    const dated = allocatePlanPeriods(stretches, subjects, (_, index) => usage[index]!);
+    const selected = subjects.filter(subject => focusKey ? subject === focusKey : subject !== "");
+    const periodBills = stretches.map((_, index) => aggregateBilled(selected.map(subject => dated.get(subject)![index]!.billed_usd)));
+    const bucketBills = new Map(present.map(bucket => [bucket, [] as Array<number | null>]));
+    // Conserve each dated project's cents before placing them in calendar buckets.
+    // Unknown periods retain their own completeness instead of erasing known subtotals.
+    for (let index = 0; index < stretches.length; index++) {
+      const piece = stretches[index]!, bill = periodBills[index]!;
+      const weights = new Map<string, number>();
+      if (stretches.length === 1) for (const bucket of present) weights.set(bucket, subBucketProjApi.get(bucket)?.get(subId) ?? 0);
+      else for (const row of usage[index]!.rows ?? []) {
+        if (!selected.includes(row.subject)) continue;
+        const bucket = bucketOfDay(row.day, opts.granularity);
+        const amount = typeof row.amount === "string" ? Number(row.amount) : ledgerPresentationNumber(row.amount);
+        weights.set(bucket, (weights.get(bucket) ?? 0) + amount);
+      }
+      const allocated = bill.billed_usd === null ? new Map<string, number>()
+        : allocatePaidAcrossSubjects(weights, bill.billed_usd);
+      const first = bucketOfDay(new Date(piece.fromMs).toISOString().slice(0, 10), opts.granularity);
+      const last = bucketOfDay(new Date(piece.untilMs - 1).toISOString().slice(0, 10), opts.granularity);
+      for (const bucket of present) {
+        if (!weights.has(bucket) && (bucket < first || bucket > last)) continue;
+        bucketBills.get(bucket)!.push(bill.billed_usd === null ? null : allocated.get(bucket) ?? 0);
+        if (!bill.billed_complete) incompleteBilledBuckets.add(bucket);
+      }
+    }
     let totApi = 0;
-    let totBilled = 0;
     for (let i = 0; i < present.length; i++) {
       const bucket = present[i]!;
       const b = merged.get(bucket);
       if (!b) continue;
       const api = apiAlloc[i] ?? 0;
-      const billed = billedAlloc[i] ?? (splittable ? 0 : null);
+      const amounts = bucketBills.get(bucket)!;
+      const billed = amounts.length ? aggregateBilled(amounts).billed_usd : stretches.length ? 0 : null;
       if (!b.by_sub) b.by_sub = {};
       b.by_sub[subId] = { api_usd: api, billed_usd: billed };
       totApi += api;
-      if (billed != null) totBilled += billed;
     }
+    const totalBill = aggregateBilled(periodBills.map(bill => bill.billed_usd));
+    billedComplete &&= stretches.length > 0 && periodBills.every(bill => bill.billed_complete);
     totalBySub.set(subId, {
       api_usd: round2(totApi),
-      billed_usd: splittable ? round2(totBilled) : null,
+      billed_usd: stretches.length ? totalBill.billed_usd : null,
     });
   }
   // The displayed amount of a bucket is the rounded sum of the original amounts, not the sum
@@ -734,13 +751,13 @@ function* repoHistorySteps(sqlite: Database, opts: RepoHistoryOpts, inputs: Repo
     b.api_complete = !conflicted && !apiIncomplete.has(b.bucket);
     const billedAgg = aggregateBilled(Object.values(b.by_sub).map((v) => v.billed_usd));
     b.billed_usd = billedAgg.billed_usd;
-    b.billed_complete = billedAgg.billed_complete;
+    b.billed_complete = billedAgg.billed_complete && !incompleteBilledBuckets.has(b.bucket);
   }
   totals.api_usd = round2(exactTotalApi);
   totals.api_complete = !conflicted && apiIncomplete.size === 0;
   const totalsBilled = aggregateBilled(Array.from(totalBySub.values()).map((v) => v.billed_usd));
   totals.billed_usd = totalsBilled.billed_usd;
-  totals.billed_complete = totalsBilled.billed_complete;
+  totals.billed_complete = totalsBilled.billed_complete && billedComplete;
   totals.by_sub = Object.fromEntries(totalBySub.entries());
   // Wall time is a union across all sessions/providers on each computer, independent of the money cohorts.
   const activity = (inputs.activity ??= readProjectActivity(sqlite, resolver, rateCards, opts.idleGapMinutes, range))

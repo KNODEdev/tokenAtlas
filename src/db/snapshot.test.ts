@@ -81,17 +81,10 @@ test("schema24 snapshot retains canonical multiplicity, provenance and pending s
     expect(recipient.query("SELECT id FROM probe_counters ORDER BY id").all()).toEqual(ids);
     expect(recipient.query("SELECT DISTINCT json_extract(evidence,'$.role') AS role FROM probe_fact_deliveries WHERE json_extract(evidence,'$.role') IS NOT NULL ORDER BY role").all()).toEqual([{ role: "producer" }, { role: "receiver" }]);
     recipient.close(true); fixtureConnections.delete(recipient);
-    const oldRoot = path.join(root, "schema23"); fs.mkdirSync(oldRoot);
-    const ignore = path.join(root, "ignore"); fs.writeFileSync(ignore, "");
-    for (const cmd of [["git", "-c", `core.excludesFile=${ignore}`, "archive", "--format=tar", "--output", path.join(root, "old.tar"), "31740888de5d2e1de6187379db505d796852583c", "src", "drizzle"], ["tar", "-xf", "old.tar", "-C", "schema23"]]) {
-      const child = Bun.spawn(cmd, { cwd: cmd[0] === "tar" ? root : process.cwd(), stdout: "pipe", stderr: "pipe" });
-      const error = new Response(child.stderr).text(); expect({ code: await child.exited, error: await error }).toEqual({ code: 0, error: "" });
-    }
-    fs.symlinkSync(path.resolve("node_modules"), path.join(oldRoot, "node_modules"), "junction");
-    const child = Bun.spawn([process.execPath, "--eval", `import {validateAtlasSnapshotCandidate,currentAtlasSchemaVersion} from "./src/db/snapshot";const c=validateAtlasSnapshotCandidate(${JSON.stringify(snapshot.manifestPath)});console.log(JSON.stringify({schema:currentAtlasSchemaVersion(),valid:c.valid,compatible:c.compatible}));`], { cwd: oldRoot, stdout: "pipe", stderr: "pipe" });
-    const out = new Response(child.stdout).text(), err = new Response(child.stderr).text();
-    expect({ code: await child.exited, err: await err }).toEqual({ code: 0, err: "" });
-    expect(JSON.parse(await out)).toEqual({ schema: 23, valid: false, compatible: false });
+    // The pre-canonical reader supports schema 23; this contract must not require private Git objects.
+    const oldReader = validateAtlasSnapshotCandidate(snapshot.manifestPath!, { currentSchemaVersion: 23 });
+    expect(oldReader).toMatchObject({ valid: false, compatible: false });
+    expect(oldReader.errors).toContain("snapshot schema is not compatible with this application");
     copy.exec("DROP TRIGGER probe_counters_no_update");
     copy.exec("UPDATE probe_counters SET payload=json_set(payload,'$.used_percent',999)");
     const manifest = JSON.parse(fs.readFileSync(snapshot.manifestPath!, "utf8"));

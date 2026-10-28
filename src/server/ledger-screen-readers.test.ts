@@ -12,6 +12,7 @@ import { declareClaudeLabelPeriods } from "./subscription-reader.fixture";
 import { prepareUsageRegisters } from "./usage-register.fixture";
 import { buildRepoHistory, listSubjects } from "./repo-history";
 import { overrideProjectRules, projectRulesOverride } from "../projects/resolve";
+import { advanceModelSpeeds } from "../db/model-speed-register";
 
 /**
  * Screens that used to total the provider fact tables read the usage ledger (plan U4.7 legacy
@@ -159,6 +160,7 @@ test("a Claude account's activity splits an hour a period boundary cuts, exactly
     { ...folder, until: "2026-08-10T10:30:00.000Z" }, { ...folder, value: "claude9", from: "2026-08-10T10:30:00.000Z", until: null }]);
   prepareUsageRegisters(db, cards);
   const accounts = { version: 2 as const, subscriptions: [{ id: "claude1", vendor: "claude" }, { id: "claude9", vendor: "claude" }], sources: [] };
+  while (advanceModelSpeeds(db, { budgetMs: 10000 }).pending) {}
   const ctx = { ...context(db), sqlite: noFactScan(db), accounts };
   const read = async (account: string) => (await handleActivity(ctx, url(`/api/activity?account=${account}`)).json() as
     { totals: { calls: number; tokens: number } }).totals;
@@ -182,10 +184,11 @@ test("model speed of a Claude account reads its owned hours, split exactly at a 
   prepareUsageRegisters(db, cards);
   const accounts = { version: 2 as const, subscriptions: [{ id: "claude1", vendor: "claude" }, { id: "claude9", vendor: "claude" }], sources: [] };
   const ctx = { ...context(db), sqlite: noFactScan(db), accounts };
-  type Body = { grain: string; long_out_min: number; models: Array<{ model: string; total: Record<string, number | null>;
+  type Body = { grain: string; long_out_min: number; models: Array<{ model: string; speed: string; total: Record<string, number | null>;
     points: Array<Record<string, number | string | null>> }> };
   const read = async (query: string) => (await handleModelSpeed(ctx, url(`/api/model-speed?${query}`)).json()) as Body;
   // c1 (10:00, one call of its two copies) stays with claude1.
+  while (advanceModelSpeeds(db, { budgetMs: 10000 }).pending) {}
   const first = await read("account=claude1&grain=hour");
   expect(first.models.map(model => [model.model, model.total.calls, model.total.timed_calls, model.total.timed_out, model.total.timed_ms]))
     .toEqual([["test", 1, 1, 50, 1000]]);
@@ -193,12 +196,13 @@ test("model speed of a Claude account reads its owned hours, split exactly at a 
   expect(first.models[0]!.points.map(point => point.at)).toEqual(["2026-08-10T10:00:00.000Z"]);
   // The 10:45 call of the same hour belongs to claude9: a long call (300 out), timed; c3 has no time.
   const ninth = await read("account=claude9");
-  const byModel = Object.fromEntries(ninth.models.map(model => [model.model, model.total]));
-  expect(byModel.test).toMatchObject({ calls: 2, timed_calls: 2, timed_out: 305, timed_ms: 4600, long_calls: 1, long_out: 300, long_ms: 600,
+  const byModel = Object.fromEntries(ninth.models.map(model => [`${model.model}:${model.speed}`, model.total]));
+  expect(byModel["test:standard"]).toMatchObject({ calls: 1, timed_calls: 1, timed_out: 300, timed_ms: 600, long_calls: 1, long_out: 300, long_ms: 600,
     long_speed: 500, coverage: 1 });
-  expect(byModel.other).toMatchObject({ calls: 1, timed_calls: 0, speed: null, coverage: 0 });
+  expect(byModel["test:fast"]).toMatchObject({ calls: 1, timed_calls: 1, timed_out: 5, timed_ms: 4000, long_calls: 0, speed: 1.25 });
+  expect(byModel["other:standard"]).toMatchObject({ calls: 1, timed_calls: 0, speed: null, coverage: 0 });
   expect(ninth.long_out_min).toBe(256);
-  expect(ninth.models.find(model => model.model === "test")!.points.map(point => point.at)).toEqual(["2026-08-10", "2026-08-11"]);
+  expect([...new Set(ninth.models.filter(model => model.model === "test").flatMap(model => model.points.map(point => point.at)))].sort()).toEqual(["2026-08-10", "2026-08-11"]);
   expect((await handleModelSpeed(ctx, url("/api/model-speed"))).status).toBe(400);
   expect((await handleModelSpeed(ctx, url("/api/model-speed?account=nobody"))).status).toBe(400);
   expect((await handleModelSpeed(ctx, url("/api/model-speed?account=claude1&grain=week"))).status).toBe(400);

@@ -99,10 +99,10 @@ test("all-models retry loads both breakdowns and mounted sorting survives a unit
     await invoke(retry, "onClick");
     await flushUntil(() => bodyRows(dom.host).length === 3);
     expect(breakdown.mock.calls.map(([params]) => params.dim)).toEqual(["model", "surface", "model", "surface"]);
-    expect(bodyRows(dom.host)[0]!.textContent).toContain("model-cost");
+    expect(bodyRows(dom.host)[0]!.textContent).toContain("model-unit");
     expect(dom.host.textContent).not.toContain("model-empty");
     await act(async () => root.render(<AllAggregate screen="models" unit="tokens" cards={[]} />));
-    expect(bodyRows(dom.host)[0]!.textContent).toContain("model-cost");
+    expect(bodyRows(dom.host)[0]!.textContent).toContain("model-unit");
     await invoke(button(dom.host, "Tokens"), "onClick");
     expect(bodyRows(dom.host)[0]!.textContent).toContain("model-tokens");
     await invoke(button(dom.host, "$/M"), "onClick");

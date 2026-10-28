@@ -676,7 +676,9 @@ export function readActivityDays(db: Database, provider: UsageLedgerProvider, pl
       const key = activityDayKey(day, dim);
       const spans = until !== undefined ? [[until - ms, until] as ActivityInterval] : prepared!.get(key);
       if (!spans) throw new ActivityPending(`Active intervals of ${provider} await background preparation`, provider);
-      intervals.set(key, [...(intervals.get(key) ?? []), ...spans]);
+      let collected = intervals.get(key);
+      if (!collected) intervals.set(key, collected = []);
+      for (const span of spans) collected.push(span);
     }
   };
   const inRange = (day: string) => (range.since === undefined || day >= range.since) && (range.until === undefined || day <= range.until);
@@ -713,7 +715,7 @@ export function readActivityDays(db: Database, provider: UsageLedgerProvider, pl
    * One chain (session, source, account key, class; home for OpenCode-other) of published calls in (instant, identity)
    * order, built once per read with each call's position and the account's own previous call: one lookup per call.
    */
-  type OwnedChain = { position: Map<string, number>; facts: ActivityFact[]; previous: Int32Array };
+  type OwnedChain = { position: Map<string, number>; times: Float64Array; previous: Int32Array };
   const boundaryChains = new Map<string, OwnedChain>();
   const chainOf = (fact: ActivityFact): OwnedChain => {
     const key = JSON.stringify([fact.session, fact.source, fact.account_key, kind === "o" ? fact.home : null]);
@@ -722,9 +724,14 @@ export function readActivityDays(db: Database, provider: UsageLedgerProvider, pl
       const facts = publishedOf((chainFacts.all(fact.session, fact.source, fact.account_key) as ActivityFact[])
         .filter(other => activityClass(provider, other) === kind && (kind === "e" || other.home === fact.home))).sort(byInstantThenIdentity);
       const previous = new Int32Array(facts.length);
+      const times = new Float64Array(facts.length);
       let owned = -1;
-      facts.forEach((other, index) => { previous[index] = owned; if (plan.owns(other.source, other.account_key, other.ts)) owned = index; });
-      chain = { facts, previous, position: new Map(facts.map((other, index) => [other.identity, index])) };
+      facts.forEach((other, index) => {
+        times[index] = Date.parse(other.ts);
+        previous[index] = owned;
+        if (plan.owns(other.source, other.account_key, other.ts)) owned = index;
+      });
+      chain = { times, previous, position: new Map(facts.map((other, index) => [other.identity, index])) };
       boundaryChains.set(key, chain);
     }
     return chain;
@@ -744,8 +751,8 @@ export function readActivityDays(db: Database, provider: UsageLedgerProvider, pl
       if (index === undefined) continue;
       const previous = chain.previous[index]!;
       if (previous < 0) continue;
-      const gap = Date.parse(fact.ts) - Date.parse(chain.facts[previous]!.ts);
-      if (gap > 0) add(row.day, row.dim_id, Math.min(gap, cutoff), Date.parse(fact.ts));
+      const gap = chain.times[index]! - chain.times[previous]!;
+      if (gap > 0) add(row.day, row.dim_id, Math.min(gap, cutoff), chain.times[index]);
     }
   }
   if (mixed.size) {

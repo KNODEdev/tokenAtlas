@@ -75,8 +75,8 @@ echo [2] Checking accounts v2 configuration...
 call bun scripts\dev\assert-accounts-v2.ts
 if errorlevel 1 (echo [X] Account preflight failed - see the error above. & pause & exit /b 1)
 
-echo [2] Freeing port %PORT_APP% if a previous run is still holding it...
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\dev\free-port.ps1 -Port %PORT_APP%
+echo [2] Stopping the previous tokenAtlas instance on port %PORT_APP%...
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\dev\free-port.ps1 -Port %PORT_APP% -ProjectRoot "%CD%"
 if errorlevel 1 (pause & exit /b 1)
 echo.
 

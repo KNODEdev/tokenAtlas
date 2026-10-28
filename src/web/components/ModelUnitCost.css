@@ -1,0 +1,20 @@
+/* Models → Cost per 1M: one row per model on a log price axis; heads, legends and the table come from the Models view. */
+.muc-svg { display: block; overflow: visible; }
+.muc-grid { stroke: var(--line); stroke-dasharray: 3 3; }
+.muc-tick { font-family: var(--font-figure); font-size: var(--fs-2); fill: var(--muted); }
+.muc-note { font-family: var(--font-sans); font-size: var(--fs-2); fill: var(--muted); }
+.muc-average { stroke: var(--pencil); stroke-dasharray: 4 3; }
+.muc-label { font-family: var(--font-figure); font-size: var(--fs-3); fill: var(--text); }
+.muc-value { font-family: var(--font-figure); font-size: var(--fs-3); font-weight: var(--fw-semibold); fill: var(--text); }
+.muc-row-hit { fill: transparent; }
+.muc-row:hover .muc-row-hit { fill: var(--raised); }
+.muc-band { stroke: none; }
+.muc-dot { stroke: var(--surface); stroke-width: 2; }
+.muc-glyph { stroke-width: 1.5; }
+.muc-glyph.is-hollow { fill: var(--surface); stroke: var(--muted); }
+.muc-glyph.is-tick { stroke: var(--text); stroke-width: 1.75; stroke-linecap: round; }
+.muc-glyph.is-solid { fill: var(--text); stroke: none; }
+
+.muc-legend-glyph { width: 14px; height: 14px; flex-shrink: 0; overflow: visible; }
+.archive-legend i.muc-legend-dot { width: 10px; height: 10px; border-radius: var(--r-dot); background: var(--muted); }
+.muc-swatch { display: inline-block; width: 8px; height: 8px; margin-right: var(--s-3); border-radius: var(--r-dot); vertical-align: middle; }

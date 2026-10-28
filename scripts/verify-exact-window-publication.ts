@@ -161,33 +161,40 @@ export async function verifyConfigurationFallbacks(ctx: AppContext) {
   return {unusedRule:unused.published,relevantRate:priced.published,otherProject:other.published,relevantProject:moved.published};
 }
 
+const CHILD_PROCESS_TIMEOUT_MS=60_000;
+const HOLDER_ARM_TIMEOUT_MS=5_000;
+// Seven sequential child budgets, the transaction hold and bounded cleanup/headroom.
+export const PUBLICATION_VERIFICATION_TIMEOUT_MS=7*CHILD_PROCESS_TIMEOUT_MS+HOLDER_ARM_TIMEOUT_MS+10_000;
+
 export async function verifyPublicationProcesses(cleanup = false) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"tokenatlas-tests-publication-"));
   const env={...process.env,NODE_ENV:"test",TOKENATLAS_TEST_ROOT:root,TOKENATLAS_DB:path.join(root,"fixture.sqlite"),
     TOKENATLAS_CONFIG:path.join(root,"config"),TOKENATLAS_ARCHIVE:path.join(root,"archive"),TOKENATLAS_LOCAL_STATE:path.join(root,"state"),
     TOKENATLAS_SNAPSHOT_DIR:path.join(root,"snapshots"),TOKENATLAS_SYNC_MINUTES:"0",TOKENATLAS_PROBE_MINUTES:"0"};
   for(const name of ["config","archive","state","snapshots"])fs.mkdirSync(path.join(root,name));
-  const results: Array<{mode:string;workers:number;published:number;readerChanges:number;httpMs:number;totalMs:number;calls:number;latest:boolean}>=[];
+  const results: Array<{mode:string;workers:number;published:number;readerChanges:number;httpMs:number;totalMs:number;processMs:number;calls:number;latest:boolean}>=[];
   const run=(mode:string)=>{
+    const started=performance.now();
     const output=path.join(root,mode+".json");
     const child=Bun.spawnSync([process.execPath,import.meta.filename,mode,env.TOKENATLAS_DB,output],
-      {cwd:path.resolve(import.meta.dir,".."),env,stdout:"pipe",stderr:"pipe",timeout:60000});
+      {cwd:path.resolve(import.meta.dir,".."),env,stdout:"pipe",stderr:"pipe",timeout:CHILD_PROCESS_TIMEOUT_MS});
     fs.writeFileSync(path.join(root,mode+".log"),child.stdout.toString()+child.stderr.toString());
     assert.equal(child.exitCode,0,child.stderr.toString());
     const result=JSON.parse(fs.readFileSync(output,"utf8"));
     results.push({mode,workers:result.workers,published:result.published,readerChanges:result.readerChanges,
-      httpMs:result.httpMs,totalMs:result.totalMs,calls:result.body.totals.calls,latest:result.body.short_counter.live!==null});
+      httpMs:result.httpMs,totalMs:result.totalMs,processMs:performance.now()-started,calls:result.body.totals.calls,latest:result.body.short_counter.live!==null});
   };
   try {
     run("init");run("restart");run("unrelated");
     const armed=path.join(root,"armed");
     const holder=Bun.spawn([process.execPath,import.meta.filename,"hold",env.TOKENATLAS_DB,armed],{env,stdout:"pipe",stderr:"pipe"});
     try {
-      for(let n=0;!fs.existsSync(armed)&&n<500;n++)await Bun.sleep(10);
+      const deadline=performance.now()+HOLDER_ARM_TIMEOUT_MS;
+      while(!fs.existsSync(armed)&&performance.now()<deadline)await Bun.sleep(10);
       assert.ok(fs.existsSync(armed),"Child did not reach the real replacement transaction");
     } finally {holder.kill(9);await holder.exited;}
     run("after-kill");run("advance-probe");run("restart-after-probe");
-    const fallback=Bun.spawnSync([process.execPath,import.meta.filename,"fallbacks",env.TOKENATLAS_DB,path.join(root,"fallbacks.json")],{env,stdout:"pipe",stderr:"pipe",timeout:60000});
+    const fallback=Bun.spawnSync([process.execPath,import.meta.filename,"fallbacks",env.TOKENATLAS_DB,path.join(root,"fallbacks.json")],{env,stdout:"pipe",stderr:"pipe",timeout:CHILD_PROCESS_TIMEOUT_MS});
     assert.equal(fallback.exitCode,0,fallback.stderr.toString());
     const fallbacks=JSON.parse(fs.readFileSync(path.join(root,"fallbacks.json"),"utf8"));
     return {root,entry:"createFetchHandler HTTP -> data-worker; storeWindowAnswers publication",mode:"synthetic isolated, fresh process per row",

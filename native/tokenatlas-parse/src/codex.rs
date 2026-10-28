@@ -359,22 +359,38 @@ struct Record {
     accounting: Option<usize>,
     duplicates: Vec<V>,
 }
-#[derive(Default)]
 struct FirstTokenCollector {
     contexts: HashMap<String, V>,
     starts: HashMap<String, (i64, V)>,
     turns: std::collections::BTreeMap<String, V>,
     active: Option<String>,
+    tier: V,
+    effort: V,
+    model: V,
+}
+impl Default for FirstTokenCollector {
+    fn default() -> Self {
+        Self { contexts: HashMap::new(), starts: HashMap::new(), turns: std::collections::BTreeMap::new(),
+            active: None, tier: V::Null, effort: V::Null, model: V::Null }
+    }
 }
 impl FirstTokenCollector {
     fn observe(&mut self, value: &V) {
         let payload = value.get("payload");
+        if value.get("type").is("thread_settings_applied") || value.get("type").is("event_msg") && payload.get("type").is("thread_settings_applied") {
+            let settings = payload.get("thread_settings");
+            if settings.has("service_tier") { self.tier = settings.get("service_tier").clone(); }
+            self.effort = settings.get("reasoning_effort").or(&self.effort);
+            self.model = settings.get("model").or(&self.model);
+        }
         let Some(id) = payload.get("turn_id").text().filter(|s| !s.trim().is_empty()) else {
             self.pool(value);
             return;
         };
         if value.get("type").is("turn_context") {
-            self.contexts.insert(id, payload.get("model").text().filter(|s| !s.trim().is_empty()).map_or(V::Null, V::from));
+            self.model = payload.get("model").or(&self.model);
+            self.effort = payload.get("effort").or(&self.effort);
+            self.contexts.insert(id, obj([("model", self.model.clone()), ("service_tier", self.tier.clone()), ("effort", self.effort.clone())]));
             return;
         }
         if !value.get("type").is("event_msg") { return; }
@@ -395,7 +411,9 @@ impl FirstTokenCollector {
             && ms.number().unwrap() <= (end - start + 1000) as f64;
         let ts = chrono::DateTime::from_timestamp_millis(*start).unwrap().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
         let mut turn = obj([
-            ("id", V::from(id.as_str())), ("model", self.contexts.get(&id).cloned().unwrap_or(V::Null)),
+            ("id", V::from(id.as_str())), ("model", self.contexts.get(&id).map_or(V::Null, |v| v.get("model").clone())),
+            ("service_tier", self.contexts.get(&id).map_or(V::Null, |v| v.get("service_tier").clone())),
+            ("effort", self.contexts.get(&id).map_or(V::Null, |v| v.get("effort").clone())),
             ("ts", V::from(ts)), ("ms", if valid { ms.clone() } else { V::Null }), ("billing", billing.clone()),
             ("reason", if valid { V::Null } else if matches!(ms, V::Null) { V::from("not_recorded") } else { V::from("invalid") }),
         ]);
@@ -421,7 +439,7 @@ impl FirstTokenCollector {
         }
     }
     fn result(self) -> V {
-        obj([("version", n(1)), ("turns", V::Arr(self.turns.into_values().collect()))])
+        obj([("version", n(2)), ("turns", V::Arr(self.turns.into_values().collect()))])
     }
 }
 fn reconcile(bytes: &[u8], first_token_only: bool) -> Result<(Vec<Record>, bool, Marks, V), String> {

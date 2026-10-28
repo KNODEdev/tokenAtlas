@@ -114,8 +114,8 @@ test("sources come from periods, recorded calls and declarations, with their com
       ["claude", "claude/example-laptop-a", "example-laptop-a", ".claude", null],
       ["claude", "claude/example-main", "EXAMPLE-MAIN", ".claude", { first: "2026-07-20T08:00:00.000Z", last: "2026-07-22T10:00:00.000Z", calls: 10 }],
       ["claude", "claude/example-main-desktop", "EXAMPLE-MAIN", null, { first: "2026-06-25T08:00:00.000Z", last: "2026-06-25T08:30:00.000Z", calls: 2 }],
-      ["codex", "codex/example-main-sample_b", "EXAMPLE-MAIN", ".codex-2", null],
       ["codex", "codex/example-main-sample_a", "EXAMPLE-MAIN", ".codex", { first: "2026-08-01T07:00:00Z", last: "2026-08-01T11:00:00Z", calls: 9 }],
+      ["codex", "codex/example-main-sample_b", "EXAMPLE-MAIN", ".codex-2", null],
     ]);
   } finally { ctx.close(); }
 });

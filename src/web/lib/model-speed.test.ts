@@ -16,6 +16,22 @@ const series = (model: string, points: ModelSpeedPoint[]): ModelSpeedSeries => {
   return { model, total, points };
 };
 
+test("All merges only identical execution settings for speeds and first-token percentiles", () => {
+  const variant = (speed: string, effort: string | null, value: number) => ({ ...series("same", [day("2026-10-25", {
+    calls: 10, timed_calls: 10, timed_out: 1000, timed_ms: value, first_token: { turns: 1, histogram: [[value, 1]] },
+  })]), speed, effort });
+  const entries = mergeSpeedParts([{ account: "a", models: [variant("fast", "ultra", 1000), variant("standard", "ultra", 9000), variant("fast", null, 3000)] },
+    { account: "b", models: [variant("fast", "ultra", 3000), variant("fast", "high", 5000)] }], false);
+  expect(entries).toHaveLength(4);
+  const ultra = entries.find(e => e.series.speed === "fast" && e.series.effort === "ultra")!;
+  expect(ultra.series.total.speed).toBe(500);
+  // The fixture's total is usage-only; merge percentiles from the actual daily points after applying a date range.
+  expect(entriesSince(entries, "2026-10-25").find(e => e.key === ultra.key)!.series.total.first_token?.histogram).toEqual([[1000, 1], [3000, 1]]);
+  const selection = { ...EMPTY_SELECTION, models: { a: [ultra.key] } };
+  const selected = mergeSpeedParts(selectedParts([{ account: "a", models: [variant("fast", "ultra", 1000), variant("standard", "ultra", 9000)] }], selection), false);
+  expect(selected.map(e => e.series.speed)).toEqual(["standard"]);
+});
+
 test("TTFT merges measured turns, not daily/account percentiles, and preserves missing values and date filters", () => {
   const a = day("2026-10-01", { first_token: { turns: 10, histogram: [[1000, 9]] } });
   const b = day("2026-10-25", { first_token: { turns: 1, histogram: [[9000, 1]] } });

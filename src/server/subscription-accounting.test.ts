@@ -430,7 +430,7 @@ test("Capacity and /api/windows expose one Claude meter's boundaries, plans and 
   }
   expect(byId.get(dropEnded.id)?.shape?.filter(point => point.pct === 100).length).toBeGreaterThanOrEqual(2);
   expect(closed.claude_code_capacity?.weekly_capacity_tokens.value).toBeGreaterThan(0);
-  const limit = await handleClaudeLimit(apiContext, new URL(`http://local/api/claude-limit?account=${account}`
+  const limit = await handleClaudeLimit(apiContext, new URL(`http://127.0.0.1/api/claude-limit?account=${account}`
     + `&from=${encodeURIComponent(closed.cycle_start!)}&until=${encodeURIComponent(closed.cycle_end!)}`)).json();
   expect(limit.plan).toBe("max-20x");
   expect(limit.current?.window_id).toBe(closed.id);
@@ -458,7 +458,7 @@ test("Capacity and /api/windows expose one Claude meter's boundaries, plans and 
     buildSubscriptionAccountingReport(ctx, "claude", { account, since: "2026-09-24", until: "2026-09-27", counter });
     expect(reads() - beforeCapacity).toBe(1);
     const beforeLimit = reads();
-    await handleClaudeLimit(apiContext, new URL(`http://local/api/claude-limit?account=${account}`)).json();
+    await handleClaudeLimit(apiContext, new URL(`http://127.0.0.1/api/claude-limit?account=${account}`)).json();
     expect(reads() - beforeLimit).toBe(1);
     const beforeWindows = reads();
     await apiHandleWindows(apiContext, new URL(`http://localhost/api/windows?account=${account}`));

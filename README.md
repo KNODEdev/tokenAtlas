@@ -31,6 +31,11 @@ with further work planned below. Gemini CLI account discovery does not currently
 have a connected quota reader. Verified time-to-first-token measurements are
 currently available for Codex; other sources remain unmeasured for this metric.
 
+Claude Code cloud history requires valid CLI sign-in and a trusted-device credential
+for the same profile. Failed imports can leave usage and cost comparisons incomplete;
+the app reports them in its status and cloud import details drawer. See the
+[Claude cloud import guide](docs/claude-cloud.md) for access, recovery and measurement limits.
+
 ## Planned development
 
 We are developing tokenAtlas into a shared place to compare usage across AI tools:
@@ -76,6 +81,9 @@ checked with the versions recorded in [VERIFICATION.md](VERIFICATION.md).
 4. Open `http://127.0.0.1:7331`. On a new installation, confirm the archive and
    source folders in setup before the first import. Configure account history and
    subscriptions in Settings.
+
+If the port is already occupied, the launcher stops without terminating the
+application using it. Close that application yourself before starting tokenAtlas.
 
 An existing `.env` is not required. `.env.example` documents optional overrides.
 OneDrive is optional. Keep the database on local storage, outside the source

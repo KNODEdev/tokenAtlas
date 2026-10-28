@@ -12,7 +12,7 @@ const VENDOR_COLORS: Readonly<Record<string, string>> = {
   zai: "var(--glm)", "z.ai": "var(--glm)", glm: "var(--glm)", opencode: "var(--glm)",
 };
 /**
- * Distinct inks for series of one subject (projects of a window, models of one subscription), assigned by rank so
+ * Distinct inks for series of one subject that are not models (projects of a window), assigned by rank so
  * the largest neighbours in a stack never share a hue; status brick stays out.
  */
 export const DISTINCT_INKS: readonly string[] = ["var(--accent)", "var(--claude)", "var(--violet)", "var(--gemini)", "var(--glm)", "var(--warn)",
@@ -68,7 +68,30 @@ export function modelStrokes(models: ReadonlyArray<string | null>, fallbackVendo
   });
 }
 
-/** The fill per model in list order (bars and dots): the stroke colour without its dash. */
+/**
+ * The fill per model in list order (bars and dots): the stroke colour without its dash. A fill has no dash to tell
+ * a vendor's second round of shades apart, so that round keeps the lightness steps at half the chroma.
+ */
 export function modelColors(models: ReadonlyArray<string | null>, fallbackVendor?: string): string[] {
-  return modelStrokes(models, fallbackVendor).map(stroke => stroke.color);
+  const seen = new Map<string, number>();
+  return modelStrokes(models, fallbackVendor).map((stroke, index) => {
+    const base = vendorColor(modelVendor(models[index]) ?? fallbackVendor);
+    const rank = seen.get(base ?? "") ?? 0;
+    seen.set(base ?? "", rank + 1);
+    if (!base || rank < SHADE_COUNT) return stroke.color;
+    const step = SHADE_STEPS[rank % SHADE_COUNT]!;
+    return `oklch(from ${base} clamp(0.32, calc(l ${step < 0 ? "-" : "+"} ${Math.abs(step)}), 0.95) calc(c * 0.5) h)`;
+  });
+}
+
+/**
+ * Fill per model, shades handed out largest first, so a model keeps its colour across the views of one scope
+ * whatever each view sorts by: "All" tells vendors apart by hue, one subscription its models by shade.
+ */
+export function modelColorsByTokens(rows: ReadonlyArray<{ model: string | null; tokens: number }>, fallbackVendor?: string): Map<string | null, string> {
+  const totals = new Map<string | null, number>();
+  for (const row of rows) totals.set(row.model, (totals.get(row.model) ?? 0) + row.tokens);
+  const ranked = [...totals].sort((a, b) => b[1] - a[1]).map(([model]) => model);
+  const colors = modelColors(ranked, fallbackVendor);
+  return new Map(ranked.map((model, index) => [model, colors[index]!]));
 }

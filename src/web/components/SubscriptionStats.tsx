@@ -26,6 +26,7 @@ import { CodexDataIssues } from "./CodexDataIssues";
 import "./CodexSpeedStats.css";
 import { subscriptionAnalysisAdapter } from "../lib/subscription-analysis";
 import { ModelUsage } from "./ModelUsage";
+import { ModelUnitCost } from "./ModelUnitCost";
 import { filterWindowQuality, type WindowQuality } from "../../shared/subscription-quality";
 import type { CodexComparisonWindow } from "../../shared/codex-accounting";
 import { SubscriptionRevaluation } from "./SubscriptionRevaluation";
@@ -35,6 +36,8 @@ import { CapacityCycleFilter } from "./CapacityCycleFilter";
 import { CapacityFiltersDrawer } from "./CapacityFiltersDrawer";
 import { legacyCapacityMinimum, readCapacityPreferences, writeCapacityPreferences, type CapacityFilterPreferences } from "../lib/capacity-filter-preferences";
 import { useContextPreview } from "../lib/context-premium";
+import type { ApiAccount } from "../lib/api";
+import { modelReportAccounts, readAllModelReports } from "../lib/all-model-reports";
 
 const planFilterKey = (window: CodexComparisonWindow): string => JSON.stringify([
   window.plan_detail?.status ?? null, window.plan_detail?.label ?? window.plan, window.plan_detail?.multiplier ?? null,
@@ -43,7 +46,8 @@ const planFilterKey = (window: CodexComparisonWindow): string => JSON.stringify(
 interface SubscriptionStatsProps {
   dataRevision?: number; section?: "capacity" | "models"; account: string;
   /** Models: the one view a page tab shows; without it both views stay as inner tabs. */
-  modelsView?: "usage" | "trends"; provider?: string; project?: string;
+  modelsView?: "usage" | "trends" | "cost"; provider?: string; project?: string;
+  accounts?: readonly ApiAccount[];
   openDataSettings?: (target: DataSettingsTarget) => void; initialRange?: NonNullable<DataSettingsTarget["returnRange"]>;
   /** Models: opens Usage events for this subscription, a model and the selected dates. */
   onModelEvents?: (model: string, range: { since: string; until: string }) => void;
@@ -55,14 +59,17 @@ export function SubscriptionStats(props: SubscriptionStatsProps) {
   return <SubscriptionStatsView key={JSON.stringify([subscriptionAnalysisAdapter(props.provider ?? "codex").id, props.account])} {...props} />;
 }
 
-function SubscriptionStatsView({ account, project, openDataSettings, initialRange, provider = "codex", section = "capacity", modelsView, dataRevision, onModelEvents, onOverview }: SubscriptionStatsProps) {
+function SubscriptionStatsView({ account, project, openDataSettings, initialRange, provider = "codex", section = "capacity", modelsView, dataRevision, onModelEvents, onOverview, accounts = [] }: SubscriptionStatsProps) {
   const { language, locale, t } = useI18n();
   const id = useId();
   const adapter = subscriptionAnalysisAdapter(provider);
   const isCodex = adapter.id === "codex";
+  const all = adapter.id === "all" && section === "models";
+  const reportAccounts = modelReportAccounts(accounts);
+  const accountsKey = JSON.stringify(reportAccounts);
   const business = isCodex && account.endsWith("::business");
   const today = new Date().toISOString().slice(0, 10);
-  const [view, setView] = useState<"capacity" | "model-capacity" | "measurements" | "trends" | "usage" | "methodology">(section === "models" ? modelsView ?? "usage" : "capacity");
+  const [view, setView] = useState<"capacity" | "model-capacity" | "measurements" | "trends" | "usage" | "cost" | "methodology">(section === "models" ? modelsView ?? "usage" : "capacity");
   const [preferences, setPreferences] = useState<CapacityFilterPreferences>(() => {
     const saved = readCapacityPreferences(adapter.id, account, {
       unit: "api_standard", quality: "all", basis: "observed", minimum: legacyCapacityMinimum(),
@@ -94,10 +101,11 @@ function SubscriptionStatsView({ account, project, openDataSettings, initialRang
     { id: "measurements", label: t("Measurements", "Pomiary"), detail: t("The complete measurement table, column selection, CSV export and details of every observation.", "Pełna tabela pomiarów, wybór kolumn, eksport CSV i szczegóły każdej obserwacji.") },
     { id: "trends", label: t("Traffic history", "Historia ruchu"), detail: t("Explore changes over time and compare them with model appearances and your own markers.", "Prześledź zmiany w czasie, pojawienie się modeli i własne znaczniki.") },
     { id: "usage", label: t("Models & sources", "Modele i źródła"), detail: t("See which models, modes and computers contributed to the recorded usage.", "Sprawdź, które modele, tryby i komputery złożyły się na zapisane zużycie.") },
+    { id: "cost", label: t("Cost per 1M", "Koszt / 1M"), detail: t("What 1M tokens of each model cost at Standard API prices over the selected dates, against the list price of each token type.", "Ile kosztuje 1M tokenów każdego modelu po cenach Standard API w wybranych datach, na tle ceny cennikowej każdego typu tokenów.") },
     { id: "methodology", label: t("Methodology", "Metodyka"), detail: t("Definitions, assumptions and checks against the measured account limit.", "Definicje, założenia i sprawdzenie względem zmierzonego limitu konta.") },
   ] as const;
   const availableViews = views.filter(item => section === "models" ? modelsView ? item.id === modelsView : item.id === "usage" || item.id === "trends"
-    : item.id !== "usage" && item.id !== "trends" && (item.id !== "model-capacity" || !business && (isCodex || adapter.id === "claude")));
+    : item.id !== "usage" && item.id !== "trends" && item.id !== "cost" && (item.id !== "model-capacity" || !business && (isCodex || adapter.id === "claude")));
   // One tab row (user, 2026-10-21): Capacity's own views take its place, the remaining tools follow after a rule.
   const [capacityTab, setCapacityTabState] = useState(readCapacityReportTab);
   const capacityTabLabels: Record<CapacityReportTab, string> = {
@@ -138,7 +146,7 @@ function SubscriptionStatsView({ account, project, openDataSettings, initialRang
   const [draft, setDraft] = useState(custom);
   const [dateError, setDateError] = useState(false);
   const directCapacity = isCodex && !business && !project && !referenceDay && section === "capacity";
-  const whole = useRecordedRange(days === -1, account, true, directCapacity ? counter ?? null : undefined);
+  const whole = useRecordedRange(days === -1, all ? undefined : account, !all, directCapacity ? counter ?? null : undefined);
   const until = days === -1 ? whole.data?.until ?? today : days === 0 ? custom.until : today;
   const since = days === -1 ? whole.data?.since ?? today : days === 0 ? custom.since : new Date(Date.parse(until) - (days - 1) * 86400000).toISOString().slice(0, 10);
   const openSettings = (target: DataSettingsTarget) => openDataSettings?.({ ...target, returnRange: { since, until, ...(counter ? { counter } : {}), ...(quality !== "all" ? { quality } : {}), ...(referenceDay ? { reference_day: referenceDay, ...(priceCycles ? { price_cycles: priceCycles } : {}) } : {}) } });
@@ -146,10 +154,12 @@ function SubscriptionStatsView({ account, project, openDataSettings, initialRang
   const needsAccounting = view === "methodology" || dataOpen;
   const state = useAsync<CodexAccountingReport | CodexCapacityReport | null>(signal => {
     if (!whole.ready) return Promise.resolve(null);
+    if (all) return readAllModelReports(accounts, { since, until, account, project: project || undefined,
+      ...(referenceDay ? { reference_day: referenceDay } : {}) }, signal);
     if (directCapacity) return adapter.readCapacity({ since, until, account, counter }, signal);
     return adapter.read({ since, until, account, project: project || undefined, counter,
       ...(referenceDay ? { reference_day: referenceDay } : {}) }, signal);
-  }, [adapter.id, account, project, since, until, counter, referenceDay, whole.ready, directCapacity]);
+  }, [adapter.id, account, project, since, until, counter, referenceDay, whole.ready, directCapacity, all, accountsKey]);
   // Opening diagnostics must preserve the ready cycle chart while its larger report is read.
   const accounting = useAsync(signal => !directCapacity || !needsAccounting || !whole.ready ? Promise.resolve(null)
     : adapter.read({ since, until, account, counter }, signal),
@@ -161,9 +171,9 @@ function SubscriptionStatsView({ account, project, openDataSettings, initialRang
     state.reload();
     if (directCapacity && needsAccounting) accounting.reload();
   }, [dataRevision, state.reload, accounting.reload, directCapacity, needsAccounting]);
-  const markerState = useAsync(() => adapter.markers(), [adapter.id, account, since, until]);
+  const markerState = useAsync(() => all ? Promise.resolve(null) : adapter.markers(), [adapter.id, account, since, until, all]);
   const data = whole.ready && state.data?.scope.account === account && state.data.scope.since === since && state.data.scope.until === until
-    && (state.data.scope.project ?? "") === (project ?? "") && (!counter || state.data.provider?.counter === counter)
+    && (state.data.scope.project ?? "") === (project ?? "") && (all || !counter || state.data.provider?.counter === counter)
     && state.data.scope.reference_day === referenceDay ? state.data : null;
   const markers = capacityMarkers(markerState.data, since, until, adapter.id, Date.now(), data?.windows ?? []);
   const fullData = data && !("projection" in data) ? data : accounting.data;
@@ -288,7 +298,7 @@ function SubscriptionStatsView({ account, project, openDataSettings, initialRang
       {/* Models' single views keep their one scope row; Capacity's controls all sit in the head row above. */}
       {compactHead && <div className="ui-toolbar stats-meta-row">
         {headControls}
-        <span className="stats-scope">{since} – {until} UTC · {account}{project ? ` · ${t("project", "projekt")} ${project}` : ""}</span>
+        <span className="stats-scope">{since} – {until} UTC · {all ? t("All subscriptions", "Wszystkie subskrypcje") : account}{project ? ` · ${t("project", "projekt")} ${project}` : ""}</span>
         {view !== "trends" && <HelpDot label={t("About this view", "O tym widoku")}>{availableViews[0]?.detail}</HelpDot>}
         <span className="ui-spacer" />
         {reportControls}
@@ -360,8 +370,8 @@ function SubscriptionStatsView({ account, project, openDataSettings, initialRang
     {data && <>
       {counters?.counter_reason && <p role="status" className="codex-view-description">{counters.counter_reason}</p>}
       {!isCodex && fullData && <div className="ui-toolbar stats-provider">
-        <span>{data.provider?.label}</span>
-        <HelpDot label={data.provider?.label}>{t("No provider credit conversion is configured. API equivalents and tokens describe recorded work, not a fixed subscription budget.", "Brak skonfigurowanego przelicznika kredytów dostawcy. Ekwiwalent API i tokeny opisują zapisany ruch, nie stały budżet abonamentu.")}</HelpDot>
+        <span>{all ? t("All subscriptions", "Wszystkie subskrypcje") : data.provider?.label}</span>
+        <HelpDot label={all ? t("All subscriptions", "Wszystkie subskrypcje") : data.provider?.label}>{t("No provider credit conversion is configured. API equivalents and tokens describe recorded work, not a fixed subscription budget.", "Brak skonfigurowanego przelicznika kredytów dostawcy. Ekwiwalent API i tokeny opisują zapisany ruch, nie stały budżet abonamentu.")}</HelpDot>
         {!data.provider?.counters?.length && data.provider?.counter_reason && <span role="status">{data.provider.counter_reason}</span>}
         {!!fullData.normalization.standard_api_usd.unpriced_events && <span role="status">{fullData.normalization.standard_api_usd.unpriced_events} {t("events without complete pricing; see Models & sources for missing rates.", "zdarzeń bez pełnej wyceny; brakujące stawki zobaczysz w Modelach i źródłach.")}</span>}
       </div>}
@@ -381,7 +391,7 @@ function SubscriptionStatsView({ account, project, openDataSettings, initialRang
         {view === "methodology" && <CapacityMilestones markers={markers} />}
       </>}
       {view === "model-capacity" && <ModelCapacity provider={adapter.id} account={account} counter={data.provider?.counter ?? counter} since={since} until={until} dataRevision={dataRevision} project={project} />}
-      {section === "capacity" && view !== "model-capacity" && <div hidden={hasCycleFilterEmpty || (view === "capacity" ? hasQualityFilterEmpty : hasCapacityFilterEmpty)}><CodexWindowTable analysisScope={{ provider: adapter.id, options: { ...data.scope, counter: data.provider?.counter ?? undefined } }} openDataSettings={openDataSettings ? openSettings : undefined} creditsAvailable={isCodex} key={`${account}:${data.provider?.counter ?? "weekly"}`} markers={markers} basis={capacityBasis} windows={view === "capacity" && data.windows !== null ? qualityWindows : capacityWindows} view={view}
+      {section === "capacity" && view !== "model-capacity" && view !== "cost" && <div hidden={hasCycleFilterEmpty || (view === "capacity" ? hasQualityFilterEmpty : hasCapacityFilterEmpty)}><CodexWindowTable analysisScope={{ provider: adapter.id, options: { ...data.scope, counter: data.provider?.counter ?? undefined } }} openDataSettings={openDataSettings ? openSettings : undefined} creditsAvailable={isCodex} key={`${account}:${data.provider?.counter ?? "weekly"}`} markers={markers} basis={capacityBasis} windows={view === "capacity" && data.windows !== null ? qualityWindows : capacityWindows} view={view}
         allWindows={data.windows === null ? undefined : selectedWindows} unit={unit} minObservedPercent={minObservedPercent} range={{ since, until }} manual={manual} contextImpact={contextImpact}
         capacityTab={capacityTab} /></div>}
       {!business && view === "capacity" && referenceDay && <section aria-label={t("Compare at one price date", "Porównanie przy jednym cenniku")}>
@@ -397,10 +407,13 @@ function SubscriptionStatsView({ account, project, openDataSettings, initialRang
         <CodexPromotionTimeline />
       </section>}
       {view === "trends" && fullData && <CodexUsageTimeline key={`${account}:${data.provider?.counter ?? "weekly"}`} data={fullData}
+        markerProviders={all ? [...new Set(reportAccounts.map(item => item.provider))] : undefined}
         help={availableViews.length === 1 ? availableViews[0]?.detail : undefined} />}
       {view === "usage" && fullData && <ModelUsage data={fullData} codex={isCodex} account={account} project={project} since={since} until={until}
-        openDataSettings={openDataSettings ? openSettings : undefined} onOverview={onOverview}
+        aggregateCodexAccounts={all ? reportAccounts.filter(item => item.provider === "codex").map(item => item.account) : undefined}
+        openDataSettings={openDataSettings ? openSettings : undefined} onOverview={onOverview} vendor={all ? undefined : provider}
         onModelEvents={onModelEvents ? model => onModelEvents(model, { since, until }) : undefined} />}
+      {view === "cost" && fullData && <ModelUnitCost data={fullData} codex={isCodex} vendor={all ? undefined : provider} />}
       {view === "methodology" && directCapacity && !fullData && <>{accounting.error ? <ErrorState message={accounting.error} onRetry={accounting.reload} /> : <LoadingCard height={160} />}</>}
       {view === "methodology" && fullData && <section className="capacity-section">
         {/* The report's own provenance (sources, attribution, deduplication, limits) is reference text: help dot only. */}

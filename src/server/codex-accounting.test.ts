@@ -638,12 +638,12 @@ test("accounting follows data and configuration publication", async () => {
     homeToSubId: new Map(), subIdToHomes: new Map(), rateCards: structuredClone(card), rootDir: process.cwd() } as AppContext;
   prepareCodexLedgerFixture(sqlite,card,fixtureHomes());
   const fetch = createFetchHandler(ctx);
-  const url = "http://test/api/codex-accounting?since=2026-09-08&until=2026-09-08&account=codex1";
+  const url = "http://127.0.0.1/api/codex-accounting?since=2026-09-08&until=2026-09-08&account=codex1";
   try {
     // One subscription per report: a request without one is refused before the report is read.
-    for (const refused of ["http://test/api/codex-accounting?since=2026-09-08&until=2026-09-08",
-      "http://test/api/codex-accounting?since=2026-09-08&until=2026-09-08&account=all",
-      "http://test/api/subscription-accounting?provider=codex&since=2026-09-08&until=2026-09-08"]) {
+    for (const refused of ["http://127.0.0.1/api/codex-accounting?since=2026-09-08&until=2026-09-08",
+      "http://127.0.0.1/api/codex-accounting?since=2026-09-08&until=2026-09-08&account=all",
+      "http://127.0.0.1/api/subscription-accounting?provider=codex&since=2026-09-08&until=2026-09-08"]) {
       const response = await fetch(new Request(refused));
       expect({ status: response.status, body: await response.json() })
         .toEqual({ status: 400, body: { error: "Select one subscription to analyse its capacity" } });

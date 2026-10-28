@@ -1,47 +1,66 @@
-# Stops whatever still listens on the app port (a previous _dev.bat run) and waits until the port is free.
-# Kills the whole process tree (bun run serve -> server -> native parser workers) and never blocks without
-# a limit: a server caught in a long SQLite write can take seconds to die, so progress is printed while waiting.
-param([Parameter(Mandatory)][int]$Port, [int]$TimeoutSec = 30)
+param(
+    [Parameter(Mandatory)][ValidateRange(1, 65535)][int]$Port,
+    [Parameter(Mandatory)][string]$ProjectRoot,
+    [ValidateRange(1, 120)][int]$TimeoutSec = 30
+)
+$ErrorActionPreference = 'Stop'
 
-# netstat, not Get-NetTCPConnection: the latter goes through WMI and takes ~4 s per call here.
 function Get-Listeners {
-  @(netstat -ano -p TCP; netstat -ano -p TCPv6) |
-    ForEach-Object { $f = -split $_; if ($f.Count -ge 5 -and $f[3] -eq 'LISTENING' -and $f[1] -match ":$Port$") { [int]$f[4] } } |
-    Where-Object { $_ -gt 0 } | Select-Object -Unique
+    @(netstat -ano -p TCP; netstat -ano -p TCPv6) |
+        ForEach-Object { $f = -split $_; if ($f.Count -ge 5 -and $f[3] -eq 'LISTENING' -and $f[1] -match ":$Port$") { [int]$f[4] } } |
+        Where-Object { $_ -gt 0 } | Select-Object -Unique
 }
-
 function Get-Tree([int]$Root, $All) {
-  $ids = @($Root)
-  foreach ($child in $All | Where-Object { $_.ParentProcessId -eq $Root }) { $ids += Get-Tree $child.ProcessId $All }
-  $ids
+    $Root
+    foreach ($child in $All | Where-Object { $_.ParentProcessId -eq $Root }) { Get-Tree $child.ProcessId $All }
 }
 
-$listeners = @(Get-Listeners)
-if ($listeners.Count -eq 0) { Write-Host "[OK] Port $Port free."; exit 0 }
-
-$all = @(Get-CimInstance Win32_Process)
-$targets = @()
-foreach ($id in $listeners) {
-  $proc = $all | Where-Object { $_.ProcessId -eq $id }
-  # The listener is the server; its parent "bun run serve" would otherwise linger in the old window.
-  $parent = $all | Where-Object { $_.ProcessId -eq $proc.ParentProcessId -and $_.Name -eq 'bun.exe' }
-  $root = if ($parent) { $parent.ProcessId } else { $id }
-  Write-Host "    stopping previous server: PID $id ($($proc.Name)), tree from PID $root"
-  $targets += Get-Tree $root $all
-}
-$targets = @($targets | Select-Object -Unique)
-# Stop-Process issues TerminateProcess and returns; waiting is done below with a limit.
-foreach ($id in $targets) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
-
-$deadline = (Get-Date).AddSeconds($TimeoutSec)
-while ($true) {
-  $alive = @($targets | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
-  if ($alive.Count -eq 0 -and @(Get-Listeners).Count -eq 0) { Write-Host "[OK] Port $Port free."; exit 0 }
-  if ((Get-Date) -gt $deadline) {
-    Write-Host "[X] Port $Port still held after $TimeoutSec s; process(es) not exiting: $($alive -join ', ')."
-    Write-Host "    Close the previous tokenAtlas window or end those PIDs in Task Manager, then run _dev.bat again."
+try {
+    $listeners = @(Get-Listeners)
+    if ($listeners.Count -eq 0) { Write-Host "[OK] Port $Port free."; exit 0 }
+    $entry = [IO.Path]::GetFullPath((Join-Path $ProjectRoot 'src\server\api.ts'))
+    # Require the complete entrypoint argument, not a matching directory substring.
+    $entryPattern = '(?:^|\s)(?:"' + [regex]::Escape($entry) + '"|' + [regex]::Escape($entry) + ')(?=\s|$)'
+    $all = @(Get-CimInstance Win32_Process)
+    $targets = @()
+    foreach ($id in $listeners) {
+        $server = $all | Where-Object { $_.ProcessId -eq $id }
+        if (!$server -or $server.Name -ne 'bun.exe' -or $server.CommandLine -notmatch $entryPattern) {
+            throw "Port $Port belongs to an unrecognized process (PID $id). No process was stopped."
+        }
+        # The child has an absolute entrypoint; its supervisor uses a relative one.
+        $parent = $all | Where-Object { $_.ProcessId -eq $server.ParentProcessId }
+        $root = $id
+        if ($parent -and $parent.Name -eq 'bun.exe' -and
+            ($parent.CommandLine -match $entryPattern -or $parent.CommandLine -match '\srun\s+"?src[/\\]server[/\\]api\.ts"?\s*$')) {
+            $root = $parent.ProcessId
+        }
+        $targets += @(Get-Tree $root $all)
+    }
+    # Validate every listener before stopping anything; reject recycled PIDs.
+    foreach ($id in @($targets | Select-Object -Unique)) {
+        $expected = $all | Where-Object { $_.ProcessId -eq $id }
+        $current = Get-CimInstance Win32_Process -Filter "ProcessId = $id"
+        if (!$current) { continue }
+        if ($current.CreationDate -ne $expected.CreationDate -or $current.CommandLine -ne $expected.CommandLine) {
+            throw "PID $id changed during port cleanup. Retry _dev.bat."
+        }
+        Write-Host "    stopping previous tokenAtlas process: PID $id"
+        try { Stop-Process -Id $id -Force } catch {
+            # A supervisor may have already stopped its child.
+            if (Get-Process -Id $id -ErrorAction SilentlyContinue) { throw }
+        }
+    }
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    while ($true) {
+        $alive = @($targets | Select-Object -Unique | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
+        if ($alive.Count -eq 0 -and @(Get-Listeners).Count -eq 0) { break }
+        if ((Get-Date) -ge $deadline) { throw "Port $Port or previous tokenAtlas processes still active after $TimeoutSec seconds. Retry _dev.bat after they stop." }
+        Start-Sleep -Milliseconds 250
+    }
+    Write-Host "[OK] Port $Port free."
+    exit 0
+} catch {
+    Write-Host "[X] $($_.Exception.Message)"
     exit 1
-  }
-  Write-Host "    waiting for PID(s) $($alive -join ', ') to exit..."
-  Start-Sleep -Seconds 2
 }

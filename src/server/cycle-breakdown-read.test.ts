@@ -45,7 +45,7 @@ async function preparedCapture(ctx: AppContext, suffix = "", handler = handleCyc
 
 test("frozen reference source is pinned independently", () => {
   const bytes = fs.readFileSync(path.resolve(import.meta.dir, "../../scripts/lib/cycle-breakdown-reference.ts"));
-  expect(createHash("sha256").update(bytes.toString("utf8").replaceAll("\r\n","\n")).digest("hex")).toBe("165e48d10d5adc90adfc5790b6359510b73448df60243850fc276ee73ff3ea3d");
+  expect(createHash("sha256").update(bytes.toString("utf8").replaceAll("\r\n","\n")).digest("hex")).toBe("9a0d1b6f38b162982a79837ca0c5932a8e7dcd91ee5050db7ff9b04769f19fdb");
 });
 
 async function parity(ctx: AppContext, suffix = "") {

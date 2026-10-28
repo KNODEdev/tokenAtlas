@@ -5,6 +5,8 @@ import { useI18n } from "../lib/i18n";
 import { LoadingSkeleton, LoadingStatus, type LoadingShape } from "./LoadingStatus";
 import "./ui.css";
 import { DataTable } from "./DataTable";
+import type { TableSortProps } from "./DataTable";
+import type { TableSortValue } from "../lib/table-sort";
 export { DataTable, TableRow, TableColGroup } from "./DataTable";
 /** Data text (the former monospace voice); see docs/design/paper-atlas.md. */
 export const MONO = "var(--font-mono)";
@@ -129,10 +131,10 @@ export function Bar({
   );
 }
 /** `fixed`: the columns keep their declared widths and long cells are clipped instead of widening the table. */
-export function Table({ children, fixed, tableId }: { children: ReactNode; fixed?: boolean; tableId: string }) {
+export function Table({ children, fixed, tableId, ...sorting }: { children: ReactNode; fixed?: boolean; tableId: string } & TableSortProps) {
   return (
     <div className="ui-table-wrap">
-      <DataTable tableId={tableId} className={`ui-table${fixed ? " is-fixed" : ""}`}>{children}</DataTable>
+      <DataTable tableId={tableId} {...sorting} className={`ui-table${fixed ? " is-fixed" : ""}`}>{children}</DataTable>
     </div>
   );
 }
@@ -142,17 +144,19 @@ export function Th({
   title,
   columnId,
   className,
+  "aria-sort": ariaSort,
 }: {
   children: ReactNode;
   align?: "left" | "right" | "center";
   title?: string;
   columnId?: string;
   className?: string;
+  "aria-sort"?: "ascending" | "descending" | "none";
   /** Read by the table's column chooser: the column starts hidden until chosen (IA-43). */
   defaultHidden?: boolean;
 }) {
   return (
-    <th className={`ui-th${className ? ` ${className}` : ""}`} data-column-id={columnId} title={title} style={{ textAlign: align }}>
+    <th className={`ui-th${className ? ` ${className}` : ""}`} data-column-id={columnId} aria-sort={ariaSort} title={title} style={{ textAlign: align }}>
       {children}
     </th>
   );
@@ -171,6 +175,8 @@ export function Td({
   style?: CSSProperties;
   colSpan?: number;
   title?: string;
+  /** Raw data used by table sorting, before formatting or rounding. */
+  sortValue?: TableSortValue;
 }) {
   return (
     <td className={mono ? "ui-td is-num" : "ui-td"} colSpan={colSpan} title={title} style={{ textAlign: align, ...style }}>

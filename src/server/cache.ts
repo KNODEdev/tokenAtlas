@@ -104,8 +104,8 @@ export class ResponseCache {
       WHERE bucket='*' ORDER BY source`).all() as Array<{source:string;revision:number}> : null;
     const probeSources = new Set(["probe_windows", "ratelimit", "sync_runs"]);
     const tracked = rows ? analysisHash(rows.filter(row => (includeReadings || !probeSources.has(row.source))
-      // None of these cacheable routes reads first-token histograms.
-      && row.source !== "response_time_hours"
+      // Timing projections have their own Speed version; other routes do not read them.
+      && row.source !== "response_time_hours" && row.source !== "model_speed_hours"
       && (windowSums || !row.source.startsWith(WINDOW_USAGE_SOURCES)))) : "legacy";
     const schema = (sqlite.query("PRAGMA schema_version").get() as {schema_version:number}).schema_version;
     const stamp = `${schema}:${revisions}:${derived}:${rules}:${tracked}:${this.configuration?analysisHash(this.configuration(includeReadings)):""}`;

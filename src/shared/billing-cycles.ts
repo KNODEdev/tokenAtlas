@@ -395,8 +395,8 @@ export type BillingCycleResets = Partial<Record<"open" | "scheduled" | "plan_cha
   BillingCycleResetBonus>>;
 /**
  * Banked resets the account was granted in the cycle (Codex, from its reset-credit readings, recorded from 02.09): `count` grants
- * seen from `from` (the reading counting starts at) to the cycle's end or now. `complete` when a reading at most a day before the
- * cycle anchors the count; otherwise grants before `from` are unknown and `count` is a lower bound.
+ * seen from `from` (the reading counting starts at) to the cycle's end or now. `complete` requires a reading at most a day before the
+ * cycle and dated credit-list evidence throughout; observation-only grants are a lower bound.
  */
 export interface BillingCycleBankedGrants { count: number; from: string; complete: boolean }
 /**

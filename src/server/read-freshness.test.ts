@@ -41,7 +41,7 @@ function fetcher(db: Database) {
     plansCatalog: { provider_groups: [] } } as unknown as AppContext;
   const fetch = createFetchHandler(ctx);
   return async (route: string) => {
-    const response = await fetch(new Request(`http://test${route}`));
+    const response = await fetch(new Request(`http://127.0.0.1${route}`));
     return { status: response.status, freshness: response.headers.get(FRESHNESS_HEADER), body: await response.json() as Record<string, any> };
   };
 }

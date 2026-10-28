@@ -3,12 +3,11 @@ import type { TimedSums } from "../db/usage-ledger";
 import type { AccountReadPlan } from "./account-resolver";
 import { readOwnedLedgerHours, type SumVendor } from "./ledger-sums";
 import type { FirstTokenSamples } from "../shared/first-token";
+import { executionKey, type ModelExecution } from "../shared/model-execution";
 
 /**
- * Output speed of each model over time for one subscription (docs/verification/model-speed-2026-10-06.md):
- * the ledger's timed sums of the hours the account owns, per model, on the hour or the UTC day grain. Claude reads
- * the shared ledger's owned hours (`readModelSpeed`), Codex its ledger's owned hour cohorts (`readCodexOwnedTimedHours` in
- * ledger-sums.ts, `modelSpeedSeries` over them in api.ts). This module only shapes those sums. Stored rows only (an hour a period boundary cuts reads its bounded facts, as every owned-hour reader does).
+ * Shapes stored owned hours into model/speed/effort series. The API reads the canonical timing projection
+ * through model-speed-read.ts; readModelSpeed remains the legacy aggregate/reference helper.
  *
  * Speed is `out * 1000 / ms` over the summed calls, never an average of per-call speeds. `long_*` counts only
  * calls with at least `LONG_CALL_OUT` output tokens, where generation rather than latency dominates the time.
@@ -23,7 +22,7 @@ export interface ModelSpeedPoint {
   long_calls: number; long_out: number; long_ms: number; long_speed: number | null;
   coverage: number | null;
 }
-export interface ModelSpeedSeries { model: string | null; total: ModelSpeedPoint; points: ModelSpeedPoint[] }
+export interface ModelSpeedSeries extends Partial<ModelExecution> { model: string | null; total: ModelSpeedPoint; points: ModelSpeedPoint[] }
 
 type Sums = { calls: number } & TimedSums;
 const empty = (): Sums => ({ calls: 0, timed_calls: 0, timed_out: 0, timed_ms: 0, timed_long_calls: 0, timed_long_out: 0, timed_long_ms: 0 });
@@ -41,24 +40,24 @@ function add(into: Sums, row: Sums): void {
 export function readModelSpeed(db: Database, vendor: SumVendor, plan: AccountReadPlan,
   query: { grain: "hour" | "day"; since?: string; until?: string }): ModelSpeedSeries[] {
   const range = { ...(query.since ? { since: query.since } : {}), ...(query.until ? { until: query.until } : {}) };
-  return modelSpeedSeries(readOwnedLedgerHours(db, vendor, plan, range), query.grain);
+  return modelSpeedSeries(readOwnedLedgerHours(db, vendor, plan, range).map(row => ({ ...row, speed: row.speed ?? "unknown" })), query.grain);
 }
 
 /** Owned calendar-hour sums of one account (any ledger), as series per model on the hour or UTC day grain. */
-export function modelSpeedSeries(hours: Iterable<{ hour: number | null; model: string | null } & Sums>, grain: "hour" | "day"): ModelSpeedSeries[] {
+export function modelSpeedSeries(hours: Iterable<{ hour: number | null; model: string | null } & Sums & Partial<ModelExecution>>, grain: "hour" | "day"): ModelSpeedSeries[] {
   const query = { grain };
-  const models = new Map<string, { model: string | null; total: Sums; buckets: Map<string, Sums> }>();
+  const models = new Map<string, { model: string | null; speed?: string; effort?: string | null; total: Sums; buckets: Map<string, Sums> }>();
   for (const row of hours) {
     const instant = new Date(row.hour! * 3_600_000).toISOString();
     const at = query.grain === "hour" ? instant : instant.slice(0, 10);
-    const key = JSON.stringify(row.model);
-    const entry = models.get(key) ?? { model: row.model, total: empty(), buckets: new Map<string, Sums>() };
+    const key = executionKey(row.model, row);
+    const entry = models.get(key) ?? { model: row.model, ...(row.speed !== undefined ? { speed: row.speed, effort: row.effort ?? null } : {}), total: empty(), buckets: new Map<string, Sums>() };
     models.set(key, entry);
     const bucket = entry.buckets.get(at) ?? empty();
     entry.buckets.set(at, bucket);
     add(bucket, row); add(entry.total, row);
   }
   return [...models.values()].sort((a, b) => b.total.calls - a.total.calls || String(a.model).localeCompare(String(b.model)))
-    .map(entry => ({ model: entry.model, total: point("total", entry.total),
+    .map(entry => ({ model: entry.model, ...(entry.speed !== undefined ? { speed: entry.speed, effort: entry.effort } : {}), total: point("total", entry.total),
       points: [...entry.buckets].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([at, sums]) => point(at, sums)) }));
 }

@@ -112,7 +112,7 @@ function EventList({ initial, target, accounts, goto }: ScreenProps & { initial:
             "totals for the whole filter are not available: the server returns one page at a time, and a page is not summed",
             "sumy całego filtra są niedostępne: serwer zwraca po jednej stronie, a strony nie sumujemy")}
         </div>
-        <Table tableId="Events:0" fixed>
+        <Table tableId="Events:0" fixed sortable={false}>
           <TableColGroup>
             <col style={{ width: "13%" }} />
             {bySubscription && <col style={{ width: "11%" }} />}

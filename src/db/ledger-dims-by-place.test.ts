@@ -22,6 +22,7 @@ import { card } from "../server/codex-window-calls.fixture";
 import { rebuildCodexLedgerDay } from "./codex-price-ledger";
 import { ensureRawSyncIndexes } from "./migrate";
 import { overrideProjectRules } from "../projects/resolve";
+import { replayFixtureMigrations } from "./migration-range.fixture";
 
 const MIGRATIONS = path.resolve(import.meta.dir, "../../drizzle");
 const M0069 = 1789776000037;
@@ -36,15 +37,8 @@ function database() {
   // The raw project ids here describe the old dimension split only; the ledgers are keyed by place whatever the rules.
   overrideProjectRules(db, { projects: [] });
   const migrate = () => {
-    // Later migrations run again after it (drizzle applies what follows the newest recorded one): 0070 and 0073 re-add their columns.
-    db.exec(`DELETE FROM __drizzle_migrations WHERE created_at>=${M0069}; ALTER TABLE usage_ledger_days DROP COLUMN act_key;
-      ALTER TABLE plan_periods DROP COLUMN anchor_ts; ALTER TABLE plan_periods DROP COLUMN cycle_months`);
-    for(const family of ['subscription_capacity','subscription_hours','project_plan']){
-      const tables=family==='subscription_capacity'?['windows','dirty','state']:family==='subscription_hours'?['dirty','state']:['days','dirty','state'];
-      for(const suffix of tables)db.exec(`DROP TABLE ${family}_${suffix}`);
-    }
-    db.exec('DROP TABLE subscription_window_hours');
-    migrateDrizzle(drizzle(db), { migrationsFolder: MIGRATIONS });
+    db.exec("ALTER TABLE usage_ledger_days DROP COLUMN act_key");
+    replayFixtureMigrations(db, directory, "0069_dims_by_place", "0070_usage_ledger_day_act_key");
   };
   return { db, migrate, close() { db.close(true); fs.rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); } };
 }

@@ -169,7 +169,7 @@ describe("durable subscription usage", () => {
       sqlite, rateCards: cards, accounts: splitProbeReaderFixtureConfig(subscriptions), homeToSubId: new Map(), subIdToHomes: new Map(),
       eras: buildEraIndex(subscriptions), eraErrors: [], claudeGauge: {}, grokGauge: {},
     } as unknown as AppContext;
-    const response = await createFetchHandler(ctx)(new Request("http://test/api/era-timelines"));
+    const response = await createFetchHandler(ctx)(new Request("http://127.0.0.1/api/era-timelines"));
     expect(response.status).toBe(200);
     expect(response.headers.get("X-Usage-Source")).toBe("register-v8");
     expect((await response.json()).subscriptions[0].segments[0].stats.tokens).toBeGreaterThan(0);
@@ -331,7 +331,7 @@ test("Codex and Claude usage is never a silent zero: an unprepared register is p
   const ctx = { sqlite: missing, rateCards: unsupported, accounts: splitProbeReaderFixtureConfig(subscriptions), homeToSubId: new Map(), subIdToHomes: new Map(),
     eras: buildEraIndex(subscriptions), eraErrors: [], claudeGauge: {}, grokGauge: {}, plans: { segments: [] },
     plansCatalog: { provider_groups: [] } } as unknown as AppContext;
-  for (const response of [handleEraTimelines(ctx), handleHistoryCoverage(ctx, new URL("http://test/api/history-coverage"))]) {
+  for (const response of [handleEraTimelines(ctx), handleHistoryCoverage(ctx, new URL("http://127.0.0.1/api/history-coverage"))]) {
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({ usage_unavailable: ["codex","claude","gemini","grok","glm"]
       .map(provider => ({provider})) });

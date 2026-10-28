@@ -106,7 +106,7 @@ test("three reset windows train on two and validate on the untouched third, acro
 test("unknown speed, counter decreases, stale probes and plan changes exclude intervals", () => {
   for (const reason of ["incomplete_pricing_or_speed", "counter_decreased", "probe_gap_over_2h", "plan_unknown_or_changed"]) {
     const { events, probes } = fixture();
-    if (reason === "incomplete_pricing_or_speed") events[0]!.speed = "unknown";
+    if (reason === "incomplete_pricing_or_speed") Object.assign(events[0]!, { speed: "unknown", service_tier: "future-unmapped" });
     if (reason === "counter_decreased") probes[1]!.used_percent = 5;
     if (reason === "probe_gap_over_2h") probes[1]!.ts = "2026-09-08T04:00:00Z";
     if (reason === "plan_unknown_or_changed") probes[1]!.plan = "plus";

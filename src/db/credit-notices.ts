@@ -113,7 +113,7 @@ export function writeCreditNotices(db: Database, provider: string, account: stri
           archiveSpent.run(`${draft.notice}|history:${existing.observed_at}`, existing.id);
           insert.run(provider, account, draft.notice, draft.pool, draft.kind, draft.unit, draft.amount, draft.amount_text,
             draft.expires_at, draft.observed_at, JSON.stringify({ ...draft.detail, since: draft.observed_at }), now, now);
-        })();
+        }).immediate();
         written++;
         continue;
       }

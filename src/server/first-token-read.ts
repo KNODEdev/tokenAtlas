@@ -5,26 +5,36 @@ import type { FirstTokenAdapter } from "../providers/first-token/types";
 import type { AccountResolver } from "./account-resolver";
 import { emptyFirstToken, mergeFirstToken, type FirstTokenSamples } from "../shared/first-token";
 import type { ModelSpeedSeries, ModelSpeedPoint } from "./model-speed";
+import { codexExecution, executionKey, type ModelExecution } from "../shared/model-execution";
 
-interface Bin { source: string; model: string; billing: string; hour: number; ms: number; turns: number }
+interface Bin { source: string; model: string; billing: string; hour: number; ms: number; turns: number;
+  service_tier: string | null; effort: string | null; mode_known: number }
 const HOUR = 3_600_000;
 /** Prepared histograms for whole hours; only account/date boundaries read bounded canonical turns. */
 export function readFirstTokenTimes(db: Database, resolver: AccountResolver, provider: string, account: string,
-  options: { since?: string; until?: string; grain: "day" | "hour"; adapters?: readonly FirstTokenAdapter[] }) {
+  options: { since?: string; until?: string; grain: "day" | "hour"; adapters?: readonly FirstTokenAdapter[];
+    classify?: (tier: string | null, day: string) => string | null }) {
   const result = new Map<string, Map<string, FirstTokenSamples>>();
+  const executions = new Map<string, { model: string } & ModelExecution>();
   const bins = new Map<string, Map<string, { turns: number; counts: Map<number, number> }>>();
-  if (!hasFirstTokenSchema(db)) return { models: result, pending: false };
+  if (!hasFirstTokenSchema(db)) return { models: result, executions, pending: false };
   const adapter = (options.adapters ?? firstTokenAdapters).find(a => a.id === provider);
-  if (!adapter) return { models: result, pending: false };
+  if (!adapter) return { models: result, executions, pending: false };
   const state = db.query("SELECT version FROM response_time_state WHERE provider=?").get(provider) as { version: number } | null;
   const pending = state?.version !== adapter.version || !!db.query("SELECT 1 FROM response_time_queue WHERE provider=? LIMIT 1").get(provider);
   const fromDate = options.since ? Date.parse(`${options.since}T00:00:00Z`) : -Infinity;
   const untilDate = options.until ? Date.parse(`${options.until}T00:00:00Z`) + 86_400_000 : Infinity;
   const add = (row: Bin, ts: string) => {
     if (adapter.owner(resolver, row.source, ts, row.billing) !== account.toLowerCase()) return;
+    // Legacy measurements remain stored while mode metadata is filled, never labelled as a known mode.
+    if (!row.mode_known) return;
     const date = new Date(row.hour * HOUR).toISOString(), at = options.grain === "day" ? date.slice(0, 10) : date;
-    const points = bins.get(row.model) ?? new Map<string, { turns: number; counts: Map<number, number> }>();
-    bins.set(row.model, points);
+    const execution = row.mode_known === 2 ? { speed: "mixed", effort: null } : codexExecution(row.service_tier || null, row.effort,
+      options.classify ? tier => options.classify!(tier, date.slice(0, 10)) : undefined);
+    const key = executionKey(row.model, execution);
+    executions.set(key, { model: row.model, ...execution });
+    const points = bins.get(key) ?? new Map<string, { turns: number; counts: Map<number, number> }>();
+    bins.set(key, points);
     const point = points.get(at) ?? { turns: 0, counts: new Map<number, number>() };
     point.turns += row.turns;
     if (row.ms >= 0) point.counts.set(row.ms, (point.counts.get(row.ms) ?? 0) + row.turns);
@@ -36,34 +46,35 @@ export function readFirstTokenTimes(db: Database, resolver: AccountResolver, pro
     const first = Math.ceil(from / HOUR), stop = Math.floor(until / HOUR);
     const wholeFrom = Number.isFinite(first) ? first : -Number.MAX_SAFE_INTEGER;
     const wholeUntil = Number.isFinite(stop) ? stop : Number.MAX_SAFE_INTEGER;
-    for (const row of db.query(`SELECT source,model,billing,hour,ms,turns FROM response_time_hours
+    for (const row of db.query(`SELECT source,model,billing,hour,ms,turns,service_tier,effort,mode_known FROM response_time_hours
       WHERE provider=? AND source=? AND hour>=? AND hour<?`).all(provider, range.source, wholeFrom, wholeUntil) as Bin[])
       add(row, new Date(row.hour * HOUR).toISOString());
     const edges: Array<[number, number]> = [];
     if (Number.isFinite(from) && from < first * HOUR) edges.push([from, Math.min(until, first * HOUR)]);
     if (Number.isFinite(until) && stop * HOUR < until && stop * HOUR >= first * HOUR) edges.push([Math.max(from, stop * HOUR), until]);
-    for (const [a, b] of edges) for (const row of db.query(`SELECT source,model,billing,ts,ms FROM response_time_turns
+    for (const [a, b] of edges) for (const row of db.query(`SELECT source,model,billing,ts,ms,service_tier,effort,mode_known FROM response_time_turns
       WHERE provider=? AND source=? AND ts>=? AND ts<? AND model IS NOT NULL`)
       .all(provider, range.source, new Date(a).toISOString(), new Date(b).toISOString()) as Array<Omit<Bin, "hour" | "turns"> & { ts: string }>)
       add({ ...row, ms: row.ms ?? -1, hour: Math.floor(Date.parse(row.ts) / HOUR), turns: 1 }, row.ts);
   }
   for (const [model, points] of bins) result.set(model, new Map([...points].map(([at, p]) =>
     [at, { turns: p.turns, histogram: [...p.counts].sort(([a], [b]) => a - b) }])));
-  return { models: result, pending };
+  return { models: result, executions, pending };
 }
 
 const emptyPoint = (at: string): ModelSpeedPoint => ({ at, calls: 0, timed_calls: 0, timed_out: 0, timed_ms: 0, speed: null,
   long_calls: 0, long_out: 0, long_ms: 0, long_speed: null, coverage: null });
 /** Timing-only days/models remain visible without inventing usage calls. */
 export function attachFirstTokenTimes(series: ModelSpeedSeries[], timing: ReturnType<typeof readFirstTokenTimes>): ModelSpeedSeries[] {
-  const models = new Map(series.map(s => [s.model, { ...s, total: { ...s.total }, points: s.points.map(p => ({ ...p })) }]));
-  for (const [model, samples] of timing.models) {
-    const row = models.get(model) ?? { model, total: emptyPoint("total"), points: [] };
+  const models = new Map(series.map(s => [executionKey(s.model, s), { ...s, total: { ...s.total }, points: s.points.map(p => ({ ...p })) }]));
+  for (const [key, samples] of timing.models) {
+    const execution = timing.executions.get(key)!;
+    const row = models.get(key) ?? { ...execution, total: emptyPoint("total"), points: [] };
     const points = new Map(row.points.map(p => [p.at, p]));
     for (const [at, first_token] of samples) points.set(at, { ...(points.get(at) ?? emptyPoint(at)), first_token });
     row.points = [...points.values()].sort((a, b) => a.at.localeCompare(b.at));
     row.total.first_token = mergeFirstToken([...samples.values()]);
-    models.set(model, row);
+    models.set(key, row);
   }
   for (const row of models.values()) {
     row.total.first_token ??= emptyFirstToken();

@@ -10,8 +10,8 @@ export type BankedGrants = BillingCycleBankedGrants;
 
 /**
  * Grants in [start, end) from the account's reset-credit readings: when two consecutive readings both carry the credit
- * list (09.10 on), each credit id not seen before; otherwise each rise of the count. A grant and a use between two
- * readings cancel out in the count, so the count era can miss one; the list era cannot. Null without a reading inside.
+ * list, dated grants belong to their provider timestamp, not their first observation. Undated IDs and count rises
+ * are observation-based lower bounds: a grant and a use between readings can cancel out. Null without a reading inside.
  */
 export function bankedGrants(readings: readonly CreditReading[], start: number, end: number): BankedGrants | null {
   const sorted = readings.filter((r) => r.ts < end).sort((a, b) => a.ts - b.ts);
@@ -20,15 +20,34 @@ export function bankedGrants(readings: readonly CreditReading[], start: number, 
   const baseline = sorted.filter((r) => r.ts < start).at(-1);
   const anchored = baseline !== undefined && start - baseline.ts <= DAY_MS;
   const series = anchored ? [baseline, ...inside] : inside;
-  const seen = new Set<string>((series[0]!.list ?? []).map((credit) => credit.id));
-  let count = 0;
-  for (let i = 1; i < series.length; i++) {
-    const previous = series[i - 1]!, reading = series[i]!;
-    if (previous.list && reading.list) count += reading.list.filter((credit) => !seen.has(credit.id)).length;
-    else count += Math.max(0, reading.count - previous.count);
-    for (const credit of reading.list ?? []) seen.add(credit.id);
+  const seen = new Set<string>();
+  let datedCount = 0, observedCount = 0, outsideCount = 0;
+  let complete = anchored;
+  for (let i = 0; i < series.length; i++) {
+    const previous = series[i - 1], reading = series[i]!;
+    if (!reading.list) complete = false;
+    for (const credit of reading.list ?? []) {
+      if (seen.has(credit.id)) continue;
+      seen.add(credit.id);
+      const granted = Date.parse(credit.granted_at);
+      if (Number.isFinite(granted) && granted <= reading.ts) {
+        if (granted >= start && granted < end) {
+          datedCount++;
+          if (previous?.list && previous.ts >= start) observedCount++;
+        } else if (reading.ts >= start) outsideCount++;
+      } else {
+        complete = false;
+        if (previous?.list && previous.ts >= start) observedCount++;
+      }
+    }
+    if (previous && (!reading.list || !previous.list)) {
+      complete = false;
+      // A count rise spanning the cycle boundary cannot date the grant to this cycle.
+      if (previous.ts >= start) observedCount += Math.max(0, reading.count - previous.count);
+    }
   }
-  return { count, from: iso(series[0]!.ts), complete: anchored };
+  // A later credit list can describe the same grants already seen as count rises.
+  return { count: Math.max(datedCount, observedCount - outsideCount), from: iso(series[0]!.ts), complete };
 }
 
 const tableExists = (db: Database, name: string) => !!db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);

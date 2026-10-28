@@ -96,7 +96,7 @@ describe("global usage", () => {
     const expected = buildGlobalUsage(original, range);
     try {
       const handler = createFetchHandler(ctx);
-      const url = `http://test/api/global-usage?${new URLSearchParams(range)}`;
+      const url = `http://127.0.0.1/api/global-usage?${new URLSearchParams(range)}`;
       const changes = sqlite.query("SELECT total_changes() n").get();
       const first = await handler(new Request(url));
       expect(first.status).toBe(200);
@@ -106,7 +106,7 @@ describe("global usage", () => {
       expect(second.headers.get("X-Cache")).toBe("hit");
       expect(await second.json()).toEqual(expected);
       expect(sqlite.query("SELECT total_changes() n").get()).toEqual(changes);
-      expect((await handler(new Request(`http://test/api/global-usage?since=not-a-day`))).status).toBe(400);
+      expect((await handler(new Request(`http://127.0.0.1/api/global-usage?since=not-a-day`))).status).toBe(400);
     } finally {
       ctx.analysisReader?.close(); await Bun.sleep(0); sqlite.close();
       await fs.promises.rm(directory,{recursive:true,force:true,maxRetries:10,retryDelay:50});
@@ -209,10 +209,10 @@ describe("global usage", () => {
     const ctx = fixture();
     ctx.sqlite.exec("UPDATE events SET speed=NULL; UPDATE oc_events SET model='unpriced'; DROP TABLE grok_events; DELETE FROM gemini_events");
     const report = buildGlobalUsage(ctx, range);
-    // A Codex call without a recorded tier has its API equivalent at Standard (a lower bound); its credits stay unpriced.
+    // An omitted Codex tier is known Standard for both API and credit valuation (25 October policy).
     const codex = report.rows.find(row => row.source === "codex")!;
     expect(codex.api_usd).toEqual({ subtotal: 0.78, priced_calls: 1, unpriced_calls: 0 });
-    expect(codex.credits).toMatchObject({ priced_calls: 0, unpriced_calls: 1 });
+    expect(codex.credits).toMatchObject({ priced_calls: 1, unpriced_calls: 0 });
     expect(report.rows.filter(row => row.source === "opencode").every(row => row.tokens > 0 && row.api_usd.unpriced_calls === 1)).toBe(true);
     expect(report.sources.find(source => source.id === "grok")).toEqual({ id: "grok", available: false, events: 0 });
     expect(report.sources.find(source => source.id === "gemini")).toEqual({ id: "gemini", available: true, events: 0 });

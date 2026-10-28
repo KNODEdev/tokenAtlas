@@ -17,3 +17,9 @@ test("an unprefixed name falls back to the screen's vendor, then to neutral colo
   expect(modelColors(["antigravity-auto"], "google")).toEqual(["var(--gemini)"]);
   expect(modelStrokes(["a", "b", "c", "d"]).map(stroke => stroke.dash)).toEqual([undefined, undefined, undefined, "6 4"]);
 });
+
+test("a vendor's seventh model fills with a softer shade instead of repeating the first", () => {
+  const colors = modelColors(Array.from({ length: 7 }, (_, index) => `gpt-${index}`));
+  expect(new Set(colors).size).toBe(7);
+  expect(colors[6]).toContain("calc(c * 0.5)");
+});

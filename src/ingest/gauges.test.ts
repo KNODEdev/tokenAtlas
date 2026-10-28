@@ -381,7 +381,7 @@ describe("ingestGaugesAsync", () => {
     expect(result.skipped).toBe(0);
     // The observation segment is read past and bookmarked, not imported.
     expect(result.rows).toBe(3);
-    expect(result.stores).toEqual(["EXAMPLE-MAIN-sample_b", "EXAMPLE-MAIN-sample_a"]);
+    expect(result.stores).toEqual(["EXAMPLE-MAIN-sample_a", "EXAMPLE-MAIN-sample_b"]);
     expect(count(dbPath, "SELECT count(*) AS n FROM probe_windows WHERE machine = 'EXAMPLE-MAIN'")).toBe(3);
     expect(count(dbPath, "SELECT count(*) AS n FROM probe_windows WHERE subject = 'codex3'")).toBe(1);
     expect(count(dbPath, "SELECT count(*) AS n FROM probe_windows")).toBe(3);

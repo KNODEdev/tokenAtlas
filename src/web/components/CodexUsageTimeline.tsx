@@ -3,7 +3,8 @@ import { useWidth } from "./WindowStatusCard";
 import { ChartExport } from "./ChartExport";
 import { useMemo, useState, type ReactNode } from "react";
 import type { CodexAccountingReport } from "../../shared/codex-accounting";
-import { compact } from "../lib/format";
+import { compact, usageModelLabel } from "../lib/format";
+import { modelColorsByTokens } from "../lib/model-colors";
 import { getLocale, useI18n } from "../lib/i18n";
 import { api } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
@@ -13,10 +14,11 @@ import { useContextPreview } from "../lib/context-premium";
 import { CodexMarkerEditor } from "./CodexMarkerEditor";
 import { Dropdown, ErrorState, HelpBlock, HelpDot } from "./ui";
 import "./CodexCapacitySummary.css";
+import { allModelMarkers } from "../lib/all-model-reports";
 
 const DAY = 86400000;
 type Metric = "creditsPP" | "apiPP" | "api" | "credits" | "tokens";
-interface Bar { start: number; end: number; value: number | null; tokens: number; priced: number; fast: number; unknown: number; color: string; note: string;
+interface Bar { start: number; end: number; value: number | null; tokens: number; priced: number; fast: number; unknown: number; color: string; model: string | null; note: string;
   events: number | null; partial: boolean; extra?: string }
 /** Drawn at the container's real width, like the other analytical charts: the plot band and 10 px axis text never scale. */
 const HEIGHT = 300, X0 = 65, RIGHT = 20, BASE = 250, PLOT = 185, AXIS_FONT = 10, MARKER_FONT = 10;
@@ -72,11 +74,12 @@ function layoutMarkers(markers: MarkerInput[], xOf: (day: string) => number, wid
   });
 }
 
-export function CodexUsageTimeline({ data, help }: { data: CodexAccountingReport; help?: ReactNode }) {
+export function CodexUsageTimeline({ data, help, markerProviders }: { data: CodexAccountingReport; help?: ReactNode; markerProviders?: readonly string[] }) {
   const { language, t, locale } = useI18n();
   const [chartRef, chartWidth] = useWidth(1000);
   const provider = data.provider?.id ?? "codex";
   const isCodex = provider === "codex";
+  const all = provider === "all";
   const contextPreview = useContextPreview();
   const windows = useMemo(() => contextPreview && isCodex
     ? data.windows?.map(window => capacityWithContext(window, true).window) : data.windows, [data.windows, contextPreview, isCodex]);
@@ -93,8 +96,9 @@ export function CodexUsageTimeline({ data, help }: { data: CodexAccountingReport
   const [metric, setMetric] = useState<Metric>("api");
   const [active, setActive] = useState<number | null>(null);
   const [editingMarkers, setEditingMarkers] = useState(false);
-  const markerState = useAsync(() => isCodex ? api.codexTimelineMarkers() : api.subscriptionTimelineMarkers(provider), [provider, data.events]);
-  const markerMap = new Map(markerState.data?.automatic.filter(m => m.id !== "model:?").map(m => [m.id, m]));
+  const markerProvidersKey = JSON.stringify(markerProviders ?? []);
+  const markerState = useAsync(() => all ? allModelMarkers(markerProviders ?? []) : isCodex ? api.codexTimelineMarkers() : api.subscriptionTimelineMarkers(provider), [provider, data.events, markerProvidersKey]);
+  const markerMap = new Map(markerState.data?.automatic.filter(m => m.id !== "model:?" && !m.id.endsWith(":model:?")).map(m => [m.id, m]));
   for (const marker of markerState.data?.markers ?? []) markerMap.set(marker.id, marker);
   const allMarkers = [...markerMap.values()].sort((a, b) => a.day.localeCompare(b.day));
   const from = Date.parse(data.scope.since), to = Date.parse(data.scope.until) + DAY;
@@ -109,30 +113,35 @@ export function CodexUsageTimeline({ data, help }: { data: CodexAccountingReport
   };
   const milestones = allMarkers.filter(m => m.visible && Date.parse(m.day) >= from && Date.parse(m.day) < to);
   const capacity = metric === "creditsPP" || metric === "apiPP";
+  // A bar takes its dominant model's colour: vendor hues across "All", the vendor's shades in one subscription.
+  const modelColors = useMemo(() => modelColorsByTokens(data.breakdown, all ? undefined : provider), [data.breakdown, all, provider]);
+  const colorOf = (model: string | null | undefined) => model === undefined ? "var(--muted)" : modelColors.get(model) ?? "var(--muted)";
   const bars = useMemo<Bar[]>(() => {
     if (metric === "creditsPP" || metric === "apiPP") return (windows ?? []).map(w => ({
       start: Date.parse(w.start), end: Date.parse(w.end),
       value: capacityPerPoint(w, metric === "creditsPP" ? "credits_low" : "api_standard"),
       tokens: w.usage.tokens, priced: w.usage.priced_tokens, fast: w.usage.fast_tokens, unknown: w.usage.unknown_tokens,
-      color: w.models[0]?.name.includes("astra") ? "var(--accent)" : w.models[0]?.name.includes("sol") ? "var(--violet)" : "var(--muted)",
+      color: colorOf(w.models[0]?.name), model: w.models[0]?.name ?? null,
       note: `${w.start_percent} → ${w.end_percent}% · ${w.observed_pp} ${t("pp", "p.p.")} · ${w.account}`,
       events: null, partial: false, extra: `${w.start_percent} → ${w.end_percent}% · ${w.observed_pp} ${t("pp", "p.p.")}`,
     }));
     return (data.traffic_periods ?? []).map(period => {
-      const model = Object.entries(period.models).sort((a, b) => b[1] - a[1])[0]?.[0];
+      const top = Object.entries(period.models).sort((a, b) => b[1] - a[1])[0]?.[0];
+      const model = top === undefined ? undefined : top === "?" ? null : top;
       return {
         start: Date.parse(period.start), end: Date.parse(period.end),
         value: metric === "tokens" ? (period.events ? period.tokens : null) : period.priced_events ? (metric === "api" ? period.api : period.credits) : null,
         tokens: period.tokens, priced: metric === "tokens" ? period.tokens : period.priced_tokens,
         fast: period.fast_tokens, unknown: period.unknown_tokens,
-        color: model?.includes("astra") ? "var(--accent)" : model?.includes("sol") ? "var(--violet)" : "var(--muted)",
+        color: colorOf(model), model: model ?? null,
         events: period.events, partial: isCodex && !(period.start_reset && period.end_reset),
         note: `${period.account} · ${!isCodex ? t("Recorded UTC day; independent of reset boundaries", "Zapisany dzień UTC; niezależny od granic resetów") : period.start_reset && period.end_reset ? t("Reset to reset", "Od resetu do resetu") : t("Partial period — reset boundary not fully observed or range clipped", "Niepełny okres — niepełne odczyty granic resetu lub ograniczony zakres")} · ${numeric((Date.parse(period.end) - Date.parse(period.start)) / DAY)} ${t("days", "dni")} · ${period.events} ${t("events", "zdarzeń")}`,
       };
     });
-  }, [data, windows, isCodex, language, metric, t]);
+  }, [data, windows, isCodex, language, metric, t, modelColors]);
+  const dominant = [...new Map(bars.filter(b => b.value !== null && b.model !== null).map(b => [b.model, b.color])).entries()];
   const max = Math.max(1, ...bars.map(b => b.value ?? 0));
-  const unassignedTokens = Math.max(0, data.breakdown.reduce((sum, row) => sum + (row.model === "gpt-5.3-codex-spark" ? 0 : row.tokens), 0)
+  const unassignedTokens = Math.max(0, data.breakdown.reduce((sum, row) => sum + (isCodex && row.model === "gpt-5.3-codex-spark" ? 0 : row.tokens), 0)
     - (data.traffic_periods ?? []).reduce((sum, period) => sum + period.tokens, 0));
   const width = Math.max(chartWidth, 400), X1 = width - RIGHT;
   const x = (ms: number) => X0 + (X1 - X0) * (ms - from) / (to - from);
@@ -154,7 +163,7 @@ export function CodexUsageTimeline({ data, help }: { data: CodexAccountingReport
   const valueText = (b: Bar) => b.value === null ? "—" : metric === "api" || metric === "apiPP" ? `$${numeric(b.value)}` : metric === "tokens" ? compact(b.value) : `${numeric(b.value)} ${t("cr", "kr")}`;
   const details = (b: Bar) => `${new Date(b.start).toISOString().slice(0, 16).replace("T", " ")} – ${new Date(b.end).toISOString().slice(0, 16).replace("T", " ")} UTC · ${b.value === null ? t("no pricing / data", "brak wyceny / danych") : numeric(b.value)} · ${b.note}`;
   return <section aria-label={t("Subscription capacity and traffic history", "Historia pojemności abonamentu i ruchu")} style={{ fontSize: "var(--fs-4)", margin: "18px 0 24px" }}>
-    <h3 className="stats-section-title" style={{ margin: 0 }}>{t("Capacity and traffic over time", "Pojemność i ruch w czasie")}
+    <h3 className="stats-section-title" style={{ margin: 0 }}>{all ? t("Traffic history", "Historia ruchu") : t("Capacity and traffic over time", "Pojemność i ruch w czasie")}
       <HelpDot label={t("About this view", "O tym widoku")}>{about}</HelpDot>
     </h3>
     {markerState.error && <ErrorState message={`${t("Timeline points", "Punkty osi czasu")}: ${markerState.error}`} onRetry={markerState.reload} />}
@@ -162,13 +171,17 @@ export function CodexUsageTimeline({ data, help }: { data: CodexAccountingReport
       onSave={async marker => { const change = { revision: markerState.data!.revision, marker }; await (isCodex ? api.saveCodexTimelineMarker(change) : api.saveSubscriptionTimelineMarker(provider, change)); markerState.reload(); }}
       onRemove={async remove => { const change = { revision: markerState.data!.revision, remove }; await (isCodex ? api.saveCodexTimelineMarker(change) : api.saveSubscriptionTimelineMarker(provider, change)); markerState.reload(); }} />}
     <div className="ui-toolbar" style={{ margin: "10px 0" }}>
-      <button className="ui-button" type="button" disabled={!markerState.data || markerState.loading} onClick={() => setEditingMarkers(true)}>{t("Edit points", "Edytuj punkty")} ({milestones.length})</button>
+      <button className="ui-button" type="button" disabled={all || !markerState.data || markerState.loading}
+        title={all ? t("Select one subscription to edit its timeline points", "Wybierz jedną subskrypcję, aby edytować jej punkty osi czasu") : undefined}
+        onClick={() => setEditingMarkers(true)}>{t("Edit points", "Edytuj punkty")} ({milestones.length})</button>
       <label className="ui-field"><span className="ui-field-label">{t("Metric", "Miara")}</span> <Dropdown className="ui-input" value={metric} onChange={value => { setMetric(value as Metric); setActive(null); }}
-        options={Object.entries(metricLabels).filter(([key]) => isCodex || !key.startsWith("credits")).map(([key, label]) => ({ value: key, label }))} /></label>
+        options={Object.entries(metricLabels).filter(([key]) => all ? key === "api" || key === "tokens" : isCodex || !key.startsWith("credits")).map(([key, label]) => ({ value: key, label }))} /></label>
       {!capacity && <span style={{ color: "var(--muted)" }}>{isCodex ? t("Periods: reset to reset · UTC", "Okresy: od resetu do resetu · UTC") : t("Traffic by recorded UTC day", "Ruch według zapisanych dni UTC")}</span>}
-      {isCodex && <span style={{ color: "var(--muted)" }}>{t("Color", "Kolor")}: <span style={{ color: "var(--violet)" }}>Sol</span> · <span style={{ color: "var(--accent)" }}>Astra</span> · {t("others - dominant model by tokens", "pozostałe — dominujący model według tokenów")}</span>}
+      {dominant.length > 0 && <span className="timeline-models" title={t("Colour: the dominant model of each bar by tokens", "Kolor: dominujący model słupka według tokenów")}>
+        {dominant.map(([model, color]) => <span key={model}><i style={{ background: color }} />{usageModelLabel(model!)}</span>)}
+      </span>}
     </div>
-    {!bars.length && <p role="status">{t("No reset periods can be reconstructed from the available readings in this range.", "Dostępne odczyty nie pozwalają odtworzyć okresów resetów w tym zakresie.")}</p>}
+    {!bars.length && <p role="status">{all ? t("No recorded traffic in this range.", "Brak zapisanego ruchu w tym zakresie.") : t("No reset periods can be reconstructed from the available readings in this range.", "Dostępne odczyty nie pozwalają odtworzyć okresów resetów w tym zakresie.")}</p>}
     {!capacity && unassignedTokens > 0 && <p style={{ color: "var(--warn)" }} title={t("Missing readings or uncertain reset boundaries. Excluded from these bars; retained in Models & sources.", "Brak odczytów lub niepewne granice resetów. Pominięte na wykresie; zachowane w Modelach i źródłach.")}>
       {compact(unassignedTokens)} {t("tokens outside reset periods, not in the bars", "tokenów poza okresami resetów, poza słupkami")}</p>}
     <ChartExport title={metricLabels[metric]}><div ref={chartRef} className="capacity-chart" style={{ minWidth: 0, overflowX: "clip" }}>

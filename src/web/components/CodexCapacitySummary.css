@@ -199,3 +199,8 @@
 .capacity-milestones { font-size: var(--fs-3); color: var(--muted); margin: var(--s-4) 0 var(--s-7); }
 .capacity-milestones > div { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-9); margin-top: var(--s-2); color: var(--text); }
 .capacity-milestones b { display: inline-block; min-width: 15px; }
+
+/* Traffic history: the dominant models the bars are coloured by. */
+.timeline-models { display: inline-flex; flex-wrap: wrap; gap: var(--s-2) var(--s-6); color: var(--muted); font-size: var(--fs-3); }
+.timeline-models > span { display: inline-flex; align-items: center; gap: var(--s-3); white-space: nowrap; }
+.timeline-models i { display: inline-block; width: 10px; height: 8px; border-radius: var(--r-bar); flex-shrink: 0; }

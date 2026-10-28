@@ -1,7 +1,19 @@
 import { expect, test } from "bun:test";
 import { Database } from "../db/sqlite";
 import { createFetchHandler, type AppContext } from "./api";
-import { refuseCrossSiteWrite } from "./write-guard";
+import { refuseCrossSiteWrite, refuseForeignHost } from "./write-guard";
+
+test("foreign authorities cannot reach reads, writes or static pages", async () => {
+  const { db, fetch } = router();
+  try {
+    for (const host of ["attacker.example", "127.0.0.1.evil.example", "localhost.evil.example"])
+      for (const route of ["/", "/api/accounts", "/api/setup"])
+        expect((await fetch(new Request(`http://${host}:7331${route}`))).status).toBe(403);
+    for (const host of ["127.0.0.1", "localhost", "[::1]"])
+      expect(refuseForeignHost(new Request(`http://${host}:7331/api/accounts`))).toBeNull();
+    expect(refuseForeignHost(new Request("http://localhost/api/accounts", { headers: { host: "evil.example" } }))?.status).toBe(403);
+  } finally { db.close(); }
+});
 
 // Write routes a page on another site could reach with a simple request (no CORS preflight).
 const WRITE_ROUTES = [

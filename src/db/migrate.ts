@@ -264,16 +264,50 @@ function assertExistingMigrationHistory(dbPath: string, migrationsFolder: string
     sqlite.close(true);
   }
 }
+const TRACKING_RECOVERY_KEY = "migration_claude_tracking_handoff";
+type MigrationTrackingEvidence = { columns: string; triggers: string };
+
+/** Keep the first trigger evidence durable when several guarded migrations run in one upgrade. */
+function migrationTrackingEvidence(sqlite: Database, migrationsFolder: string): MigrationTrackingEvidence | null {
+  const exists = (table: string) => !!sqlite.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table);
+  if (!exists("meta")) return null;
+  const saved = sqlite.query("SELECT value FROM meta WHERE key=?").get(TRACKING_RECOVERY_KEY) as { value: string } | null;
+  if (saved) {
+    const evidence = JSON.parse(saved.value) as MigrationTrackingEvidence;
+    if (typeof evidence.columns !== "string" || typeof evidence.triggers !== "string") throw new Error("Invalid migration tracking recovery evidence");
+    return evidence;
+  }
+  if (!exists("claude_events")) return null;
+  const lastApplied = migrationTableExists(sqlite) ? appliedMigrationRows(sqlite).at(-1)?.created_at ?? -1 : -1;
+  if (!readMigrationFiles({ migrationsFolder }).some(entry => entry.folderMillis > lastApplied
+    && entry.sql.some(statement => statement.includes("analysis_tracking_handoff")))) return null;
+  const handed = exists("analysis_tracking_handoff")
+    ? sqlite.query("SELECT columns,triggers FROM analysis_tracking_handoff WHERE source='claude_events'").get() as MigrationTrackingEvidence | null : null;
+  const triggerRows = sqlite.query(`SELECT name,sql FROM sqlite_master WHERE type='trigger' AND tbl_name='claude_events'
+    AND name IN ('analysis_claude_events_insert','analysis_claude_events_update','analysis_claude_events_delete')`).all() as Array<{ name: string; sql: string }>;
+  const evidence = handed ?? {
+    columns: JSON.stringify((sqlite.query("PRAGMA table_info(claude_events)").all() as Array<{ name: string }>).map(column => column.name)),
+    triggers: JSON.stringify(Object.fromEntries(triggerRows.map(trigger => [trigger.name, trigger.sql]))),
+  };
+  sqlite.query("INSERT INTO meta(key,value) VALUES(?,?)").run(TRACKING_RECOVERY_KEY, JSON.stringify(evidence));
+  return evidence;
+}
+
 export function applyDrizzleMigrations(
   db: Parameters<typeof migrate>[0] & { $client: ReturnType<typeof initDb>["sqlite"] },
   migrationsFolder: string = DEFAULT_MIGRATIONS_FOLDER
 ): void {
   assertMigrationHistory(db, migrationsFolder);
+  const evidence = migrationTrackingEvidence(db.$client, migrationsFolder);
   migrate(db, { migrationsFolder });
+  if (evidence && db.$client.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='analysis_tracking_handoff'").get())
+    db.$client.query("UPDATE analysis_tracking_handoff SET columns=?,triggers=? WHERE source='claude_events'")
+      .run(evidence.columns, evidence.triggers);
   backfillProbeFacts(db.$client);
   probeFactShadow(db.$client);
   installAnalysisTracking(db.$client);
   installFactDayRevisions(db.$client);
+  if (evidence) db.$client.query("DELETE FROM meta WHERE key=?").run(TRACKING_RECOVERY_KEY);
 }
 export function ensureRawSyncIndexes(sqlite: ReturnType<typeof initDb>["sqlite"]): void {
   asSchemaWriter(sqlite, () => {

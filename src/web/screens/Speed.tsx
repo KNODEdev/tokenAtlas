@@ -12,7 +12,7 @@ import { ALL_ACCOUNT, type RosterCard } from "../lib/roster";
 import {
   MIN_POINT_CALLS, MIN_RANKED_CALLS, accountSelected, accountState, entriesSince, latestWeek, mergeSpeedParts, modelSelected, modelTotals,
   rangeStart, rankedModels, readHiddenModels, readSpeedSelection, selectedParts, setAccounts, speedModels, speedProviderOf,
-  speedSubscriptions, toggleAccount, toggleModel, totalSpeed, writeHiddenModels, writeSpeedSelection,
+  speedSubscriptions, speedSeriesKey, executionSuffix, toggleAccount, toggleModel, totalSpeed, writeHiddenModels, writeSpeedSelection,
   type ModelSpeedResponse, type ModelTotals, type SpeedEntry, type SpeedGrain, type SpeedKind, type SpeedPart, type SpeedRange, type SpeedSelection,
   type SpeedSubscription,
   type SpeedProvider,
@@ -23,6 +23,7 @@ import { Kpi, KpiRow, unit } from "../components/WindowStatusCard";
 import { modelStrokes } from "../lib/model-colors";
 import { AccountPeriodDrawer } from "../components/AccountPeriodDrawer";
 import { TriStateCheck as Check } from "../components/TriStateCheck";
+import { compareTableValues, modelVersionSortValue } from "../lib/table-sort";
 import "../components/SubscriptionChoice.css";
 import "./History.css";
 import "./Speed.css";
@@ -62,10 +63,11 @@ function SpeedSingle({ account }: { account: string }) {
     return <LoadingCard label={t("Loading response times", "Wczytywanie czasów odpowiedzi")} height={420} shape="kpi" />;
   }
   if (!entries.length) {
+    if (data.speed_pending || data.first_token_pending) return <LoadingCard label={t("Preparing model timings", "Przygotowywanie pomiarów modeli")} height={420} shape="kpi" />;
     return <EmptyState title={t("No calls of this subscription yet", "Ta subskrypcja nie ma jeszcze wywołań")}
       detail={t("Speeds appear once its calls are imported.", "Prędkości pojawią się po zaimportowaniu jej wywołań.")} />;
   }
-  return <SpeedReport entries={entries} hiddenScope={account} longOutMin={data.long_out_min} firstTokenPending={data.first_token_pending} />;
+  return <SpeedReport entries={entries} hiddenScope={account} longOutMin={data.long_out_min} firstTokenPending={data.first_token_pending} speedPending={data.speed_pending} />;
 }
 
 type Loaded = { sub: SpeedSubscription; data: ModelSpeedResponse | null; error: string | null; pending: boolean; off: boolean };
@@ -135,7 +137,7 @@ function SpeedAll({ cards }: { cards: RosterCard[] }) {
     return <EmptyState title={t("No supported subscription", "Brak obsługiwanej subskrypcji")}
       detail={t("Unknown response and first-token times are shown as missing.", "Nieznane czasy odpowiedzi i pierwszego tokena są pokazywane jako brak danych.")} />;
   }
-  const modelsOf = (account: string) => speedModels(parts.find(part => part.account === account)?.models ?? []).map(series => series.model!);
+  const modelsOf = (account: string) => speedModels(parts.find(part => part.account === account)?.models ?? []).map(speedSeriesKey);
   const chosen = subs.filter(sub => accountState(selection, sub.id, modelsOf(sub.id), inactive) !== "none").length;
   const failed = loaded.filter(item => item.error !== null).length;
   const waiting = loaded.filter(item => item.pending).length;
@@ -159,6 +161,7 @@ function SpeedAll({ cards }: { cards: RosterCard[] }) {
         split entries have different keys, so their hidden series never mix. */}
     <SpeedReport entries={entries} hiddenScope={ALL_ACCOUNT} waiting={waiting > 0}
       firstTokenPending={loaded.some(item => !item.off && item.data?.first_token_pending)}
+      speedPending={loaded.some(item => !item.off && item.data?.speed_pending)}
       longOutMin={loaded.find(item => item.data)?.data?.long_out_min ?? 256} controls={controls} split={selection.split} subscriptions={lookup} />
     {drawer && <AccountPeriodDrawer busy={false} onClose={() => setDrawer(false)} returnFocus={opener.current} className="speed-drawer"
       closeLabel={t("Close the subscription and model choice", "Zamknij wybór subskrypcji i modeli")}
@@ -176,6 +179,7 @@ function SpeedSelectionList({ subs, loaded, slow, selection, inactive, onChange 
 }) {
   const { t, locale } = useI18n();
   const oneDecimal = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const collator = new Intl.Collator(locale, { numeric: true, sensitivity: "base" });
   const providers = [...new Set(subs.map(sub => sub.provider))].map(provider => ({ provider, subs: subs.filter(sub => sub.provider === provider) }))
     .filter(group => group.subs.length);
   const actions = (accounts: string[], name: string) => <span className="speed-drawer-actions">
@@ -189,11 +193,15 @@ function SpeedSelectionList({ subs, loaded, slow, selection, inactive, onChange 
     {providers.map(({ provider, subs: group }) => {
       const name = provider === "glm" ? "GLM" : provider[0]!.toUpperCase() + provider.slice(1);
       return <section key={provider} className="speed-drawer-provider" aria-label={name}>
-        <h3><span>{name}</span>{actions(group.map(sub => sub.id), name)}</h3>
+        <h3><span>{name}</span></h3>
         {group.map(sub => {
           const item = loaded.find(entry => entry.sub.id === sub.id);
-          const models = speedModels(item?.data?.models ?? []);
-          const names = models.map(series => series.model!);
+          const models = speedModels(item?.data?.models ?? []).sort((a, b) => {
+            const version = (model: string | null) => modelVersionSortValue(model)?.split(" ")[0];
+            return compareTableValues(version(a.model), version(b.model), { column: "model", direction: "desc" }, collator)
+              || collator.compare(a.model!, b.model!);
+          });
+          const names = models.map(speedSeriesKey);
           const calls = models.reduce((sum, series) => sum + series.total.calls, 0);
           const timed = models.reduce((sum, series) => sum + series.total.timed_calls, 0);
           return <div key={sub.id} className={`speed-drawer-sub${item?.error ? " is-failed" : item?.pending ? " is-pending" : ""}`}>
@@ -210,10 +218,11 @@ function SpeedSelectionList({ subs, loaded, slow, selection, inactive, onChange 
             </label>
             {item?.error && <div className="mono speed-drawer-error">{browserSafeDiagnostic(item.error)}</div>}
             {models.length > 0 && <div className="speed-drawer-models">
-              {models.map(series => <label key={series.model} className="speed-drawer-row">
-                <Check state={modelSelected(selection, sub.id, series.model!, inactive) ? "all" : "none"} label={`${sub.label} · ${usageModelLabel(series.model!)}`}
-                  onChange={() => onChange(toggleModel(selection, sub.id, series.model!, names, inactive))} />
-                <span className="speed-drawer-name">{usageModelLabel(series.model!)}</span>
+              {models.map(series => <label key={speedSeriesKey(series)} className="speed-drawer-row">
+                <Check state={modelSelected(selection, sub.id, speedSeriesKey(series), inactive) && modelSelected(selection, sub.id, series.model!, inactive) ? "all" : "none"}
+                  label={`${sub.label} · ${usageModelLabel(series.model!)}${executionSuffix(series, t("unknown", "nieznany"), t("mixed", "mieszany"), t("unknown effort", "effort nieznany"))}`}
+                  onChange={() => onChange(toggleModel(selection, sub.id, speedSeriesKey(series), names, inactive))} />
+                <span className="speed-drawer-name">{usageModelLabel(series.model!)}{executionSuffix(series, t("unknown", "nieznany"), t("mixed", "mieszany"), t("unknown effort", "effort nieznany"))}</span>
                 <span className="mono speed-drawer-facts">{t("{0} calls", `${compact(series.total.calls)} wywołań`, [compact(series.total.calls)])}</span>
               </label>)}
             </div>}
@@ -227,11 +236,12 @@ function SpeedSelectionList({ subs, loaded, slow, selection, inactive, onChange 
 type Row = { key: string; label: string; color: string; dash: string | undefined; totals: ModelTotals; series: ModelSpeedResponse["models"][number];
   accounts: SpeedSubscription[] | null };
 
-function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false, subscriptions, waiting = false, firstTokenPending = false }: {
+function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false, subscriptions, waiting = false, firstTokenPending = false, speedPending = false }: {
   entries: SpeedEntry[]; hiddenScope: string; longOutMin: number; controls?: ReactNode; split?: boolean;
   /** "All" only: a chosen subscription has not answered yet, so an empty report is still loading. */
   waiting?: boolean;
   firstTokenPending?: boolean;
+  speedPending?: boolean;
   /** "All" only: the subscriptions behind an entry, for its label and the table's column. */
   subscriptions?: (accounts: string[]) => SpeedSubscription[];
 }) {
@@ -249,14 +259,14 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
   const rows = useMemo<Row[]>(() => {
     const sorted = ranged.map(entry => {
       const accounts = subscriptions ? subscriptions(entry.accounts) : null;
-      const model = usageModelLabel(entry.model);
+      const model = usageModelLabel(entry.model) + executionSuffix(entry.series, t("unknown", "nieznany"), t("mixed", "mieszany"), t("unknown effort", "effort nieznany"));
       return { key: entry.key, model: entry.model, series: entry.series, totals: modelTotals(entry.series), accounts,
         label: split && accounts?.[0] ? `${model} · ${accounts[0].name}` : model };
     }).sort((a, b) => b.totals.calls - a.totals.calls);
     // Each line takes its vendor's hue; models of one vendor get its shades in order of calls.
     const strokes = modelStrokes(sorted.map(row => row.model));
     return sorted.map((row, index) => ({ ...row, ...strokes[index]! }));
-  }, [ranged, language, split, subscriptions]);
+  }, [ranged, language, split, subscriptions, t]);
   const toggle = (key: string) => setHidden(previous => {
     const next = new Set(previous);
     if (!next.delete(key)) next.add(key);
@@ -279,7 +289,7 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
   </div>;
   if (!rows.length) {
     return <div className="archive speed ui-tab-page">{controlRow}
-      {waiting ? <LoadingCard label={t("Loading response times", "Wczytywanie czasów odpowiedzi")} height={420} shape="kpi" />
+      {waiting || speedPending || firstTokenPending ? <LoadingCard label={t("Loading response times", "Wczytywanie czasów odpowiedzi")} height={420} shape="kpi" />
         : entries.length ? <EmptyState title={t("No calls in the {0}", `Brak wywołań w okresie: ${periodName}`, [periodName])}
           detail={t("Choose a longer period.", "Wybierz dłuższy okres.")} />
         : <EmptyState title={t("No subscription or model is chosen", "Nie wybrano żadnej subskrypcji ani modelu")}
@@ -311,10 +321,13 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
       <Card><ChartExport title={chartTitle}>
         <div className="archive-head">
           <div><span className="ui-display" style={CARD_TITLE}>{chartTitle}</span> <HelpDot label={chartTitle}>{chartLatency
-            ? t("Verified client-reported first-token times in seconds; lower is faster. Each point uses the combined measurements for that day or week. Missing data creates gaps; hover a point for the number of measured turns and coverage.",
-              "Pewne czasy pierwszego tokena raportowane przez klienta, w sekundach; mniej znaczy szybciej. Punkt jest liczony z połączonych pomiarów dnia lub tygodnia. Brak danych pozostawia przerwę; podpowiedź punktu podaje liczbę zmierzonych tur i pokrycie.") : t(
+            ? t("Verified first-token times in seconds, grouped by model, speed mode and reasoning effort. Lower is faster. Unknown settings stay separate. Each day's or week's percentiles use only that execution variant's measurements.",
+              "Pewne czasy pierwszego tokena w sekundach, według modelu, trybu szybkości i poziomu rozumowania. Mniej znaczy szybciej. Nieznane ustawienia pozostają osobno. Percentyle dnia lub tygodnia obejmują tylko pomiary danego wariantu.") : t(
             "Points with ≥{0} calls; gaps without traffic are not bridged. Click a model to hide it.",
-            `Punkty z ≥${MIN_POINT_CALLS} wywołań; przerwy bez ruchu nie są łączone. Kliknij model, żeby go ukryć.`, [MIN_POINT_CALLS])}</HelpDot> <span className="archive-sub">· {chartLatency
+            `Punkty z ≥${MIN_POINT_CALLS} wywołań; przerwy bez ruchu nie są łączone. Kliknij model, żeby go ukryć.`, [MIN_POINT_CALLS])}
+            <br />{t("Separate series for each model, speed mode and reasoning effort. Missing settings remain unknown.", "Osobne serie dla modelu, trybu szybkości i poziomu rozumowania. Brakujące ustawienia pozostają nieznane.")}
+            {speedPending && <><br />{t("Execution timing history is still being prepared.", "Historia pomiarów według trybów jest jeszcze przygotowywana.")}</>}
+            </HelpDot> <span className="archive-sub">· {chartLatency
             ? chartMetric === "first-token-median" ? t("median · seconds", "mediana · sekundy") : "P90 · " + t("seconds", "sekundy") : kind === "long"
             ? t("calls with ≥{0} output tokens", `wywołania z ≥${longOutMin} tokenami wyjścia`, [longOutMin])
             : t("all measured calls", "wszystkie zmierzone wywołania")} · {grain === "week" ? t("per week", "na tydzień") : t("per day", "na dzień")}</span></div>
@@ -374,13 +387,13 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
                 <span className="speed-swatch" style={{ background: row.color }} />{row.label}</button></Td>
               {all && <Td title={accounts.map(sub => sub.label).join("\n")} style={{ color: "var(--muted)" }}>
                 <span className="speed-subs">{accounts.slice(0, 2).map(sub => sub.name).join(", ")}{accounts.length > 2 ? ` +${accounts.length - 2}` : ""}</span></Td>}
-              <Td mono align="right">{compact(row.totals.calls)}</Td>
-              <Td mono align="right"><span className={`speed-cov${share < 0.9 ? " is-low" : ""}`}>
+              <Td sortValue={row.totals.calls} mono align="right">{compact(row.totals.calls)}</Td>
+              <Td sortValue={share} mono align="right"><span className={`speed-cov${share < 0.9 ? " is-low" : ""}`}>
                 <i><b style={{ width: `${(share * 100).toFixed(1)}%` }} /></i>{oneDecimal.format(share * 100)}%</span></Td>
-              <Td mono align="right">{row.totals.long === null ? "—" : oneDecimal.format(row.totals.long)}</Td>
-              <Td mono align="right">{row.totals.all === null ? "—" : oneDecimal.format(row.totals.all)}</Td>
-              <Td mono align="right" title={timingTitle}>{firstTokenValue(ttft?.median_ms)}</Td>
-              <Td mono align="right" title={timingTitle}>{firstTokenValue(ttft?.p90_ms)}</Td>
+              <Td sortValue={row.totals.long} mono align="right">{row.totals.long === null ? "—" : oneDecimal.format(row.totals.long)}</Td>
+              <Td sortValue={row.totals.all} mono align="right">{row.totals.all === null ? "—" : oneDecimal.format(row.totals.all)}</Td>
+              <Td sortValue={ttft?.median_ms ?? null} mono align="right" title={timingTitle}>{firstTokenValue(ttft?.median_ms)}</Td>
+              <Td sortValue={ttft?.p90_ms ?? null} mono align="right" title={timingTitle}>{firstTokenValue(ttft?.p90_ms)}</Td>
               <Td mono align="right" style={{ color: "var(--muted)" }}>{row.totals.first} … {row.totals.last}</Td>
             </TableRow>;
           })}</tbody>

@@ -46,7 +46,7 @@ test("a report over a published ledger answers from it while newer facts are pro
   const ctx = ({sqlite:fixture.db,dbPath:fixture.dbPath,rateCards:fixture.rates,
     accounts: { version: 2, subscriptions: [], sources: [] },homeToSubId:new Map(),subIdToHomes:new Map(),eras:buildEraIndex([]),eraErrors:[],
     plans:{},plansCatalog:{provider_groups:[]},cycles:{},claudeGauge:{},grokGauge:{},rootDir:fixture.directory} as unknown as AppContext);
-  const url = "http://local/api/subscription-accounting?provider=claude&account=" + ACCOUNTS.a + "&since=2026-09-13&until=2026-09-17";
+  const url = "http://127.0.0.1/api/subscription-accounting?provider=claude&account=" + ACCOUNTS.a + "&since=2026-09-13&until=2026-09-17";
   // A window screen (window-screens.ts): computed off the HTTP thread, then read from its answer.
   const fetch = createFetchHandler(ctx);
   const read = () => fetch(new Request(url));
@@ -156,7 +156,7 @@ test("the read-only view worker returns the common limit result from stored wind
     discardLedger(fixture.db, "claude");
     const changes = fixture.db.query("SELECT total_changes() n").get();
     const work: DataWork = {dbPath:fixture.dbPath,rates:fixture.rates,homes:[],
-      request:{kind:"view",url:"http://local/api/claude-limit?account=" + ACCOUNTS.a + "&from=" + TIMES.start + "&until=" + TIMES.afterAsOf},
+      request:{kind:"view",url:"http://127.0.0.1/api/claude-limit?account=" + ACCOUNTS.a + "&from=" + TIMES.start + "&until=" + TIMES.afterAsOf},
       context:{accounts: { version: 2, subscriptions: [], sources: [] },claudeGauge:{subscription:ACCOUNTS.a,plan:"max",observations:[]},grokGauge:{},
         cycles:{},plans:{},plansCatalog:{provider_groups:[]},rootDir:fixture.directory,subHomes:[],eraErrors:[]}};
     const reply = await workerReply(worker, work);

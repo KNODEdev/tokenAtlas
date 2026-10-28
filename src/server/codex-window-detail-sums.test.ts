@@ -124,6 +124,8 @@ function referenceDetail(db: Database, options: Options): ReturnType<typeof read
     let row = rows.get(key);
     if (!row) {
       row = { model: event.model ?? "?", speed, first: event.ts, last: event.ts, calls: 0, input: 0, cached: 0, cache_write: 0, output: 0, reasoning: 0,
+        // The compared stored cohorts carry quantities, without source-counter completeness evidence.
+        cache_write_complete: false,
         tokens: 0, long_context: apiBand?.band === "long", api: apiParts?.head ?? null, credits: creditParts?.head ?? null, actual_api: null, actual_credits: null,
         unpriced_reason: apiReason ?? creditReason, exact: { actual_api: rational(0n), actual_credits: rational(0n),
           ...Object.fromEntries(["input", "cached", "cache_write", "output", "total"].flatMap(part => [[`api.${part}`, rational(0n)], [`credits.${part}`, rational(0n)]])) } };

@@ -29,6 +29,29 @@ const props = (id: string, vendor: string): ScreenProps => ({ model: emptyModel(
 const card = (id: string, group: string, active = true) => ({ id, group, active, vendorAccount: `${id}@example.test` }) as RosterCard;
 const nodes = (node: TestNode): TestNode[] => [node, ...node.children.flatMap(nodes)];
 
+test("the same model has independently visible speed and first-token lines for each execution variant", async () => {
+  setLanguage("en"); bustApiMemo();
+  const dom = installTestDom(), root = createRoot(dom.host as unknown as Element);
+  const variants = [["standard", "high", 1000], ["fast", "high", 2000], ["fast", "ultra", 9000], ["fast", null, 3000]] as const;
+  const models = variants.map(([speed, effort, ms]) => {
+    const p = { ...point("2026-10-25", 60, 60000, ms * 60), first_token: { turns: 60, histogram: [[ms, 60]] as Array<[number, number]> } };
+    return { model: "gpt-6.1-sol", speed, effort, total: p, points: [p] };
+  });
+  const read = spyOn(api, "modelSpeed").mockResolvedValue({ ...RESPONSE, models });
+  try {
+    await act(async () => root.render(<Speed {...props("codex1", "codex")} />));
+    await flushUntil(() => dom.host.textContent.includes("Per model"));
+    for (const suffix of ["standard · high", "fast · high", "fast · ultra", "fast · unknown effort"])
+      expect(dom.host.textContent).toContain(`gpt-6.1-sol · ${suffix}`);
+    await invoke(toggles(dom.host, "gpt-6.1-sol · fast · ultra")[0]!, "onClick");
+    expect(toggles(dom.host, "gpt-6.1-sol · fast · ultra").every(n => n.attributes["aria-pressed"] === "false")).toBe(true);
+    expect(toggles(dom.host, "gpt-6.1-sol · fast · high").every(n => n.attributes["aria-pressed"] === "true")).toBe(true);
+    await invoke(nodes(dom.host).find(n => n.tagName === "BUTTON" && n.textContent === "First token · median")!, "onClick");
+    expect(dom.host.textContent).toContain("9.0 s");
+    expect(nodes(dom.host).some(n => n.tagName === "SVG" && n.attributes["aria-label"] === "Time to first token")).toBe(true);
+  } finally { await act(async () => root.unmount()); read.mockRestore(); dom.restore(); }
+});
+
 test("every supported provider uses the same table and leaves unverified timings missing", async () => {
   setLanguage("en"); bustApiMemo();
   const dom = installTestDom(), root = createRoot(dom.host as unknown as Element);
@@ -262,9 +285,10 @@ test("the drawer narrows every part of All, persists without storage errors, and
     expect(codex2.attributes["aria-checked"]).toBe("mixed");
     expect((codex2 as unknown as { indeterminate: boolean }).indeterminate).toBe(true);
     expect(rowNames(dom.host)[0]).toBe("gpt-5.6-sol | codex1@example.test | 70");
-    // Clearing Codex leaves Claude only: tiles and table follow the drawer.
-    const clearCodex = nodes(dialog).find(node => node.tagName === "BUTTON" && node.attributes["aria-label"] === "Clear · Codex")!;
-    await invoke(clearCodex, "onClick");
+    // Clearing both Codex subscriptions leaves Claude only: tiles and table follow the drawer.
+    await invoke(check("codex / codex1@example.test"), "onChange");
+    await invoke(codex2, "onChange"); // mixed selects all
+    await invoke(check("codex / codex2@example.test"), "onChange");
     expect(rowNames(dom.host)).toEqual(["claude-opus-5 | claude-a@example.test | 60"]);
     expect(dom.host.textContent).toContain("Subscriptions and models · 1 of 4");
     expect(dom.host.textContent).toContain("Measured calls100.0%60 of 60 calls");
@@ -408,12 +432,29 @@ test("an inactive subscription is off and unread until turned on; then it is rea
     await act(async () => root.render(<Speed {...allProps()} />));
     await flushUntil(() => dom.host.textContent.includes("Per model") && reads().length === 8);
     expect(reads().slice(4).sort()).toEqual(["claude-a", "codex-old", "codex1", "codex2"]);
-    // "Select all · Codex" keeps it on with the others; nothing already read is read again.
+    // Selecting all keeps it on with the others; nothing already read is read again.
     await invoke(nodes(dom.host).find(node => node.tagName === "BUTTON" && node.textContent.startsWith("Subscriptions and models"))!, "onClick");
-    await invoke(nodes(dom.host).find(node => node.tagName === "BUTTON" && node.attributes["aria-label"] === "Select all · Codex")!, "onClick");
+    await invoke(nodes(dom.host).find(node => node.tagName === "BUTTON" && node.attributes["aria-label"] === "Select all · all subscriptions")!, "onClick");
     expect(dom.host.textContent).toContain("Subscriptions and models · 4 of 4");
     expect(reads()).toHaveLength(8);
   } finally { await act(async () => root.unmount()); read.mockRestore(); restoreStorage(); dom.restore(); }
+});
+
+test("the drawer orders models by version and groups names within a version", async () => {
+  setLanguage("en"); bustApiMemo();
+  const dom = installTestDom(), root = createRoot(dom.host as unknown as Element);
+  const names = ["gpt-5.6-sol", "gpt-6-terra", "gpt-6-sol", "gpt-6-astra", "gpt-6.1-sol", "gpt-5.3-codex"];
+  const read = spyOn(api, "modelSpeed").mockImplementation(async ({ account }) => ({ ...RESPONSE, account,
+    models: names.map(name => model(name, [point("2026-10-05", 10, 1000, 10000)])) }));
+  try {
+    await act(async () => root.render(<Speed {...allProps()} />));
+    await flushUntil(() => dom.host.textContent.includes("Per model"));
+    await invoke(nodes(dom.host).find(node => node.tagName === "BUTTON" && node.textContent.startsWith("Subscriptions and models"))!, "onClick");
+    const group = nodes(dom.host).find(node => node.className === "speed-drawer-models")!;
+    expect(group.children.map(row => row.children[1]!.textContent)).toEqual([
+      "gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-terra", "gpt-5.6-sol", "gpt-5.3-codex",
+    ]);
+  } finally { await act(async () => root.unmount()); read.mockRestore(); dom.restore(); }
 });
 
 test("with storage throwing, an inactive subscription turned on stays on for the visit only", async () => {

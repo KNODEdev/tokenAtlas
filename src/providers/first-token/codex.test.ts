@@ -13,8 +13,8 @@ export function turn(id = "turn-a", ms: unknown = 2000, model = "test-model", at
 test("reported TTFT belongs once to the matching completed turn and model", () => {
   const a = turn(), b = turn("turn-b", 3000, "other-model");
   expect(adapter.parse([...a.slice(0, 2), ...b.slice(0, 2), a[2], a[2], b[2]])).toEqual([
-    { id: "turn-a", model: "test-model", ts: "2026-10-25T10:00:00.000Z", ms: 2000, billing: "unknown", reason: null },
-    { id: "turn-b", model: "other-model", ts: "2026-10-25T10:00:00.000Z", ms: 3000, billing: "unknown", reason: null },
+    { id: "turn-a", model: "test-model", service_tier: null, effort: null, ts: "2026-10-25T10:00:00.000Z", ms: 2000, billing: "unknown", reason: null },
+    { id: "turn-b", model: "other-model", service_tier: null, effort: null, ts: "2026-10-25T10:00:00.000Z", ms: 3000, billing: "unknown", reason: null },
   ]);
 });
 test("missing, invalid, aborted and unmatched evidence never invents a measurement", () => {

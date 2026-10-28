@@ -34,7 +34,7 @@ test("live identity selects the actual account and revives its card without rewr
     await runCodexProbePoll(ctx, undefined, async (_db, sources) => { targets.push(...sources.map(s => s.account)); });
     expect(targets).toEqual(["codex2"]);
     expect(ctx.eras.resolve("codex", home, "2026-09-09T12:00:00Z")).toBe("codex3");
-    const roster = await (await handleRoster(ctx, new URL("http://test/api/roster"))).json() as {accounts: unknown[]};
+    const roster = await (await handleRoster(ctx, new URL("http://127.0.0.1/api/roster"))).json() as {accounts: unknown[]};
     expect(roster.accounts).toContainEqual(expect.objectContaining({id:"codex2",active:true,vendor_account:"old@example.com"}));
     ctx.scanCodexProfiles = () => [{ ...profile, identity: null, error: "access denied" }];
     targets.length = 0;
@@ -47,7 +47,7 @@ test("a detected account can be selected before its historical sessions are assi
   try {
     ctx.codexDiscovery = resolveCodexDiscovery([profile], [], [], MACHINE);
     const id = ctx.codexDiscovery.accounts[0]!.id;
-    const response = await createFetchHandler(ctx)(new Request(`http://test/api/usage-series?account=${id}`));
+    const response = await createFetchHandler(ctx)(new Request(`http://127.0.0.1/api/usage-series?account=${id}`));
     expect(response.status).toBe(200);
     expect((await response.json() as {cycles:unknown[]}).cycles).toEqual([]);
     expect(ctx.accounts).toEqual(splitProbeReaderFixtureConfig(declarations));

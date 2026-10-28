@@ -264,7 +264,7 @@ test("at a period boundary a late call on a dimension not built yet is no predec
   } finally { f.close(); }
 }, 60_000);
 
-test("a long session crossing an ownership boundary is read in linear time (perf guard)", () => {
+test("a long session crossing an ownership boundary uses linear work including intervals (perf guard)", () => {
   const f = lateCallScene([["claude/account-a", "2000-01-01", "2026-09-10T09:00:00.000Z", "acct-a"], ["claude/account-a", "2026-09-10T09:00:00.000Z", null, "acct-b"]]);
   try {
     // 40 000 calls a second apart on one day of one session and dimension, cut by the boundary at 09:00 (32 400 s in).
@@ -274,14 +274,56 @@ test("a long session crossing an ownership boundary is read in linear time (perf
     f.db.transaction(() => { for (let index = 0; index < calls; index++)
       insert.run(`c${index}`, `${ARCHIVE_LOGICAL_ROOT}/claude/account-a/s.jsonl`, new Date(start + index * 1_000).toISOString()); })();
     fillUsageLedger(f.db, "claude", RATES, ARCHIVE_LOGICAL_ROOT);
-    const resolver = loadAccountResolver(f.db), total = (account: string) =>
-      [...readActivityDays(f.db, "claude", resolver.plan("claude", account), 15).values()].reduce((sum, ms) => sum + ms, 0);
+    const resolver = loadAccountResolver(f.db);
+    let ownershipChecks = 0, fetchedRows = 0, chainFetches = 0, replacedIntervals = 0;
+    // Bound actual work, independently of scheduler load and filesystem latency.
+    const measured = new Proxy(f.db, { get(target, key) {
+      const value = Reflect.get(target, key);
+      if (key !== "query") return typeof value === "function" ? value.bind(target) : value;
+      return (sql: string) => {
+        const statement = target.query(sql);
+        if (!sql.includes("FROM usage_ledger_facts f INDEXED")) return statement;
+        return new Proxy(statement, { get(object, method) {
+          const original = Reflect.get(object, method);
+          if (method !== "all") return typeof original === "function" ? original.bind(object) : original;
+          return (...args: unknown[]) => {
+            const rows = Reflect.apply(original, object, args) as unknown[];
+            fetchedRows += rows.length;
+            if (sql.includes("AND f.session=?")) chainFetches++;
+            expect(fetchedRows).toBeLessThanOrEqual(4 * calls);
+            return rows;
+          };
+        } });
+      };
+    } });
+    const total = (account: string) => {
+      const original = resolver.plan("claude", account);
+      const plan = { ...original, owns: (...args: Parameters<typeof original.owns>) => {
+        ownershipChecks++;
+        if (ownershipChecks > 4 * calls + 8) throw new Error("Activity ownership work is not linear");
+        return original.owns(...args);
+      } };
+      const intervals = new class extends Map<string, ActivityInterval[]> {
+        override set(key: string, spans: ActivityInterval[]) {
+          const prior = this.get(key);
+          if (prior && prior !== spans) replacedIntervals += prior.length;
+          expect(replacedIntervals).toBeLessThanOrEqual(2 * calls);
+          return super.set(key, spans);
+        }
+      }();
+      const sum = [...readActivityDays(measured, "claude", plan, 15, {}, "e", intervals).values()].reduce((sum, ms) => sum + ms, 0);
+      expect([...intervals.values()].flat().reduce((sum, [a, b]) => sum + b - a, 0)).toBe(sum);
+      return sum;
+    };
     const started = performance.now();
     const owned = [total("acct-a"), total("acct-b")];
     const elapsed = performance.now() - started;
     // acct-a: 32 400 calls, acct-b the rest; each account's first call has no predecessor of its own.
     expect(owned).toEqual([(32_400 - 1) * 1_000, (calls - 32_400 - 1) * 1_000]);
-    // Linear work takes a fraction of a second; a scan of the chain per call takes seconds at this length.
-    expect(elapsed).toBeLessThan(1_500);
+    expect(chainFetches).toBe(2);
+    expect(fetchedRows).toBe(4 * calls);
+    expect(ownershipChecks).toBeLessThanOrEqual(4 * calls + 8);
+    expect(replacedIntervals).toBeLessThanOrEqual(2 * calls);
+    console.log(JSON.stringify({ entryPoint: "readActivityDays", calls, elapsedMs: elapsed, ownershipChecks, fetchedRows, chainFetches, replacedIntervals }));
   } finally { f.close(); }
 }, 180_000);

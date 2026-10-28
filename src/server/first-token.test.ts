@@ -13,6 +13,7 @@ import { selectArchiveRepresentation, withDecodedArchiveFiles } from "../ingest/
 import { attachFirstTokenTimes, readFirstTokenTimes } from "./first-token-read";
 
 const migration = fs.readFileSync(new URL("../../drizzle/0095_first_token.sql", import.meta.url), "utf8");
+const modeMigration = fs.readFileSync(new URL("../../drizzle/0096_model_execution_timings.sql", import.meta.url), "utf8");
 const source = "codex/pc";
 const evidence = { firstSeen: null, lastSeen: null, readings: 0, evidence: "synthetic" };
 // A synchronous semantic reference keeps producer/cursor tests independent of native scheduling.
@@ -23,6 +24,7 @@ const referenceReader: FirstTokenReader = { forget() {}, read(_key, _generation,
 function fixture(file = ":memory:") {
   const db = new Database(file);
   db.exec(migration);
+  db.exec(modeMigration);
   db.exec("CREATE TABLE files(home TEXT,path TEXT,size INTEGER,mtime REAL,PRIMARY KEY(home,path))");
   installFirstTokenTracking(db, codexFirstTokenAdapter);
   return db;
@@ -55,7 +57,7 @@ test("incremental correction, copy deduplication and deletion equal rebuilding t
     replaceFirstTokenFile(full, "codex", "h", "p1", source, changed);
     expect(snapshot(db)).toEqual(snapshot(full));
     const result = readFirstTokenTimes(db, resolver(), "codex", "a", { grain: "day" });
-    expect(firstTokenSummary(result.models.get("fixture-model")!.get("2026-10-25"))).toEqual({ turns: 3, measured: 2, median_ms: 1500, p90_ms: 3000, coverage: 2 / 3 });
+    expect(firstTokenSummary(result.models.get(JSON.stringify(["fixture-model","standard",null]))!.get("2026-10-25"))).toEqual({ turns: 3, measured: 2, median_ms: 1500, p90_ms: 3000, coverage: 2 / 3 });
   } finally { db.close(); full.close(); }
 });
 test("dated ownership, business pools, date filtering and timing-only days share the stored facts", () => {
@@ -65,9 +67,9 @@ test("dated ownership, business pools, date filtering and timing-only days share
       { ...sample("business", 5000, "2026-10-25T11:00:00.000Z"), billing: "business_credits" }];
     replaceFirstTokenFile(db, "codex", "h", "p", source, turns);
     const read = (account: string) => readFirstTokenTimes(db, resolver(true), "codex", account, { grain: "day" });
-    expect(firstTokenSummary(read("a").models.get("fixture-model")!.get("2026-10-25")).median_ms).toBe(1000);
-    expect(firstTokenSummary(read("b").models.get("fixture-model")!.get("2026-10-25")).median_ms).toBe(9000);
-    expect(firstTokenSummary(read("b::business").models.get("fixture-model")!.get("2026-10-25")).median_ms).toBe(5000);
+    expect(firstTokenSummary(read("a").models.get(JSON.stringify(["fixture-model","standard",null]))!.get("2026-10-25")).median_ms).toBe(1000);
+    expect(firstTokenSummary(read("b").models.get(JSON.stringify(["fixture-model","standard",null]))!.get("2026-10-25")).median_ms).toBe(9000);
+    expect(firstTokenSummary(read("b::business").models.get(JSON.stringify(["fixture-model","standard",null]))!.get("2026-10-25")).median_ms).toBe(5000);
     expect(readFirstTokenTimes(db, resolver(), "codex", "a", { grain: "day", since: "2026-10-26" }).models.size).toBe(0);
     const attached = attachFirstTokenTimes([], read("a"));
     expect(attached[0]!.total.calls).toBe(0);
@@ -131,7 +133,7 @@ test("a new adapter uses the same queue, persistence and reader without provider
     installFirstTokenTracking(db, adapter);
     replaceFirstTokenFile(db, adapter.id, "h", "p", "fixture/pc", [sample("one", 1234)]);
     const r = buildAccountResolver([{ ...evidence, provider: "fixture", subject: "fixture/pc", value: "a", from: "2026-10-01", until: null, origin: "declared" }]);
-    expect(readFirstTokenTimes(db, r, "fixture", "a", { grain: "day", adapters: [adapter] }).models.get("fixture-model")!.get("2026-10-25")!.histogram).toEqual([[1234, 1]]);
+    expect(readFirstTokenTimes(db, r, "fixture", "a", { grain: "day", adapters: [adapter] }).models.get(JSON.stringify(["fixture-model","standard",null]))!.get("2026-10-25")!.histogram).toEqual([[1234, 1]]);
   } finally { db.close(); }
 });
 
@@ -201,7 +203,7 @@ test("ordinary import handoff publishes TTFT without reading the archived file a
     db.exec("CREATE TABLE codex_file_evidence(home TEXT,path TEXT,first_token_json TEXT)");
     db.query("INSERT INTO files VALUES (?,?,?,?)").run("h", file, 20, 10);
     db.query("INSERT INTO codex_file_evidence VALUES (?,?,?)").run("h", file,
-      JSON.stringify({ version: 1, turns: [sample("ordinary", 1200)], bookmark: { size: 20, mtime: 10 } }));
+      JSON.stringify({ version: codexFirstTokenAdapter.version, turns: [sample("ordinary", 1200)], bookmark: { size: 20, mtime: 10 } }));
     const result = advanceFirstTokenTimes(db, { archiveRoot: "/fixture-archive",
       physicalPath: () => { throw new Error("Must consume the native import result"); } });
     expect(result).toMatchObject({ processed: 1, completed: 1, pending: false, failed: 0 });

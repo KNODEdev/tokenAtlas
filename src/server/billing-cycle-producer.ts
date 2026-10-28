@@ -44,8 +44,9 @@ import { resolvePlanFacts, type PlansCatalog } from "../shared/plan-catalog";
  * plans by catalog plan id, so "prolite" windows calibrate "pro-5x" cycles (user decisions 21.10).
  * 17: global plan facts price Free at zero while retaining its capacity cycles.
  * 18: Codex cycles store the banked resets granted in them, from the reset-credit readings (banked-grants.ts).
+ * 19: grant timestamps determine cycle membership; observation-only counts remain lower bounds.
  */
-export const BILLING_CYCLES_VERSION = 18;
+export const BILLING_CYCLES_VERSION = 19;
 const RULES_KEY = "billing_cycles_rules";
 const MARKS_KEY = "billing_cycles_marks";
 /** How often every account's cycles are derived again to catch the clock and moved evidence. */

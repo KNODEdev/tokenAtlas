@@ -26,7 +26,7 @@ export function installPrivacyShield(doc: Document): () => void {
     }
     if (node.nodeType !== 1) return;
     const element = node as HTMLElement;
-    // Reserved for static application branding, never API-provided content.
+    // Reserved for static branding and navigation labels, never API-provided content.
     if (element.hasAttribute("data-privacy-public")) return;
     if (["SCRIPT", "STYLE", "NOSCRIPT"].includes(element.tagName)) return;
     for (const name of ["title", "aria-label", "aria-description", "alt", "placeholder", "label"]) {

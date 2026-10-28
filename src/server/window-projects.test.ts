@@ -114,11 +114,23 @@ test("a correction is incremental, an identical retry is stable, and a full ledg
     expect(readWindowProjects(ctx, request)).toEqual(corrected);
   } finally { f.teardown(); }
 });
-test("unknown Codex billing modes retain lower-bound quality even when every call is priced", () => {
+test("omitted Codex service tier uses Standard without unknown-mode quality", () => {
   const { db, base } = codexCallsScene();
   const ctx = { sqlite: db, rateCards: card, accounts: { version: 2, sources: subscriptionDeclarations(base.homeToSubId!), subscriptions: [{ id: "acct", vendor: "codex" }] } } as unknown as AppContext;
   const report = readWindowProjects(ctx, { account: "acct", from: "2026-09-11T11:10:52.114Z", until: "2026-09-11T11:10:52.115Z" });
-  expect(report.projects[0]).toMatchObject({ calls: 1, unpriced_calls: 0, unknown_mode_tokens: 198597 });
+  expect(report.projects[0]).toMatchObject({ calls: 1, unpriced_calls: 0, unknown_mode_tokens: 0 });
+  expect(report.projects[0]!.models[0]!.unknown_mode_tokens).toBe(0);
+});
+test("explicitly unmapped Codex service tier keeps the actual price unknown", () => {
+  const { db, base } = codexCallsScene(db => {
+    db.exec("ALTER TABLE events ADD COLUMN service_tier TEXT");
+    db.exec("UPDATE events SET service_tier=CASE speed WHEN 'fast' THEN 'priority' WHEN 'standard' THEN 'default' ELSE NULL END");
+    db.query("UPDATE events SET service_tier='future-unmapped' WHERE ts=?").run("2026-09-11T11:10:52.114Z");
+  });
+  const ctx = { sqlite: db, rateCards: card, accounts: { version: 2, sources: subscriptionDeclarations(base.homeToSubId!),
+    subscriptions: [{ id: "acct", vendor: "codex" }] } } as unknown as AppContext;
+  const report = readWindowProjects(ctx, { account: "acct", from: "2026-09-11T11:10:52.114Z", until: "2026-09-11T11:10:52.115Z" });
+  expect(report.projects[0]).toMatchObject({ calls: 1, unpriced_calls: 1, unknown_mode_tokens: 198597, api_usd: null });
   expect(report.projects[0]!.models[0]!.unknown_mode_tokens).toBe(198597);
 });
 test("GLM counts the subscription's projects and excludes other OpenCode vendors", () => {

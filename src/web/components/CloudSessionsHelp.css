@@ -1,0 +1,5 @@
+.cloud-sessions-help :is(p, li) { font-size: var(--fs-4); line-height: 1.6; overflow-wrap: anywhere; }
+.cloud-sessions-help p + p, .cloud-sessions-help p + ol { margin-top: var(--s-6); }
+.cloud-sessions-help ol { list-style: decimal; padding-left: var(--s-9); }
+.cloud-sessions-help ul { list-style: disc; padding-left: var(--s-9); }
+.cloud-sessions-help li + li { margin-top: var(--s-4); }

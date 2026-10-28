@@ -16,6 +16,7 @@ import { Database } from "./sqlite";
 import { createTestDatabase } from "../sync/test-support";
 import { RATES } from "../server/claude-code-capacity.fixture";
 import { fillUsageLedger } from "../server/usage-ledger.fixture";
+import { replayFixtureMigrations } from "./migration-range.fixture";
 
 const MIGRATIONS = path.resolve(import.meta.dir, "../../drizzle");
 
@@ -41,15 +42,8 @@ function ledger() {
     ALTER TABLE usage_ledger_dims DROP COLUMN shift; ALTER TABLE usage_ledger_dims DROP COLUMN repo_group; ALTER TABLE usage_ledger_dims DROP COLUMN repo;`);
   /** The real migrator, with 0068 and 0069 not yet applied. */
   const migrate = () => {
-    // 0070 runs again after them and re-adds its column.
-    db.exec("DELETE FROM __drizzle_migrations WHERE created_at>=1789776000036; ALTER TABLE usage_ledger_days DROP COLUMN act_key;"
-      + " ALTER TABLE plan_periods DROP COLUMN anchor_ts; ALTER TABLE plan_periods DROP COLUMN cycle_months");
-    for(const family of ['subscription_capacity','subscription_hours','project_plan']){
-      const tables=family==='subscription_capacity'?['windows','dirty','state']:family==='subscription_hours'?['dirty','state']:['days','dirty','state'];
-      for(const suffix of tables)db.exec(`DROP TABLE ${family}_${suffix}`);
-    }
-    db.exec('DROP TABLE subscription_window_hours');
-    migrateDrizzle(drizzle(db), { migrationsFolder: MIGRATIONS });
+    db.exec("ALTER TABLE usage_ledger_days DROP COLUMN act_key");
+    replayFixtureMigrations(db, directory, "0068_usage_ledger_dim_repository", "0070_usage_ledger_day_act_key");
   };
   return { db, dims, before0068, migrate, close() { db.close(true); fs.rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); } };
 }

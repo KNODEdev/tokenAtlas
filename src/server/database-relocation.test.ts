@@ -21,7 +21,7 @@ test("relocation API validates before restart and exposes the active database", 
   } as unknown as AppContext;
   try {
     const handle = createFetchHandler(ctx);
-    const post = (target: string) => handle(new Request("http://fixture/api/setup/database", {
+    const post = (target: string) => handle(new Request("http://127.0.0.1/api/setup/database", {
       method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({destination:target}),
     }));
     expect((await post(source)).status).toBe(409);
@@ -30,17 +30,17 @@ test("relocation API validates before restart and exposes the active database", 
     expect(accepted.status).toBe(202);
     expect(requested).toBe(destination);
     expect(fs.existsSync(destination)).toBe(false);
-    const state = await handle(new Request("http://fixture/api/setup/database"));
+    const state = await handle(new Request("http://127.0.0.1/api/setup/database"));
     expect((await state.json()).database).toBe(source);
     requested = undefined;
     const folder = path.join(directory, "selected-folder");
-    const folderAccepted = await handle(new Request("http://fixture/api/setup/database", {
+    const folderAccepted = await handle(new Request("http://127.0.0.1/api/setup/database", {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ directory: folder }),
     }));
     expect(folderAccepted.status).toBe(202);
     expect(requested as string | undefined).toBe(path.join(folder, path.basename(source)));
     requested = undefined;
-    const invalidFolder = await handle(new Request("http://fixture/api/setup/database", {
+    const invalidFolder = await handle(new Request("http://127.0.0.1/api/setup/database", {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ directory: "relative" }),
     }));
     expect(invalidFolder.status).toBe(409);
@@ -48,7 +48,7 @@ test("relocation API validates before restart and exposes the active database", 
     const previousLocalState = process.env.TOKENATLAS_LOCAL_STATE;
     process.env.TOKENATLAS_LOCAL_STATE = path.join(directory, "machine-state");
     try {
-      const changeTemp = (directory: unknown) => handle(new Request("http://fixture/api/setup/temporary", {
+      const changeTemp = (directory: unknown) => handle(new Request("http://127.0.0.1/api/setup/temporary", {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ directory }),
       }));
       expect((await changeTemp(42)).status).toBe(409);

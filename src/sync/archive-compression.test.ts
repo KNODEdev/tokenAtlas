@@ -222,10 +222,12 @@ test("the explicit CLI plans without writes, uses selected copy locations and re
   const f = fixture();
   try {
     const run = (...args: string[]) => {
+        const started = performance.now();
       const child = spawnSync(process.execPath, [path.resolve("scripts/archive-compress.ts"), ...args], {
         cwd: process.cwd(), env: f.options.env, windowsHide: true, encoding: "utf8", timeout: 20_000,
       });
-      expect({ exit: child.status, stderr: child.stderr }).toMatchObject({ exit: 0 }); return child.stdout;
+        console.info(JSON.stringify({ entryPoint: "archive-compress CLI", phase: args[0], elapsedMs: performance.now() - started }));
+        expect({ phase: args[0], exit: child.status, signal: child.signal, error: child.error?.message, stderr: child.stderr }).toMatchObject({ exit: 0 }); return child.stdout;
     };
     expect(JSON.parse(run("plan"))).toMatchObject({ mode: "read-only plan", files: 1, minimumAgeDays: 7 });
     expect(fs.existsSync(f.plain)).toBe(true); expect(fs.existsSync(`${f.plain}.zst`)).toBe(false);
@@ -236,4 +238,4 @@ test("the explicit CLI plans without writes, uses selected copy locations and re
     expect(f.decode(`${f.plain}.zst`).toString()).toBe(text);
     expect(fs.existsSync(f.options.databasePath)).toBe(false);
   } finally { f.close(); }
-}, 30_000);
+}, 4 * 20_000 + 10_000);

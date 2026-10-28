@@ -7,6 +7,7 @@ import {installAnalysisTracking} from "./analysis";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { migrationFixtureThrough } from "./migration-range.fixture";
 
 const migrations=path.resolve(import.meta.dir,"../../drizzle");
 const retired=["account_observations","analysis_attribution_dirty","logical_sources",
@@ -40,7 +41,7 @@ function preW9Folder(root:string):string {
 function fixture() {
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),"atlas-w9-migration-"));
   const file=path.join(directory,"atlas.sqlite"),db=new Database(file,{create:true});
-  return {directory,file,db,close(){db.close(true);fs.rmSync(directory,{recursive:true,force:true,maxRetries:5,retryDelay:50});}};
+  return {directory,file,db,close(){this.db.close(true);fs.rmSync(directory,{recursive:true,force:true,maxRetries:5,retryDelay:50});}};
 }
 function seed(db:Database):void {
   db.exec(`CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value TEXT);
@@ -209,6 +210,68 @@ test("W9 invalidates only sources whose former tracking was missing or not exact
     expect(probe(revisionsOf(f.db,["probe_windows"]))).not.toEqual(probe(before.revisions));
     expect(revisionsOf(f.db,["events","ratelimit","claude_events"])).toEqual(before.revisions
       .filter(row=>["events","ratelimit","claude_events"].includes((row as {source:string}).source)));
+  } finally {f.close();}
+});
+
+test("chained handoffs preserve broken Claude tracking as evidence requiring invalidation",()=>{
+  const f=fixture();
+  try {
+    const before=preV8Database(f);
+    f.db.exec("DROP TRIGGER analysis_claude_events_update");
+    applyDrizzleMigrations(drizzle(f.db));
+    const rows=revisionsOf(f.db,trackedSources);
+    expect(rows.filter(row=>(row as {source:string}).source!=="claude_events")).toEqual(before.revisions
+      .filter(row=>(row as {source:string}).source!=="claude_events"));
+    expect(rows.filter(row=>(row as {source:string}).source==="claude_events")).not.toEqual(before.revisions
+      .filter(row=>(row as {source:string}).source==="claude_events"));
+    expect(f.db.query("SELECT value FROM meta WHERE key='migration_claude_tracking_handoff'").get()).toBeNull();
+    assertNoRetiredReferences(f.db);
+  } finally {f.close();}
+});
+
+test("a failed chained upgrade retries with the original durable tracking evidence",()=>{
+  const f=fixture();
+  try {
+    const before=preV8Database(f);
+    const folder=migrationFixtureThrough(f.directory,"0095_first_token");
+    const file=path.join(folder,"0092_claude_billing_mode.sql"),original=fs.readFileSync(file,"utf8");
+    fs.appendFileSync(file,"\n--> statement-breakpoint\nSELECT missing_migration_fixture_function();\n");
+    expect(()=>applyDrizzleMigrations(drizzle(f.db),folder)).toThrow();
+    expect(f.db.query("SELECT value FROM meta WHERE key='migration_claude_tracking_handoff'").get()).not.toBeNull();
+    expect(revisionsOf(f.db,trackedSources)).toEqual(before.revisions);
+    fs.writeFileSync(file,original);
+    applyDrizzleMigrations(drizzle(f.db),folder);
+    expect(revisionsOf(f.db,trackedSources)).toEqual(before.revisions);
+    expect(f.db.query("SELECT value FROM meta WHERE key='migration_claude_tracking_handoff'").get()).toBeNull();
+    assertNoRetiredReferences(f.db);
+  } finally {f.close();}
+});
+
+for (const installed of [false,true]) test(`tracking recovery survives reopen ${installed ? "after" : "before"} installer commit`,()=>{
+  const f=fixture();
+  try {
+    const before=preV8Database(f);
+    const folder=migrationFixtureThrough(f.directory,"0095_first_token");
+    const file=path.join(folder,"0092_claude_billing_mode.sql"),original=fs.readFileSync(file,"utf8");
+    fs.appendFileSync(file,"\n--> statement-breakpoint\nSELECT missing_migration_fixture_function();\n");
+    expect(()=>applyDrizzleMigrations(drizzle(f.db),folder)).toThrow();
+    fs.writeFileSync(file,original);
+    migrate(drizzle(f.db),{migrationsFolder:folder});
+    const saved=f.db.query("SELECT value FROM meta WHERE key='migration_claude_tracking_handoff'").get() as {value:string};
+    expect(saved).not.toBeNull();
+    if(installed) {
+      const evidence=JSON.parse(saved.value);
+      f.db.query("UPDATE analysis_tracking_handoff SET columns=?,triggers=? WHERE source='claude_events'").run(evidence.columns,evidence.triggers);
+      installAnalysisTracking(f.db);
+    }
+    f.db.close(true);
+    f.db=new Database(f.file);
+    applyDrizzleMigrations(drizzle(f.db),folder);
+    expect(revisionsOf(f.db,trackedSources)).toEqual(before.revisions);
+    expect(f.db.query("SELECT value FROM meta WHERE key='migration_claude_tracking_handoff'").get()).toBeNull();
+    assertNoRetiredReferences(f.db);
+    f.db.exec("UPDATE claude_events SET in_uncached=in_uncached+1");
+    expect(revisionsOf(f.db,trackedSources)).not.toEqual(before.revisions);
   } finally {f.close();}
 });
 

@@ -847,7 +847,7 @@ describe("fast pricing and derived metrics", () => {
 describe("GET /api/plan-capacity", () => {
   it("requires provider, plan_id and window_kind", async () => {
     const ctx = { plansCatalog: catalog(), rateCards: rateCard() } as AppContext;
-    const res = handlePlanCapacity(ctx, new URL("http://local/api/plan-capacity"));
+    const res = handlePlanCapacity(ctx, new URL("http://127.0.0.1/api/plan-capacity"));
     expect(res.status).toBe(400);
   });
   it("createFetchHandler refuses legacy unknown-speed usage and events at the first probe boundary", async () => {
@@ -900,7 +900,7 @@ describe("GET /api/plan-capacity", () => {
     prepareCodexWindowSums(db, ctx);
     const fetch = createFetchHandler(ctx);
     const res = await fetch(
-      new Request("http://local/api/plan-capacity?provider=codex&plan_id=codex-plus&window_kind=weekly&as_of=2026-03-01")
+      new Request("http://127.0.0.1/api/plan-capacity?provider=codex&plan_id=codex-plus&window_kind=weekly&as_of=2026-03-01")
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as PlanCapacityResult;

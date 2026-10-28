@@ -37,7 +37,7 @@ const table = (host: TestNode) => nodes(host).find(node => node.tagName === "TAB
 
 test("four measures, internal review only as captions, and the table's token column uses the chart's measure", async () => {
   const host = await mount({ ...data, rows: [row, review] });
-  const measures = nodes(host).filter(node => node.tagName === "BUTTON" && ["Tokens", "API-eq $", "Calls", "Credits"].includes(node.textContent));
+  const measures = nodes(host).filter(node => node.tagName === "BUTTON" && node.className !== "data-table-sort-button" && ["Tokens", "API-eq $", "Calls", "Credits"].includes(node.textContent));
   expect(measures).toHaveLength(4);
   expect(host.textContent).not.toContain("Actual charges");
   expect(host.textContent).not.toContain("Internal review tokens");

@@ -59,7 +59,7 @@ export function insertCalls(db: Database, homes: { own: string; mirror: string; 
     .run(homes.mirror, homes.own, homes.mirror, homes.own, "%session-0.jsonl", "%session-1.jsonl");
 }
 
-export function codexCallsScene() {
+export function codexCallsScene(beforePrepare?: (db: Database) => void) {
   const db = database(), archive = `${ARCHIVE_LOGICAL_ROOT}/codex`, own = "c:/own", mirror = "c:/mirror", foreign = "c:/foreign";
   // The own source changes hands at 10:15 on the first day; the mirror copies the same archive folder.
   const declarations = [
@@ -73,6 +73,7 @@ export function codexCallsScene() {
   const homeToSubId = indexSubscriptionHomes([{ id: "acct", home: own, source_home: mirror }, { id: "other", home: foreign }], declarations);
   const anchor = Date.parse("2026-09-15T00:00:00Z") / 1000;
   insertCalls(db, { own, mirror, foreign }, anchor);
+  beforePrepare?.(db);
   prepareCodexLedgerFixture(db, card, homeToSubId);
   const base: SceneOptions = { account: "acct", homes: [own, mirror, foreign], from: "2026-09-10T23:17:41.250Z", until: "2026-09-12T17:42:05.500Z",
     anchor, limitId: "codex", sessionMinutes: 300, includeBurn: true, homeToSubId };

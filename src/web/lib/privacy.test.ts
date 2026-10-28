@@ -26,6 +26,19 @@ test("leaves blank space instead of inventing account counts, matching only lite
   expect(mask.text("team-extended / team")).toBe(before);
 });
 
+test("ranking group and repository strings are identities too", () => {
+  const mask = new IdentityMask();
+  mask.learn({ subjects: [{ kind: "project", id: "client", name: "Client", group: "private-group", repos: ["private-child"] }] });
+  expect(mask.text("private-group · private-child · Client")).toBe(" ·  · ");
+});
+
+test("short identities do not erase numeric digits, units or parts of model names", () => {
+  const mask = new IdentityMask();
+  for (const name of ["h", "0", "a", "astra"]) mask.add(name);
+  expect(mask.text("2.40 pp/h · 100% · gpt-6-astra · a model")).toBe("2.40 pp/h · 100% · gpt-6-astra · a model");
+  expect(mask.text("h")).toBe("");
+});
+
 test("plan names and capacity multipliers remain visible even when encountered in account metadata", () => {
   const mask = new IdentityMask();
   for (const name of ["Pro", "Max 20×", "Pro ×20", "max20x", "codex-pro-20x", "x20", "20x", "Plus"]) {

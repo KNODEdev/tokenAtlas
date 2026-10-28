@@ -135,7 +135,8 @@ test("accounting keeps API-only and joint credit-priced cohorts separate", () =>
   expect(report.context_preview!.normalization.normalized_usd.unpriced_events).toBe(3);
 });
 test("project allocation uses preview numerator and denominator, conserves bills and catalog facts", async () => {
-  const f = fixture(); f.fill();
+  const f = contextPreviewFixture(false, undefined, db => db.exec("DELETE FROM events WHERE model='missing'"));
+  open.push(f); f.fill();
   const report = paired(buildProjectCost(f.db, f.rates, f.ctx.homeToSubId, { ...f.range, declarations: f.ctx.accounts.subscriptions,
     plansCatalog: f.ctx.plansCatalog }));
   expect(report.context_preview_status).toMatchObject({ ready: true, missing_groups: 0 });
@@ -154,6 +155,18 @@ test("project allocation uses preview numerator and denominator, conserves bills
   expect(cancellable).toEqual(history);
   expect(history.context_preview_status).toMatchObject({ ready: true, missing_groups: 0 });
   expect(history.context_preview!.totals.api_usd).toBe(7.05);
+});
+test("missing account weights withhold billed allocation in both context variants", () => {
+  const f = fixture(); f.fill();
+  const report = paired(buildProjectCost(f.db, f.rates, f.ctx.homeToSubId, { ...f.range, declarations: f.ctx.accounts.subscriptions,
+    plansCatalog: f.ctx.plansCatalog }));
+  for (const variant of [report, report.context_preview!]) {
+    expect(variant.subscriptions.find(row => row.id === "owner")!.paid_usd).toBeGreaterThan(0);
+    for (const subject of variant.subjects.filter(row => row.subscriptions.owner)) {
+      expect(subject.subscriptions.owner!.billed_usd).toBeNull();
+      expect(subject.billed_complete).toBe(false);
+    }
+  }
 });
 test("already included uplift is unchanged; projection revisions only invalidate declared responses", async () => {
   const f = fixture(true); f.fill();

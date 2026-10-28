@@ -128,16 +128,17 @@ export function prepareCodexLedgerFixture(db: Database, card: RateCard, homes: M
 }
 
 /** Pure comparison fixtures receive published values before invoking the read-only comparison. */
-export function publishedCodexComparisonFixture<T extends CodexAccountingEvent & {account:string|null;home?:string|null}>(config:CodexAccountingConfig,rows:readonly T[],referenceDay?:string): T[] {
+export function publishedCodexComparisonFixture<T extends CodexAccountingEvent & {account:string|null;home?:string|null;service_tier?:string|null}>(config:CodexAccountingConfig,rows:readonly T[],referenceDay?:string): T[] {
   if (!rows.length) return [];
   const db=new FixtureDatabase(":memory:");
   const card={version:1,currency:"USD",unit:"per 1M",vendors:{},codex_accounting:config} as RateCard;
   try {
     db.exec(`CREATE TABLE events(home TEXT,path TEXT,source_offset INTEGER,ts TEXT,model TEXT,in_tok INTEGER,cached_in INTEGER,
-      cache_write INTEGER,out_tok INTEGER,reasoning_out INTEGER,speed TEXT,billing_mode TEXT,meter_reset INTEGER,plan_type TEXT)`);
-    const insert=db.query("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,0,?,?,?,?)");
+      cache_write INTEGER,out_tok INTEGER,reasoning_out INTEGER,speed TEXT,billing_mode TEXT,meter_reset INTEGER,plan_type TEXT,service_tier TEXT)`);
+    const insert=db.query("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,0,?,?,?,?,?)");
     rows.forEach((row,index)=>insert.run(row.home ?? null,`fixture-${index}.jsonl`,index+1,row.ts,row.model,row.in_tok,row.cached_in,row.cache_write,row.out_tok,
-      row.speed ?? null,row.billing_mode ?? null,row.meter_reset ?? null,row.plan_type ?? null));
+      row.speed ?? null,row.billing_mode ?? null,row.meter_reset ?? null,row.plan_type ?? null,
+      Object.hasOwn(row,"service_tier") ? row.service_tier ?? null : row.speed === "fast" ? "priority" : row.speed === "standard" ? "default" : null));
     prepareCodexLedgerFixture(db,card);
     const ledger=codexLedgerReadContext(card);
     const events=readCodexEventRange(db,config,"0000-01-01","9999-12-31",event=>rows[event.source_offset!-1]!.account,

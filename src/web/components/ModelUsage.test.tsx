@@ -23,7 +23,7 @@ test("other providers show cache read over the whole input, cache writes include
   setLanguage("en");
   const html = renderToStaticMarkup(<ModelUsage codex={false} account="claude1" since="2026-10-01" until="2026-10-20"
     data={report({ model_details: [detail("claude-opus-5-5", { in_uncached: 10, in_cache_read: 60, in_cache_write_5m: 30 })] })} />);
-  expect(html).toContain(">Cache</th>");
+  expect(html).toContain(">Cache<span");
   expect(html).toContain("60.0%");
   expect(html).toContain("cache read 60 / input 100");
   expect(html).not.toContain("open cache history");
@@ -65,4 +65,60 @@ test("a Codex project filter leaves the cache column unread, since stored cache 
     expect(read).not.toHaveBeenCalled();
     expect(nodes(dom.host).some(node => node.attributes["aria-label"]?.includes("open cache history"))).toBe(false);
   } finally { await act(async () => root.unmount()); read.mockRestore(); breakdown.mockRestore(); dom.restore(); }
+});
+
+test("models open with newer versions first and header clicks sort exact token counts in both directions", async () => {
+  setLanguage("en");
+  const dom = installTestDom(), root = createRoot(dom.host as unknown as HTMLElement);
+  const rows = [
+    { ...detail("gpt-5.6-sol", {}), tokens: 1000.02 },
+    { ...detail("gpt-6.1-sol", {}), tokens: 1000.01 },
+    { ...detail("gpt-6-astra", {}), tokens: 10 },
+  ];
+  const table = () => nodes(dom.host).find(node => node.attributes["data-table-id"] === "ModelUsage:0")!;
+  const models = () => nodes(table()).find(node => node.tagName === "TBODY")!.children.map(row => row.children[0]!.textContent);
+  const tokens = () => nodes(table()).find(node => node.className === "data-table-sort-button" && node.textContent.startsWith("Tokens"))!;
+  try {
+    await act(async () => root.render(<ModelUsage codex={false} account="test" since="2026-10-01" until="2026-10-20" data={report({ model_details: rows })} />));
+    expect(models()).toEqual(["gpt-6.1-sol", "gpt-6-astra", "gpt-5.6-sol"]);
+    await invoke(tokens(), "onClick", { stopPropagation() {} });
+    expect(models()).toEqual(["gpt-5.6-sol", "gpt-6.1-sol", "gpt-6-astra"]);
+    await invoke(tokens(), "onClick", { stopPropagation() {} });
+    expect(models()).toEqual(["gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-sol"]);
+  } finally { await act(async () => root.unmount()); dom.restore(); }
+});
+
+test("daily model rows sort the whole result and return to the first page", async () => {
+  setLanguage("en");
+  const dom = installTestDom(), root = createRoot(dom.host as unknown as HTMLElement);
+  const breakdown = spyOn(api, "breakdown").mockImplementation(async () => ({ rows: [] }) as never);
+  const rows = Array.from({ length: 51 }, (_, index) => codexRow(`model-${index + 1}`, index + 1));
+  const table = () => nodes(dom.host).find(node => node.attributes["data-table-id"] === "ModelUsage:1")!;
+  try {
+    await act(async () => root.render(<ModelUsage codex account="test" project="test" since="2026-10-01" until="2026-10-20" data={report({ breakdown: rows })} />));
+    await invoke(nodes(dom.host).find(node => node.tagName === "BUTTON" && node.textContent === "Next")!, "onClick");
+    expect(nodes(table()).find(node => node.tagName === "TBODY")!.children).toHaveLength(1);
+    const tokens = nodes(table()).find(node => node.className === "data-table-sort-button" && node.textContent.startsWith("Tokens"))!;
+    await invoke(tokens, "onClick", { stopPropagation() {} });
+    const body = nodes(table()).find(node => node.tagName === "TBODY")!;
+    expect(body.children).toHaveLength(50);
+    expect(body.children[0]!.textContent).toContain("model-51");
+    expect(body.children[49]!.textContent).toContain("model-2");
+  } finally { await act(async () => root.unmount()); breakdown.mockRestore(); dom.restore(); }
+});
+
+test("All combines Codex and other providers' cache counts before dividing their totals", async () => {
+  setLanguage("en");
+  const dom = installTestDom(), root = createRoot(dom.host as unknown as HTMLElement);
+  const read = spyOn(api, "modelCacheHistory").mockResolvedValue({ hours: [{ model: "gpt-6.1-sol", input: 100, cached: 50, calls: 1, hour: "2026-10-01" }] } as never);
+  try {
+    await act(async () => root.render(<ModelUsage codex={false} account="all" aggregateCodexAccounts={["codex1"]} since="2026-10-01" until="2026-10-20"
+      data={report({ provider: { id: "all" } as never,
+        breakdown: [codexRow("gpt-6.1-sol", 100), { ...codexRow("gpt-6.1-sol", 100), account: "claude1" }],
+        model_details: [detail("gpt-6.1-sol", { in_uncached: 10, in_cache_read: 90 })] })} />));
+    await flushUntil(() => dom.host.textContent.includes("70.0%"));
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(read.mock.calls[0]![0].account).toBe("codex1");
+    expect(dom.host.textContent).not.toContain("open cache history");
+  } finally { await act(async () => root.unmount()); read.mockRestore(); dom.restore(); }
 });

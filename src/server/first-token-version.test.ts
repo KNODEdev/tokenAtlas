@@ -20,5 +20,18 @@ test("TTFT publications refresh speed without invalidating unrelated prepared an
     expect(version("/api/projects")).toBe(projects);
     expect(cache.get("projects", cache.stamp(db))).toBe("kept");
     expect(cache.clockStamp(db, 0)).toBe(clocked);
+    db.exec(`CREATE TABLE model_speed_state(provider TEXT PRIMARY KEY,revision INTEGER);
+      CREATE TABLE model_speed_queue(provider TEXT,event_id INTEGER,PRIMARY KEY(provider,event_id));
+      INSERT INTO model_speed_state VALUES ('codex',1),('claude',1);
+      INSERT INTO model_speed_queue VALUES ('codex',1),('claude',1)`);
+    const pending = version("/api/model-speed"), unrelated = version("/api/projects");
+    db.exec("DELETE FROM model_speed_queue WHERE provider='claude'");
+    expect(version("/api/model-speed")).not.toBe(pending);
+    expect(version("/api/projects")).toBe(unrelated);
+    const stableCache = cache.stamp(db), stableClocked = cache.clockStamp(db, 0);
+    db.exec(`INSERT INTO analysis_source_revisions(source,bucket,revision) VALUES ('model_speed_hours','*',1);
+      UPDATE model_speed_state SET revision=revision+1 WHERE provider='codex'`);
+    expect(cache.stamp(db)).toBe(stableCache);
+    expect(cache.clockStamp(db, 0)).toBe(stableClocked);
   } finally { db.close(); }
 });

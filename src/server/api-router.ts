@@ -24,7 +24,7 @@ import { validateDatabaseDestination } from "../db/relocate";
 import { serveCycleReadBatch } from "./cycle-read-batch";
 import { chooseArchiveDirectory } from "./directory-picker";
 import { createClaudeLoginService, handleClaudeLogin, claudeLoginHome } from "./claude-login";
-import { refuseCrossSiteWrite } from "./write-guard";
+import { refuseCrossSiteWrite, refuseForeignHost } from "./write-guard";
 import type { SetupSaveInput } from "./setup";
 import { prepareSourceProfileEdit, readSourceProfileConfiguration } from "./source-profile";
 import type { SourceProfileEdit } from "../shared/source-health";
@@ -479,6 +479,8 @@ export function createFetchHandler(ctx: AppContext) {
   }
   followRateCardsFile();
   return async function fetch(req: Request): Promise<Response> {
+    const refused = refuseForeignHost(req);
+    if (refused) return refused;
     const handled = trackMainThreadRequest(new URL(req.url).pathname);
     let response: Response;
     try { response = await respond(req); } finally { handled(); }

@@ -27,22 +27,27 @@ export function installFirstTokenTracking(db: Database, adapter: FirstTokenAdapt
   }).immediate();
 }
 
-interface StoredTurn { provider: string; turn_id: string; source: string | null; model: string | null; ts: string; ms: number | null; billing: string; reason: string | null }
+interface StoredTurn { provider: string; turn_id: string; source: string | null; model: string | null; ts: string; ms: number | null; billing: string; reason: string | null;
+  service_tier: string | null; effort: string | null; mode_known: number }
+const TURN_COLUMNS = "provider,turn_id,source,model,ts,ms,billing,reason,service_tier,effort,mode_known";
 function contribution(db: Database, row: StoredTurn | null, sign: number): void {
   if (!row?.source || !row.model) return;
-  const args = [row.provider, row.source, row.model, row.billing, Math.floor(Date.parse(row.ts) / 3_600_000), row.ms ?? -1] as const;
-  db.query(`INSERT INTO response_time_hours(provider,source,model,billing,hour,ms,turns) VALUES (?,?,?,?,?,?,?)
-    ON CONFLICT(provider,source,hour,model,billing,ms) DO UPDATE SET turns=turns+excluded.turns`).run(...args, sign);
-  db.query("DELETE FROM response_time_hours WHERE provider=? AND source=? AND model=? AND billing=? AND hour=? AND ms=? AND turns=0").run(...args);
+  const args = [row.provider, row.source, row.model, row.billing, Math.floor(Date.parse(row.ts) / 3_600_000), row.ms ?? -1,
+    row.service_tier ?? "", row.effort ?? "", row.mode_known] as const;
+  db.query(`INSERT INTO response_time_hours(provider,source,model,billing,hour,ms,service_tier,effort,mode_known,turns) VALUES (?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(provider,source,hour,model,billing,ms,service_tier,effort,mode_known) DO UPDATE SET turns=turns+excluded.turns`).run(...args, sign);
+  db.query(`DELETE FROM response_time_hours WHERE provider=? AND source=? AND model=? AND billing=? AND hour=? AND ms=?
+    AND service_tier=? AND effort=? AND mode_known=? AND turns=0`).run(...args);
 }
 
 /** One file publication: copies, canonical turns and histogram contributions commit together. */
 export function replaceFirstTokenFile(db: Database, provider: string, owner: string, path: string, source: string | null,
   turns: readonly FirstTokenTurn[]): boolean {
   return db.transaction(() => {
-    const old = db.query("SELECT turn_id,source,model,ts,ms,billing,reason FROM response_time_copies WHERE provider=? AND owner=? AND path=? ORDER BY turn_id")
+    const old = db.query("SELECT turn_id,source,model,ts,ms,billing,reason,service_tier,effort,mode_known FROM response_time_copies WHERE provider=? AND owner=? AND path=? ORDER BY turn_id")
       .all(provider, owner, path) as Omit<StoredTurn, "provider">[];
-    const next = source ? turns.map(t => ({ turn_id: t.id, source, model: t.model, ts: t.ts, ms: t.ms, billing: t.billing, reason: t.reason }))
+    const next = source ? turns.map(t => ({ turn_id: t.id, source, model: t.model, ts: t.ts, ms: t.ms, billing: t.billing, reason: t.reason,
+      service_tier: t.service_tier ?? null, effort: t.effort ?? null, mode_known: 1 }))
       .sort((a, b) => a.turn_id.localeCompare(b.turn_id)) : [];
     if (JSON.stringify(old) === JSON.stringify(next)) {
       db.query("DELETE FROM response_time_queue WHERE provider=? AND owner=? AND path=?").run(provider, owner, path);
@@ -50,12 +55,12 @@ export function replaceFirstTokenFile(db: Database, provider: string, owner: str
     }
     const ids = new Set([...old, ...next].map(t => t.turn_id));
     db.query("DELETE FROM response_time_copies WHERE provider=? AND owner=? AND path=?").run(provider, owner, path);
-    const insert = db.query("INSERT INTO response_time_copies VALUES (?,?,?,?,?,?,?,?,?,?)");
-    for (const row of next) insert.run(provider, owner, path, row.turn_id, row.source, row.model, row.ts, row.ms, row.billing, row.reason);
+    const insert = db.query("INSERT INTO response_time_copies(provider,owner,path,turn_id,source,model,ts,ms,billing,reason,service_tier,effort,mode_known) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    for (const row of next) insert.run(provider, owner, path, row.turn_id, row.source, row.model, row.ts, row.ms, row.billing, row.reason, row.service_tier, row.effort, row.mode_known);
     for (const id of ids) {
       const previous = db.query("SELECT * FROM response_time_turns WHERE provider=? AND turn_id=?").get(provider, id) as StoredTurn | null;
       // Ordering must not make SQLite scan every turn of a provider to find one identity.
-      const copies = db.query("SELECT provider,turn_id,source,model,ts,ms,billing,reason FROM response_time_copies INDEXED BY response_time_copies_turn WHERE provider=? AND turn_id=? ORDER BY owner,path")
+      const copies = db.query(`SELECT ${TURN_COLUMNS} FROM response_time_copies INDEXED BY response_time_copies_turn WHERE provider=? AND turn_id=? ORDER BY owner,path`)
         .all(provider, id) as StoredTurn[];
       let canonical: StoredTurn | null = copies[0] ? { ...copies[0] } : null;
       if (canonical) {
@@ -64,13 +69,18 @@ export function replaceFirstTokenFile(db: Database, provider: string, owner: str
         if (dimensions.size > 1) canonical = { ...canonical, source: null, model: null, ms: null, reason: "conflicting_identity" };
         else if (measured.size > 1 || copies.some(t => t.reason?.startsWith("conflicting"))) canonical = { ...canonical, ms: null, reason: "conflicting_measurement" };
         else if (measured.size === 1) canonical = { ...canonical, ms: [...measured][0]!, reason: null };
+        const known = copies.filter(t => t.mode_known === 1);
+        const modes = new Set(known.map(t => JSON.stringify([t.service_tier, t.effort])));
+        if (modes.size > 1) canonical = { ...canonical, service_tier: null, effort: null, mode_known: 2 };
+        else if (known[0]) canonical = { ...canonical, service_tier: known[0].service_tier, effort: known[0].effort, mode_known: 1 };
       }
-      if (JSON.stringify(previous) === JSON.stringify(canonical)) continue;
+      if (JSON.stringify(previous && TURN_COLUMNS.split(",").map(c => previous[c as keyof StoredTurn])) ===
+        JSON.stringify(canonical && TURN_COLUMNS.split(",").map(c => canonical[c as keyof StoredTurn]))) continue;
       contribution(db, previous, -1);
       db.query("DELETE FROM response_time_turns WHERE provider=? AND turn_id=?").run(provider, id);
       if (canonical) {
         const t = canonical;
-        db.query("INSERT INTO response_time_turns VALUES (?,?,?,?,?,?,?,?)").run(t.provider, t.turn_id, t.source, t.model, t.ts, t.ms, t.billing, t.reason);
+        db.query(`INSERT INTO response_time_turns(${TURN_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(t.provider, t.turn_id, t.source, t.model, t.ts, t.ms, t.billing, t.reason, t.service_tier, t.effort, t.mode_known);
         contribution(db, canonical, 1);
       }
     }

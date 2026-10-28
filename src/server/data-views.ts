@@ -74,8 +74,8 @@ export const DATA_VIEWS:Readonly<Record<string,DataView>> = {
   "/api/leverage":rows({...current(apiHandleLeverage),sources:["events","claude_events","account_periods"]}),
   "/api/account-history":rows(historical(apiHandleAccountHistory)),
   "/api/activity":rows(historical(apiHandleActivity)),
-  // Output speed per model of one Claude subscription: the ledger's timed hour sums (model-speed.ts).
-  "/api/model-speed":rows({...historical(apiHandleModelSpeed),sources:[...facts,...identity,"response_time_hours"]}),
+  // Canonical timing hours and TTFT histograms, separated by model and execution settings.
+  "/api/model-speed":rows({...historical(apiHandleModelSpeed),sources:[...facts,...identity,"response_time_hours","model_speed_hours"]}),
   "/api/projects":rows(historical(apiHandleProjects)),
   "/api/projects/rows":rows(historical(apiHandleProjectsRows)),
   "/api/projects/unassigned":rows(historical(apiHandleProjectsRows)),
@@ -170,6 +170,7 @@ export const DIRECT_DATA_ROUTES:Readonly<Record<string,string>>={
   "/api/subscription-accounting":"stored rows (register days, limit windows, window usage); a window screen (window-screens.ts)",
   "/api/global-usage":"stored rows (register days of both ledgers); no report preparation",
   "/api/events":"bounded, paginated source detail",
+  "/api/conversation-course":"bounded conversation detail from stored ledger facts; no historical report preparation",
   "/api/bootstrap":"current projection snapshot",
   "/api/revisions":"small revision metadata",
   "/api/account-state":"latest provider readings and explicit probe action",

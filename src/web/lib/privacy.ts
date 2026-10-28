@@ -32,28 +32,33 @@ export class IdentityMask {
   }
   learn(value: unknown, context = ""): void {
     if (Array.isArray(value)) { for (const row of value) this.learn(row, context); return; }
+    if (typeof value === "string" && /^(projects|repos|subjects|repositories)$/.test(context)) { this.add(value); return; }
     if (!value || typeof value !== "object") return;
     const row = value as Record<string, unknown>;
     const account = "login" in row || "vendor_account" in row || "declared_account" in row || ("id" in row && "vendor" in row && /account|subscription/.test(context));
     const project = /^(projects|repos|subjects|repositories)$/.test(context) || row.kind === "project" || row.kind === "repo" || "matches" in row;
     if (account) this.add(row.id);
-    if (project) { this.add(row.id); this.add(row.name); }
+    if (project) { this.add(row.id); this.add(row.name); this.add(row.group); }
     if (context === "sources" && typeof row.name === "string" && /[\\/]/.test(row.name)) this.add(row.name.split(/[\\/]/).at(-1));
+    if (typeof row.archiveDir === "string") this.add(row.archiveDir.split(/[\\/]/).at(-1));
     for (const [key, item] of Object.entries(row)) {
       if (/^(account|account_id|subscription|subscription_id|vendor_account|declared_account|email|login|username|user_name|account_name)$/i.test(key)) this.add(item);
       if (/^(machine|machine_id|sourceMachine|hostname|host|store)$/i.test(key)) this.add(item);
       if (/^(project|project_id|project_name|repo|repo_id|repository)$/i.test(key)) this.add(item);
-      if (/^(cwd|path|home|file|root|sourceArchiveRoot|databasePath|manifestPath)$/i.test(key)) this.add(item);
+      if (/^(cwd|path|home|file|root|archiveDir|sourceArchiveRoot|databasePath|manifestPath)$/i.test(key)) this.add(item);
       this.learn(item, key);
     }
   }
   text(value: string): string {
     if (this.dirty) {
-      const known = [...this.entries.keys()].sort((a, b) => b.length - a.length).map(raw => raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+      const escape = (raw: string) => raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const entries = [...this.entries.keys()].filter(raw => !/^\d+(?:[.,]\d+)?$/.test(raw)).sort((a, b) => b.length - a.length);
+      const known = entries.filter(raw => raw.length > 2).map(escape).join("|");
+      const short = entries.filter(raw => raw.length <= 2).map(escape).join("|");
       const email = "[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9-]+(?:\\.[A-Z0-9-]+)+";
       const path = "(?:[A-Z]:[\\\\/]|\\\\\\\\)[^\\s<>\"|]+|/(?:Users|home|mnt|Volumes)/[^\\s<>\"|]+";
       const uuid = "\\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\b";
-      this.pattern = new RegExp(`${email}|${path}|${uuid}${known ? `|(?<![\\p{L}\\p{N}_])(?:${known})(?![\\p{L}\\p{N}_])` : ""}`, "giu");
+      this.pattern = new RegExp(`${email}|${path}|${uuid}${known ? `|(?<![\\p{L}\\p{N}_.-])(?:${known})(?![\\p{L}\\p{N}_.-])` : ""}${short ? `|^(?:${short})$` : ""}`, "giu");
       this.dirty = false;
     }
     return value.replace(this.pattern!, "");

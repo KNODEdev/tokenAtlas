@@ -63,7 +63,7 @@ test("an exception view is computed off the HTTP thread, kept in memory by data 
   const sqlite=new Database(file);sqlite.exec("PRAGMA journal_mode=WAL");
   const ctx={sqlite,dbPath:file,accounts: { version: 2, subscriptions: [], sources: [] },homeToSubId:new Map(),subIdToHomes:new Map(),eras:buildEraIndex([]),eraErrors:[],homeConflict:null,
     rateCards:{version:2,currency:"USD",unit:"per 1M",vendors:{}},claudeGauge:{},grokGauge:{},cycles:{},plans:{},plansCatalog:{provider_groups:[]},rootDir:process.cwd(),attribution:null} as AppContext;
-  const reader=createDataRead(),url="http://local/api/account-history?group=day";
+  const reader=createDataRead(),url="http://127.0.0.1/api/account-history?group=day";
   prepareCodexLedgerFixture(sqlite,ctx.rateCards);
   prepareProbeReaderFixture(sqlite,[]);
   /** Rows of every table: serving a view writes none of them. */
@@ -96,12 +96,12 @@ test("an exception view is computed off the HTTP thread, kept in memory by data 
     expect(changed.headers.get("X-Data-Version")).not.toBe(first.headers.get("X-Data-Version"));
     const fetch=createFetchHandler(ctx);
     try {
-      expect(await (await fetch(new Request("http://local/api/analysis/rebuild"))).json()).toEqual({job:null});
-      expect((await fetch(new Request("http://local/api/analysis/rebuild",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({scope:"invalid"})}))).status).toBe(400);
-      const rebuild=await fetch(new Request("http://local/api/analysis/rebuild",{method:"POST",headers:{"content-type":"application/json"}}));
+      expect(await (await fetch(new Request("http://127.0.0.1/api/analysis/rebuild"))).json()).toEqual({job:null});
+      expect((await fetch(new Request("http://127.0.0.1/api/analysis/rebuild",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({scope:"invalid"})}))).status).toBe(400);
+      const rebuild=await fetch(new Request("http://127.0.0.1/api/analysis/rebuild",{method:"POST",headers:{"content-type":"application/json"}}));
       expect(rebuild.status).toBe(200);expect(await rebuild.json()).toMatchObject({ok:true,generation:1,job:{scope:"all",state:"queued"}});
     } finally {await ctx.analysisReader?.close();}
-  }finally{await reader.close();await reader.whenIdle();sqlite.close();fs.rmSync(dir,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
+  }finally{await reader.close();await reader.whenIdle();sqlite.close();fs.rmSync(dir,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 },30000);
 
 test("every API route is registered or declares why it bypasses report preparation",()=>{

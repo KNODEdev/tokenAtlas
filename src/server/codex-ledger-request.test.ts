@@ -75,9 +75,9 @@ async function regression() {
   publish();
   fs.writeFileSync(path.join(process.env.TOKENATLAS_CONFIG!, "rate-cards.json"), JSON.stringify(card));
   const fetch = createFetchHandler(ctx), reader = createDataRead();
-  const april = new URL("http://test/api/summary?vendor=codex&since=2026-04-01&until=2026-04-30");
-  const august = new URL("http://test/api/summary?vendor=codex&since=2026-08-01&until=2026-08-31");
-  const claude = new URL("http://test/api/summary?vendor=claude&since=2026-08-01&until=2026-08-31");
+  const april = new URL("http://127.0.0.1/api/summary?vendor=codex&since=2026-04-01&until=2026-04-30");
+  const august = new URL("http://127.0.0.1/api/summary?vendor=codex&since=2026-08-01&until=2026-08-31");
+  const claude = new URL("http://127.0.0.1/api/summary?vendor=claude&since=2026-08-01&until=2026-08-31");
   const request = (url: URL) => fetch(new Request(url));
   let assertions = 0;
   const eq = (actual: unknown, expected: unknown) => { assertions++; assert.deepEqual(actual, expected); };
@@ -93,7 +93,7 @@ async function regression() {
     const saved = (await buildDataView(ctx, april)).body; eq((await buildDataView(ctx, april)).status, 200);
     const aprilBody = async () => (await buildDataView(ctx, april)).body;
     const aprilStamp = codexLedgerRequestStamp(ctx, april), augustStamp = codexLedgerRequestStamp(ctx, august);
-    const missing = new URL("http://test/api/missing-rates");
+    const missing = new URL("http://127.0.0.1/api/missing-rates");
     eq(codexLedgerRequestRanges(ctx, missing), [{ dependencyProjects: false }]);
     eq((await request(missing)).status, 200);
     const invalidQueries = ["/api/events?vendor=codex&order=bad",
@@ -101,7 +101,7 @@ async function regression() {
       "/api/events?vendor=codex&account=missing&since=bad",
       "/api/cycle-breakdown?account=missing&since_ts=2026-04-01T00:00:00Z&until_ts=2026-04-30T00:00:00Z"];
     const invalidBodies: unknown[] = [];
-    for (const query of invalidQueries) { const response = await request(new URL("http://test" + query)); eq(response.status, 400); invalidBodies.push(await response.json()); }
+    for (const query of invalidQueries) { const response = await request(new URL("http://127.0.0.1" + query)); eq(response.status, 400); invalidBodies.push(await response.json()); }
     // Work is queued without a raw row, configuration or broad revision change.
     db.exec("INSERT INTO usage_ledger_dirty(provider,kind,value) VALUES('codex','rules','{\"model\":\"known\",\"basis\":\"api_equivalent_usd\",\"fromDay\":\"2026-08-01\",\"untilDay\":\"2026-08-31\",\"inputAbove\":null,\"inputUntil\":null,\"after\":-1}')");
     eq((await request(august)).status, 202);
@@ -110,14 +110,14 @@ async function regression() {
     eq(await aprilBody(), saved); eq((await reader(ctx, new Request(august))).status, 202);
     eq(db.query("SELECT * FROM sync_revisions").all(), revisions); eq(db.query("SELECT * FROM events ORDER BY id").all(), raw);
     for (let i = 0; i < invalidQueries.length; i++) {
-      const response = await request(new URL("http://test" + invalidQueries[i])); eq(response.status, 400); eq(await response.json(), invalidBodies[i]);
+      const response = await request(new URL("http://127.0.0.1" + invalidQueries[i])); eq(response.status, 400); eq(await response.json(), invalidBodies[i]);
     }
-    const coldEvents = await request(new URL("http://test/api/events?vendor=codex&since=2026-04-01&until=2026-04-30"));
+    const coldEvents = await request(new URL("http://127.0.0.1/api/events?vendor=codex&since=2026-04-01&until=2026-04-30"));
     eq(coldEvents.status, 200); eq((await coldEvents.json()).rows.length, 1);
-    const aprilHistory = new URL("http://test/api/account-history?since=2026-04-01&until=2026-04-30");
+    const aprilHistory = new URL("http://127.0.0.1/api/account-history?since=2026-04-01&until=2026-04-30");
     const coldHistory = await request(aprilHistory); eq(coldHistory.status,200); eq((await coldHistory.json()).totals.calls,1);
-    eq((await request(new URL("http://test/api/account-history?since=2026-08-01&until=2026-08-31"))).status,202);
-    const cycleUrl = new URL("http://test/api/cycle-breakdown?account=owner&since_ts=2026-04-01T00:00:00Z&until_ts=2026-04-30T00:00:00Z");
+    eq((await request(new URL("http://127.0.0.1/api/account-history?since=2026-08-01&until=2026-08-31"))).status,202);
+    const cycleUrl = new URL("http://127.0.0.1/api/cycle-breakdown?account=owner&since_ts=2026-04-01T00:00:00Z&until_ts=2026-04-30T00:00:00Z");
     eq(handleCycleBreakdown(ctx,cycleUrl).status,200);
     const coldCycle = await request(cycleUrl);
     eq(coldCycle.status, 200);
@@ -127,9 +127,9 @@ async function regression() {
     const aprilBaseBefore = db.query("SELECT * FROM codex_price_ledger_events WHERE day='2026-04-01'").all();
     const rosterContext = { ...ctx, accounts: { ...ctx.accounts, subscriptions: [{ id: "owner", vendor: "codex" }, { id: "claude-owner", vendor: "claude" }] } };
     // The roster and the window rail read stored window rows, never the Codex ledger.
-    eq(codexLedgerRequestRanges(rosterContext, new URL("http://test/api/roster?account=claude-owner&window=7&since=ignored")).length, 0);
-    eq(codexLedgerRequestRanges(rosterContext, new URL("http://test/api/windows")).length, 0);
-    eq(codexLedgerRequestRanges(rosterContext, new URL("http://test/api/plan-capacity?provider=claude&plan_id=x&window_kind=weekly")).length, 0);
+    eq(codexLedgerRequestRanges(rosterContext, new URL("http://127.0.0.1/api/roster?account=claude-owner&window=7&since=ignored")).length, 0);
+    eq(codexLedgerRequestRanges(rosterContext, new URL("http://127.0.0.1/api/windows")).length, 0);
+    eq(codexLedgerRequestRanges(rosterContext, new URL("http://127.0.0.1/api/plan-capacity?provider=claude&plan_id=x&window_kind=weekly")).length, 0);
     db.exec("DELETE FROM usage_ledger_dirty WHERE provider='codex' AND kind='rules' AND value='{\"model\":\"known\",\"basis\":\"api_equivalent_usd\",\"fromDay\":\"2026-08-01\",\"untilDay\":\"2026-08-31\",\"inputAbove\":null,\"inputUntil\":null,\"after\":-1}'");
     const originalRead = nativeAdapters.readCodexLedgerOwnedSeries;
     const bodyRace = spyOn(nativeAdapters,"readCodexLedgerOwnedSeries").mockImplementation((...args)=> {
@@ -162,9 +162,9 @@ async function regression() {
       const response = await request(new URL(april.toString() + "&final_stamp=race")); eq(response.status, 202);
       eq(stampCalls, 2); eq(db.query("SELECT COUNT(*) n FROM usage_ledger_dirty WHERE provider='codex' AND kind='rules' AND value='{\"model\":\"known\",\"basis\":\"api_equivalent_usd\",\"fromDay\":\"2026-04-01\",\"untilDay\":\"2026-05-01\",\"inputAbove\":null,\"inputUntil\":null,\"after\":-1}'").get(), { n: 1 });
     } finally { finalPublicationRace.mockRestore(); db.exec("DELETE FROM usage_ledger_dirty WHERE provider='codex' AND kind='rules' AND value='{\"model\":\"known\",\"basis\":\"api_equivalent_usd\",\"fromDay\":\"2026-04-01\",\"untilDay\":\"2026-05-01\",\"inputAbove\":null,\"inputUntil\":null,\"after\":-1}'"); }
-    const project = new URL("http://test/api/project-cost?since=2026-08-01&until=2026-08-31");
+    const project = new URL("http://127.0.0.1/api/project-cost?since=2026-08-01&until=2026-08-31");
     eq(codexLedgerRequestRanges(ctx, project), [{ fromMs: Date.parse("2026-07-25"), toMs: Date.parse("2026-09-08") }]);
-    eq(codexLedgerRequestRanges(ctx, new URL("http://test/api/project-cost")), [{}]);
+    eq(codexLedgerRequestRanges(ctx, new URL("http://127.0.0.1/api/project-cost")), [{}]);
     const projectBody = { fixture: "accepted project report" }, frozenClock = spyOn(Date, "now").mockReturnValue(Date.now());
     try {
       const cache = ctx.responseCache!;
@@ -177,7 +177,7 @@ async function regression() {
       db.exec("DELETE FROM usage_ledger_dirty WHERE provider='codex' AND kind='rules' AND value='{\"model\":\"known\",\"basis\":\"chatgpt_credits\",\"fromDay\":\"2026-07-27\",\"untilDay\":\"2026-07-28\",\"inputAbove\":null,\"inputUntil\":null,\"after\":-1}'");
     } finally { frozenClock.mockRestore(); }
     const base = structuredClone(codexLedgerSettings(ctx.rateCards).policy.base_rules.find(rule => rule.id === "api")!);
-    const edit = await fetch(new Request("http://test/api/codex-ledger-settings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+    const edit = await fetch(new Request("http://127.0.0.1/api/codex-ledger-settings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
       expected_revision: codexLedgerSettings(ctx.rateCards).revision, origin: "user", operations: [{ kind: "overlay_base_rule", replace_id: "api",
         rule: { ...base, id: "api-august", valid_from: "2026-08-01", valid_until: "2026-09-01", rates: { ...base.rates, in_uncached: "3" } } }],
     }) }));
@@ -193,18 +193,18 @@ async function regression() {
     eq(db.query("SELECT * FROM codex_price_ledger_events WHERE day='2026-04-01'").all(), aprilBaseBefore);
     eq((await reader(ctx, new Request(august))).status, 202);
     eq((await buildDataView(ctx, august)).status, 202);
-    const compare = new URL("http://test/api/compare?vendor=codex&a_since=2026-04-01&a_until=2026-04-30&b_since=2026-10-01&b_until=2026-10-31");
+    const compare = new URL("http://127.0.0.1/api/compare?vendor=codex&a_since=2026-04-01&a_until=2026-04-30&b_since=2026-10-01&b_until=2026-10-31");
     eq(codexLedgerRequestRanges(ctx, compare).length, 2); ok(codexLedgerRequestStamp(ctx, compare), "comparison excludes the pending August gap");
     eq((await request(compare)).status, 200);
-    const emptyA = new URL("http://test/api/compare?vendor=codex&a_since=2026-04-30&a_until=2026-04-01&b_since=2026-08-01&b_until=2026-08-31");
+    const emptyA = new URL("http://127.0.0.1/api/compare?vendor=codex&a_since=2026-04-30&a_until=2026-04-01&b_since=2026-08-01&b_until=2026-08-31");
     eq(codexLedgerRequestRanges(ctx, emptyA).length, 1); eq((await request(emptyA)).status, 202);
     for (const query of ["since=broken", "group=bad", "vendor=all"]) {
-      eq((await request(new URL("http://test/api/summary?" + query))).status, 400);
+      eq((await request(new URL("http://127.0.0.1/api/summary?" + query))).status, 400);
     }
     for (const route of ["/api/breakdown?dim=bad", "/api/codex-accounting?window_minutes=7", "/api/subscription-accounting?provider=bad&since=broken"]) {
-      eq((await request(new URL("http://test" + route))).status, 400);
+      eq((await request(new URL("http://127.0.0.1" + route))).status, 400);
     }
-    const filtered = new URL("http://test/api/global-usage?vendors=claude&since=2026-08-01&until=2026-08-31");
+    const filtered = new URL("http://127.0.0.1/api/global-usage?vendors=claude&since=2026-08-01&until=2026-08-31");
     eq(codexLedgerRequestStamp(ctx, filtered), null);
     eq(ratesWithoutAuthoritativeCodexPolicy({ ...ctx.rateCards, vendors: { openai: { models: { other: { in_uncached: 7, in_cache_read: 1, out_total: 8 } } } } }).vendors.openai!.models!.other!.in_uncached, 7);
     publish();
@@ -254,7 +254,7 @@ async function regression() {
           ["/api/cycle-breakdown?account=owner&since_ts=2026-04-01T00:00:00Z&until_ts=2026-04-30T00:00:00Z", (body: any) => body.days.reduce((sum: number, day: { usd: number }) => sum + day.usd, 0)],
           ["/api/cycle-breakdown?account=owner&since_ts=2026-04-01T00:00:00Z&until_ts=2026-04-30T00:00:00Z&numeric_total=1", (body: any) => body.totals.usd],
         ] as const) {
-          const report = await numericFetch(new Request("http://test" + route)); eq(report.status, 200);
+          const report = await numericFetch(new Request("http://127.0.0.1" + route)); eq(report.status, 200);
           eq(select(await report.json()), second && route.includes("cycle-breakdown") && !route.includes("numeric_total") ? 0 : required);
         }
         if (legacy) {
@@ -264,10 +264,10 @@ async function regression() {
           numericCard.vendors.anthropic = { models: { "claude-known": { in_uncached: 1, in_cache_read: 0.5, in_cache_write_5m: 1, in_cache_write_1h: 1, out_total: 2 } } };
           // Claude's day sums and valuations come from the shared usage ledger, as the maintenance worker fills it.
           installFactDayRevisions(numericDb); fillUsageLedgerFixture(numericDb, numericCard, ["claude"]);
-          const mixed = await numericFetch(new Request("http://test/api/summary?vendor=both&since=2026-04-01&until=2026-04-30")); eq(mixed.status, 200);
+          const mixed = await numericFetch(new Request("http://127.0.0.1/api/summary?vendor=both&since=2026-04-01&until=2026-04-30")); eq(mixed.status, 200);
           const mixedBody = await mixed.json(); eq(mixedBody.totals.usd, 0.01); eq(mixedBody.totals.codex.usd, 0); eq(mixedBody.totals.claude.usd, 0);
           eq(mixedBody.totals.claude.calls, 1); eq(mixedBody.buckets.map((bucket: { usd: number }) => bucket.usd), [0, 0]);
-          const legacyOnly = await numericFetch(new Request("http://test/api/summary?vendor=claude&since=2026-04-01&until=2026-04-30")); eq(legacyOnly.status, 200);
+          const legacyOnly = await numericFetch(new Request("http://127.0.0.1/api/summary?vendor=claude&since=2026-04-01&until=2026-04-30")); eq(legacyOnly.status, 200);
           eq((await legacyOnly.json()).totals.claude, { calls: 1, usd: 0 });
         }
         return { actual: summary.totals.codex.usd, required, nano: String(amount.n * 1000000000n / amount.d) };

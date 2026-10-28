@@ -14,6 +14,7 @@ export type ScreenId =
   | "patterns"
   | "models"
   | "model-traffic"
+  | "model-cost"
   | "speed"
   | "events"
   | "projects"
@@ -95,6 +96,7 @@ export const SCREEN_TITLES: Record<ScreenId, string> = {
   patterns: "Analytics · Patterns",
   models: "Models",
   "model-traffic": "Model traffic history",
+  "model-cost": "Model cost per 1M tokens",
   speed: "Speed",
   events: "Usage events",
   projects: "Projects",
@@ -121,6 +123,7 @@ export const SCREEN_TITLES_PL: Record<ScreenId, string> = {
   patterns: "Analityka · Wzorce",
   models: "Modele",
   "model-traffic": "Historia ruchu modeli",
+  "model-cost": "Koszt modeli za 1M tokenów",
   speed: "Prędkość",
   events: "Zdarzenia użycia",
   projects: "Projekty",
@@ -175,6 +178,7 @@ export const NAVIGATION: readonly NavSection[] = [
     // "models" keeps every existing target (events, data settings) on the per-model table.
     tab("sources", "Models & sources", "Modele i źródła", [view("models", "Models & sources", "Modele i źródła")]),
     tab("traffic", "Traffic history", "Historia ruchu", [view("model-traffic", "Traffic history", "Historia ruchu")]),
+    tab("cost", "Cost per 1M", "Koszt / 1M", [view("model-cost", "Cost per 1M", "Koszt / 1M")]),
   ] },
   { id: "data", label: { en: "Data and sync", pl: "Dane i synchronizacja" }, icon: "⌸", system: true, tabs: [
     tab("sources", "Source status", "Stan źródeł", [view("sources", "Source status", "Stan źródeł")]),
@@ -217,7 +221,8 @@ export function screenTitle(screen: ScreenId, language: Language): string {
 }
 /**
  * Old all-account targets of window screens keep their meaning in the new menu (02, "Zgodność starych celów"):
- * calendar history and pace go to Usage, the account comparison and model ranking to Structure, the heatmap to Activity.
+ * calendar history and pace go to Usage, account comparison to Structure, the heatmap to Activity.
+ * Models and traffic now share their subscription views with the All aggregate.
  */
 export function allAccountsTarget(screen: ScreenId): ScreenId {
   switch (screen) {
@@ -225,8 +230,6 @@ export function allAccountsTarget(screen: ScreenId): ScreenId {
     case "analytics": return "usage-pace";
     case "compare": return "structure";
     case "patterns": return "activity";
-    case "models": return "structure-models";
-    case "model-traffic": return "usage-history";
     default: return screen;
   }
 }

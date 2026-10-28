@@ -26,4 +26,5 @@ The private measurement/migration scripts and the private-history compatibility
 test listed in the preparation report are omitted intentionally. Private account
 examples were replaced by synthetic values; the originals were not modified.
 
-The initial Windows parser release uses tag `parser-019adcdfd689`.
+The current Windows parser release is identified by `native/tokenatlas-parse/release.json`.
+The manifest records the public release tag, source hash and binary SHA-256 together.

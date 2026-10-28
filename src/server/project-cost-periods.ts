@@ -15,7 +15,7 @@ import { ledgerPresentationNumber } from "../db/codex-ledger-adapters";
 import { add as addRational, rational, type Rational } from "../db/price-ledger-exact";
 
 export interface PeriodTraffic { tokens: number; calls: number; api_usd: number }
-export interface PlanPeriodUsage { groups: Map<string, PeriodTraffic>; incomplete: boolean }
+export interface PlanPeriodUsage { groups: Map<string, PeriodTraffic>; incomplete: boolean; rows?: readonly PeriodUsageRow[] }
 export interface PeriodUsageRow {
   subject: string; day: string; tokens: number; calls: number; amount: string | Rational; incomplete: boolean;
 }
@@ -53,7 +53,7 @@ function readPlanPeriodRows(db: Database, rates: RateCard, resolver: AccountReso
   return result;
 }
 
-function sumPeriodRows(rows: readonly PeriodUsageRow[]): PlanPeriodUsage {
+export function sumPlanPeriodRows(rows: readonly PeriodUsageRow[]): PlanPeriodUsage {
   const groups = new Map<string, PeriodTraffic>(), money = new Map<string, DecimalSum>(), codexMoney = new Map<string, Rational>();
   let incomplete = false;
   for (const row of rows) {
@@ -67,12 +67,12 @@ function sumPeriodRows(rows: readonly PeriodUsageRow[]): PlanPeriodUsage {
   }
   for (const [key, value] of groups) value.api_usd = codexMoney.has(key)
     ? ledgerPresentationNumber(codexMoney.get(key)!) : Number(money.get(key)!.toString());
-  return { groups, incomplete };
+  return { groups, incomplete, rows };
 }
 
 export function readPlanPeriodUsage(db: Database, rates: RateCard, resolver: AccountResolver,
   account: { id: string; vendor: string }, stretch: PlanPriceStretch): PlanPeriodUsage {
-  return sumPeriodRows(readPlanPeriodRows(db, rates, resolver, account, stretch));
+  return sumPlanPeriodRows(readPlanPeriodRows(db, rates, resolver, account, stretch));
 }
 
 /** Read the account once; refine only source days whose stored row straddles a plan boundary. */
@@ -103,7 +103,7 @@ export function readPlanPeriodsUsage(db: Database, rates: RateCard, resolver: Ac
     }
     for (const range of ranges) selected.push(...readPlanPeriodRows(db, rates, resolver, account, range)
       .filter(row => refine.has(JSON.stringify([row.day, row.subject]))));
-    return sumPeriodRows(selected);
+    return sumPlanPeriodRows(selected);
   });
 }
 

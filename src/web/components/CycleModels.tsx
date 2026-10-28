@@ -4,6 +4,7 @@ import { useAsync } from "../lib/useAsync";
 import { TableRow, Bar, Card, CardTitle, EmptyState, LoadingCard, Table, Td, Th } from "./ui";
 import { compact, full, pct, usd } from "../lib/format";
 import { useI18n } from "../lib/i18n";
+import { modelColors } from "../lib/model-colors";
 const UNKNOWN = "?";
 export interface CycleModelsProps {
   account: string;
@@ -43,7 +44,9 @@ export function CycleModels({ account, sinceIso, untilIso, projectId, cycleLabel
             { name: `${t("other", "pozostałe")} (${tail.length})`, vendor: tail[0]!.vendor, tokens: 0, usd: 0, calls: 0 } as BreakdownRow
           )
         : null;
-    return { head, rest, totals, count: sorted.length };
+    // The subscription's vendor covers unprefixed names; its models take its shades, largest first.
+    const colors = modelColors(head.map(row => row.name === UNKNOWN ? null : row.name), head[0]?.vendor ?? undefined);
+    return { head, rest, totals, count: sorted.length, colors };
   }, [language, limit, state.data, t]);
   if (state.loading && !state.data) return <LoadingCard label={t("Loading model breakdown...", "Wczytywanie podziału na modele...")} height={200} shape="table" />;
   if (state.error) {
@@ -105,8 +108,8 @@ export function CycleModels({ account, sinceIso, untilIso, projectId, cycleLabel
             </TableRow>
           </thead>
           <tbody>
-            {view.head.map((r) => (
-              <ModelRow key={r.name} row={r} max={max} total={view.totals.tokens} />
+            {view.head.map((r, index) => (
+              <ModelRow key={r.name} row={r} max={max} total={view.totals.tokens} color={view.colors[index]} />
             ))}
             {view.rest && <ModelRow key="__rest" row={view.rest} max={max} total={view.totals.tokens} muted />}
             <TableRow>
@@ -143,11 +146,13 @@ function ModelRow({
   max,
   total,
   muted,
+  color = "var(--accent)",
 }: {
   row: BreakdownRow;
   max: number;
   total: number;
   muted?: boolean;
+  color?: string;
 }) {
   const { t } = useI18n();
   const share = total > 0 ? (row.tokens / total) * 100 : 0;
@@ -175,7 +180,7 @@ function ModelRow({
       <Td>
         <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 120 }}>
           <div style={{ flex: 1 }}>
-            <Bar value={width} height={6} color={muted ? "var(--faint)" : "var(--accent)"} />
+            <Bar value={width} height={6} color={muted ? "var(--faint)" : color} />
           </div>
           <span style={{ fontFamily: "var(--font-figure)", letterSpacing: "var(--ls-tight)", fontSize: "var(--fs-3)", color: "var(--muted)", width: 44, textAlign: "right" }}>
             {pct(share, 1)}

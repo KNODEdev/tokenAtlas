@@ -4,7 +4,8 @@ import { useAsync } from "../lib/useAsync";
 import { DataTable, TableRow, Card, CardTitle, Dropdown, ErrorState, GhostButton, LoadingCard, Pill } from "../components/ui";
 import { polishPlural } from "../lib/mixFormat";
 import { useI18n } from "../lib/i18n";
-import type { CloudSessionsResponse } from "../../shared/cloud-sessions";
+import { CloudSessionsHelp } from "../components/CloudSessionsHelp";
+import { cloudSessionProblems, useCloudSessions } from "../lib/cloud-sessions";
 export interface SetupRow extends SuggestedSubscription {
   editedId: string;
   include: boolean;
@@ -477,23 +478,20 @@ function TemporaryLocation({ root, disabled }: { root: string; disabled: boolean
 /** How often this computer reads Claude cloud sessions into its `-cloud` archive folders (0 turns it off). */
 function CloudSessionsInterval({ disabled }: { disabled: boolean }) {
   const { t, locale } = useI18n();
-  const [state, setState] = useState<CloudSessionsResponse | null>(null);
+  const read = useCloudSessions();
+  const state = read.data;
   const [minutes, setMinutes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    api.cloudSessions().then(setState).catch(failure => setError(failure instanceof Error ? failure.message : String(failure)));
-  }, []);
   const save = async () => {
     setBusy(true); setError(null);
-    try { setState(await api.saveCloudSessionsMinutes(Number(minutes))); setMinutes(""); }
+    try { await api.saveCloudSessionsMinutes(Number(minutes)); read.reload(); setMinutes(""); }
     catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); }
     finally { setBusy(false); }
   };
   const setting = state?.setting;
   const last = state?.status?.last;
-  const problems = [...(state?.status?.error ? [state.status.error] : []),
-    ...(last?.profiles.flatMap(profile => profile.errors.map(e => `${profile.archiveDir.split(/[\\/]/).pop()}: ${e}`)) ?? [])];
+  const problems = cloudSessionProblems(state);
   const valid = /^\d+$/.test(minutes.trim()) && Number(minutes) <= 1440;
   return <div style={{ marginTop: 14 }}>
     <Field label={t("Claude cloud sessions: check every (minutes)", "Sesje Claude w chmurze: sprawdzaj co (min)")}>
@@ -508,8 +506,10 @@ function CloudSessionsInterval({ disabled }: { disabled: boolean }) {
         onChange={event => setMinutes(event.target.value)} disabled={disabled || busy}
         placeholder={setting ? String(setting.minutes) : ""} className="ui-input" style={{ width: 120 }} />
       <GhostButton onClick={() => void save()} disabled={disabled || busy || !valid}>{t("Save interval", "Zapisz odstęp")}</GhostButton>
+      <CloudSessionsHelp problems={problems} />
     </Field>
-    {[...(error ? [error] : []), ...problems].map(problem =>
+    {!!problems.length && <div role="alert" className="is-warn">{t("Claude cloud history incomplete", "Niepełna historia Claude z chmury")}</div>}
+    {[...(error || read.error ? [error ?? read.error!] : [])].map(problem =>
       <div key={problem} role="alert" style={{ marginTop: 6, fontSize: "var(--fs-4)", color: "var(--warn)" }}>{problem}</div>)}
   </div>;
 }

@@ -15,7 +15,7 @@ import { loadAccountResolver } from "./account-resolver";
 import { storedHistoryUsage } from "./stored-history-usage";
 import { buildRepoHistory, type Breakdown, type Granularity } from "./repo-history";
 import { ACTIVITY_CUTOFF_MINUTES } from "../db/usage-ledger";
-import { oracleActivity, oracleGaps, type OracleFact } from "./activity-oracle";
+import { oracleActivity, oracleGaps, oracleIntervalUnion, type OracleFact } from "./activity-oracle";
 import { prepareClaudeReaderFixture } from "./subscription-reader.fixture";
 import type { RateCard } from "./pricing";
 
@@ -158,7 +158,7 @@ test("the oracle's rule on a hand-checked chain: cap, zero gap, no session, othe
 const bucketOf = (day: string, granularity: Granularity) => granularity === "month" ? day.slice(0, 7) : granularity === "day" ? day
   : new Date(Date.parse(`${day}T00:00:00.000Z`) - ((new Date(`${day}T00:00:00.000Z`).getUTCDay() + 6) % 7) * 86_400_000).toISOString().slice(0, 10);
 
-test("the project history's active seconds equal the oracle at every cutoff, granularity and breakdown", () => {
+test("project history preserves session sums and unions wall time at every cutoff, granularity and breakdown", () => {
   const { db, teardown } = fixture(9);
   try {
     const resolver = loadAccountResolver(db);
@@ -169,10 +169,28 @@ test("the project history's active seconds equal the oracle at every cutoff, gra
     for (const range of [{ since: "2026-09-10", until: "2026-09-16" }, { since: "2026-09-13", until: "2026-09-14" }])
       for (const cutoffMinutes of ACTIVITY_CUTOFF_MINUTES) {
         const oracle = oracleActivity("claude", facts, { cutoffMinutes, ownerOf, groupOf: fact => JSON.stringify([fact.subject, fact.model]), ...range });
+        const gaps = oracleGaps("claude", facts, ownerOf);
         for (const granularity of ["day", "week", "month"] as const) for (const by of ["none", "vendor", "model", "account"] as const) {
           const history = buildRepoHistory(db, { repo: null, projectId: "alpha", granularity, by: by as Breakdown, idleGapMinutes: cutoffMinutes, ...range,
-            rateCards: RATES, homeToSubId: new Map() });
+            rateCards: RATES, homeToSubId: new Map(), machineOf: () => "ORACLE-PC" });
           const buckets = new Map<string, number>(), splits = new Map<string, number>();
+          const intervals = new Map<string, Array<[number, number]>>();
+          const add = (key: string, a: number, b: number) => {
+            const spans = intervals.get(key) ?? []; spans.push([a, b]); intervals.set(key, spans);
+          };
+          for (const fact of facts) {
+            const gap = gaps.get(fact.id), account = ownerOf(fact);
+            if (!gap || !account || fact.subject !== "p:alpha" || gap.gapMs <= 0) continue;
+            const until = Math.min(Date.parse(fact.ts), Date.parse(range.until) + 86_400_000);
+            let start = Math.max(Date.parse(fact.ts) - Math.min(gap.gapMs, cutoffMinutes * 60_000), Date.parse(range.since));
+            while (start < until) {
+              const day = new Date(start).toISOString().slice(0, 10), end = Math.min(until, Date.parse(day) + 86_400_000);
+              const bucket = bucketOf(day, granularity);
+              add(bucket, start, end);
+              if (by !== "none") add(`${bucket}|${by === "vendor" ? "claude" : by === "model" ? `claude/${fact.model ?? "?"}` : account}`, start, end);
+              start = end;
+            }
+          }
           for (const [key, ms] of oracle) {
             const [day, account, group] = key.split(" ");
             const [subject, model] = JSON.parse(group!) as [string | null, string | null];
@@ -184,9 +202,11 @@ test("the project history's active seconds equal the oracle at every cutoff, gra
             splits.set(`${bucket}|${split}`, (splits.get(`${bucket}|${split}`) ?? 0) + ms / 1000);
           }
           for (const point of history.points) {
-            expect(Math.abs(point.active_seconds - (buckets.get(point.bucket) ?? 0))).toBeLessThan(1e-6);
+            const unionSeconds = (key: string) => oracleIntervalUnion(intervals.get(key) ?? []).reduce((sum, [a, b]) => sum + (b - a) / 1000, 0);
+            expect(Math.abs(point.session_seconds - (buckets.get(point.bucket) ?? 0))).toBeLessThan(1e-6);
+            expect(Math.abs(point.active_seconds - unionSeconds(point.bucket))).toBeLessThan(1e-6);
             for (const [key, value] of Object.entries(point.split ?? {}))
-              expect(Math.abs(value.active_seconds - (splits.get(`${point.bucket}|${key}`) ?? 0))).toBeLessThan(1e-6);
+              expect(Math.abs(value.active_seconds - unionSeconds(`${point.bucket}|${key}`))).toBeLessThan(1e-6);
             compared++;
           }
           expect([...buckets.keys()].filter(bucket => !history.points.some(point => point.bucket === bucket))).toEqual([]);

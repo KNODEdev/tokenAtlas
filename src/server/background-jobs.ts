@@ -39,6 +39,7 @@ import { ledgerProviderOf } from "./subscription-accounting-adapters";
 import { advanceCodexContextPrices } from "./codex-context-producer";
 import { advanceCodexContextDetails } from "./codex-context-model-producer";
 import { advanceFirstTokenTimes, type FirstTokenReader } from "./first-token-producer";
+import { advanceModelSpeeds } from "../db/model-speed-register";
 
 /**
  * The background writer's job queue (U2.1). Outside a sync run, every multi-row write to the
@@ -153,6 +154,11 @@ const JOBS: readonly BackgroundJob[] = [
     const prices = advanceAllUsagePrices(turn.db, turn.rates, turn.config.sources, codexPhysicalSourceHomes(turn.config.sources),
       { limit: 500, steps: 4, turnMs: turn.turnMs, canWrite: turn.canWrite });
     return !!(prices.codex?.progressed && prices.codex.executablePending || prices.othersPending);
+  } },
+  { scope: "model-speed-modes", run(turn) {
+    const status = advanceModelSpeeds(turn.db, { canWrite: turn.canWrite, budgetMs: Math.min(100, turn.turnMs || 100) });
+    turn.backlog.report("model-speed-modes", "events", "preparing model execution timings", "records", status.pending ? 1 : 0);
+    return status.processed > 0 && status.pending;
   } },
   { scope: "codex-context-prices", run(turn) {
     const context = advanceCodexContextPrices(turn.db, { canWrite: turn.canWrite });

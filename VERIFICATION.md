@@ -1,5 +1,34 @@
 # Initial source snapshot — 25 October 2026
 
+## Follow-up source audit — 27 October 2026
+
+The application repository is public and has independent history; the landing source
+and private development archive remain separate. Gitleaks 8.30.1 scanned all 16
+reachable commits and the reviewed working source. Its two findings were checked:
+a public OAuth client identifier and a stylesheet integrity hash, not access secrets.
+Tracked files and reachable path history contain no installation database, local
+account declarations, dependency cache, landing tree or GitHub Actions workflow.
+Commit author metadata and an old illustrative machine name remain identifying metadata.
+
+The source follow-up passes TypeScript checking, an isolated web build, 61 focused
+regression tests, 171 HTTP regression tests, 21 native-parser tests and 38 monitor tests. React Doctor 0.9.13
+reported no issues in its 44-file changed-source scope. Browser checks of synthetic
+data confirmed cloud-import warnings, English/Polish help drawers, recovery and
+unavailable states, modal focus restoration and the reported privacy regressions.
+
+A broader local run was stopped after 865 passes and 18 failures; it did not finish
+the full suite. Nine failures were also reproduced in an unmodified HEAD source
+copy, including stale architecture/transaction guards, legacy migration fixtures
+and a test requiring an absent historical Git object. This is not a full-suite or
+stable-release pass. The live UI was surveyed across eight navigation areas, but
+some views remained loading and provider authentication prevented complete coverage.
+
+These are source checks. They do not activate the updated server, billing rules or
+frontend in an existing installation. Claude cloud history still requires valid
+sign-in for the affected local profile; see [the cloud import guide](docs/claude-cloud.md).
+
+## Original snapshot checks
+
 This is an actively developed desktop application, not a declaration of a stable
 release. Verification was local on Windows with Bun 1.4.4, Cargo 1.99.0 and
 Python 3.14.6. GitHub Actions are not used.

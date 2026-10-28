@@ -27,7 +27,7 @@ test("every screen has exactly one place in the menu and old names stay searchab
 
 test("Models has separate page tabs for speed, the per-model table and traffic history", () => {
   const models = NAVIGATION.find(section => section.id === "models")!;
-  expect(models.tabs.map(tab => tab.label.pl)).toEqual(["Szybkość", "Modele i źródła", "Historia ruchu"]);
+  expect(models.tabs.map(tab => tab.label.pl)).toEqual(["Szybkość", "Modele i źródła", "Historia ruchu", "Koszt / 1M"]);
   // Existing targets of "models" (events, data settings) land on the per-model table.
   expect(navLocation("models").tab.label.en).toBe("Models & sources");
   expect(screenLabel("model-traffic", "pl")).toBe("Modele › Historia ruchu");
@@ -38,8 +38,8 @@ test("old window targets keep their meaning for all subscriptions (02, old targe
   expect(allAccountsTarget("analytics")).toBe("usage-pace");
   expect(allAccountsTarget("compare")).toBe("structure");
   expect(allAccountsTarget("patterns")).toBe("activity");
-  expect(allAccountsTarget("models")).toBe("structure-models");
-  expect(allAccountsTarget("model-traffic")).toBe("usage-history");
+  expect(allAccountsTarget("models")).toBe("models");
+  expect(allAccountsTarget("model-traffic")).toBe("model-traffic");
   expect(allAccountsTarget("capacity")).toBe("capacity");
   for (const screen of ["usage-history", "usage-pace", "structure", "activity", "structure-models"] as ScreenId[]) {
     expect(navLocation(screen).section.id).toBe("usage");

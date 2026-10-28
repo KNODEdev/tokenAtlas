@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test";
-import { Fragment } from "react";
+import { act, Fragment } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DataTable, TableRow, TableColGroup, TableGrid, TableGridRow } from "./DataTable";
-import { Table, Th, Td } from "./ui";
+import { HelpDot, Table, Th, Td } from "./ui";
+import { installTestDom, invoke, type TestNode } from "../lib/test-dom-harness";
 import { normalizeTableColumns, readTableColumns, saveTableColumns, tableColumnsKey } from "../lib/table-columns";
 
 const columns = [{ id: "when", label: "UTC" }, { id: "plan", label: "Plan" }, { id: "value", label: "Value" }];
@@ -94,7 +96,7 @@ test("keyed fragments containing repeated header declarations retain every colum
   </Fragment>)}</TableRow></thead><tbody><TableRow>{[1, 2, 3, 4, 5, 6].map(value => <Td key={value}>{value}</Td>)}</TableRow></tbody></Table>);
   expect((html.match(/<th /g) ?? []).length).toBe(6);
   expect((html.match(/<td /g) ?? []).length).toBe(6);
-  expect(html).toContain('>6</td>'); expect(html).toContain('>cache $</th>');
+  expect(html).toContain('>6</td>'); expect(html).toContain('>cache $<span');
 }));
 
 test("legacy grid tables project repeat/minmax tracks and custom button rows without changing their actions", () => storage(() => {
@@ -117,4 +119,42 @@ test("legacy grid CSS templates keep calc tracks intact", () => storage(() => {
   saveTableColumns("calc-grid", { order: ["column-1", "column-0"], hidden: [] });
   const html = renderToStaticMarkup(<TableGrid tableId="calc-grid"><TableGridRow header template="calc(var(--s-10) * 4) minmax(0, 1fr)"><span>Date</span><span>Amount</span></TableGridRow></TableGrid>);
   expect(html).toContain('grid-template-columns:minmax(0, 1fr) calc(var(--s-10) * 4)');
+}));
+
+test("header sorting uses raw numbers and keeps fragment details and totals attached", async () => {
+  const dom = installTestDom(), root = createRoot(dom.host as unknown as HTMLElement);
+  const nodes = (node: TestNode): TestNode[] => [node, ...node.children.flatMap(nodes)];
+  const bodyText = () => nodes(dom.host).find(node => node.tagName === "TBODY")!.textContent;
+  const html = <Table tableId="sortable-test"><thead><TableRow header><Th columnId="name">Name</Th>
+    <Th columnId="value">Value <HelpDot label="Exact value">Raw precision</HelpDot></Th></TableRow></thead><tbody>
+    {[{ name: "Small", value: 1000.01 }, { name: "Missing", value: null }, { name: "Large", value: 1000.02 }].map(row => <Fragment key={row.name}>
+      <TableRow><Td>{row.name}</Td><Td sortValue={row.value}>1k</Td></TableRow>
+      <TableRow><Td colSpan={2}>{row.name} details</Td></TableRow>
+    </Fragment>)}
+    </tbody><tfoot><TableRow><Td>Total</Td><Td>2k</Td></TableRow></tfoot></Table>;
+  try {
+    await act(async () => root.render(html));
+    const button = () => nodes(dom.host).find(node => node.className === "data-table-sort-button" && node.textContent.startsWith("Value"))!;
+    await invoke(button(), "onClick", { stopPropagation() {} });
+    expect(bodyText()).toBe("Large1kLarge detailsSmall1kSmall detailsMissing1kMissing details");
+    expect(nodes(dom.host).find(node => node.attributes["aria-sort"] === "descending")?.textContent).toContain("Value");
+    await invoke(button(), "onClick", { stopPropagation() {} });
+    expect(bodyText()).toBe("Small1kSmall detailsLarge1kLarge detailsMissing1kMissing details");
+    expect(nodes(dom.host).find(node => node.tagName === "TFOOT")!.textContent).toBe("Total2k");
+    const help = nodes(dom.host).find(node => node.attributes["aria-label"] === "Exact value")!;
+    expect(help.parentNode?.parentNode?.tagName).toBe("TH");
+    expect(help.parentNode?.parentNode?.attributes["aria-sort"]).toBe("ascending");
+  } finally { await act(async () => root.unmount()); dom.restore(); }
+});
+
+test("sorting retains the original column identity after the user reorders columns", () => storage(() => {
+  saveTableColumns("reordered-sort", { order: ["value", "name"], hidden: [] });
+  const html = renderToStaticMarkup(<Table tableId="reordered-sort" defaultSort={{ column: "value", direction: "desc" }}>
+    <thead><TableRow header><Th columnId="name">Name</Th><Th columnId="value">Value</Th></TableRow></thead><tbody>
+      <TableRow><Td>Small</Td><Td sortValue={10}>10</Td></TableRow><TableRow><Td>Large</Td><Td sortValue={20}>20</Td></TableRow>
+    </tbody></Table>);
+  const body = html.split("<tbody>")[1]!;
+  expect(body.indexOf(">20</td>")).toBeLessThan(body.indexOf(">Large</td>"));
+  expect(body.indexOf(">Large</td>")).toBeLessThan(body.indexOf(">Small</td>"));
+  expect(html).toContain('aria-sort="descending"');
 }));

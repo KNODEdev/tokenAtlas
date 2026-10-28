@@ -11,6 +11,8 @@ import { buildAccountResolver } from "./account-resolver";
 import { fillCodexLedgerFixture } from "./codex-ledger.fixture";
 import { modelSpeedSeries } from "./model-speed";
 import { readCodexOwnedTimedHours } from "./ledger-sums";
+import { MODEL_SPEED_SCHEMA, advanceModelSpeeds } from "../db/model-speed-register";
+import { readModeSpeedHours } from "./model-speed-read";
 
 const evidence = { verified_at: "2026-01-01", sources: ["https://example.test/prices"], confidence: "official" as const };
 function policy(): CodexLedgerPolicy {
@@ -30,7 +32,7 @@ const period = (value: string, from: string, until: string | null) => ({ provide
  * One archive source stored as `Codex/Main` (the periods name it `codex/main`), signed in to "main" until 10:30 and to
  * "later" from then on. Projects make several dimensions on both sides of the boundary; 12:00 is an hour nothing cuts.
  */
-function fixture(run: (db: Database, card: RateCard, resolver: ReturnType<typeof buildAccountResolver>) => void) {
+function fixture(run: (db: Database, card: RateCard, resolver: ReturnType<typeof buildAccountResolver>) => void, prepare?: (db: Database) => void) {
   const db = new Database(":memory:");
   const card: RateCard = { version: 2, currency: "USD", unit: "per 1M", vendors: {}, codex_ledger_policy: policy() };
   try {
@@ -42,6 +44,7 @@ function fixture(run: (db: Database, card: RateCard, resolver: ReturnType<typeof
         ('/archive','/archive/a.jsonl',3,'2026-04-01T10:40:00Z','model','standard','default',100,0,0,20,'a',2000),
         ('/archive','/archive/a.jsonl',4,'2026-04-01T10:45:00Z','model','standard','default',100,0,0,400,'c',4000),
         ('/archive','/archive/a.jsonl',5,'2026-04-01T12:00:00Z','model','standard','default',100,0,0,30,'a',3000);`);
+    prepare?.(db);
     createCodexLedgerSchema(db);
     ensureUsageLedgerSchema(db);
     const context = codexLedgerReadContext(card);
@@ -81,3 +84,22 @@ test("pending credit-price work does not block Codex speed, in hours a boundary 
   // Without the restriction the split hour's slices wait for the credit work: the test reaches that read.
   expect(() => readCodexOwnedTimedHours(db, resolver, "main")).toThrow("pending price dependencies");
 }));
+
+test("prepared Codex timings preserve speed and effort across exact ownership boundaries and raw corrections", () => fixture((db, _card, resolver) => {
+  db.exec(MODEL_SPEED_SCHEMA);
+  db.exec(`ALTER TABLE events ADD COLUMN effort TEXT;
+    UPDATE events SET effort=CASE WHEN source_offset IN (2,4) THEN 'ultra' WHEN source_offset<5 THEN 'high' END`);
+  const drain = () => { while (advanceModelSpeeds(db, { budgetMs: 10000, limit: 2 }).pending) {} };
+  const prices = db.query("SELECT id,api_whole,api_fraction_hi,api_fraction_lo FROM codex_price_ledger_events ORDER BY id").all();
+  drain();
+  const read = (account: string) => modelSpeedSeries(readModeSpeedHours(db, resolver, "codex", account).hours, "day")
+    .map(s => [s.speed, s.effort, s.total.calls, s.total.timed_out, s.total.timed_ms]).sort();
+  expect(read("main")).toEqual([["standard", "high", 1, 300, 1000], ["fast", "ultra", 1, 10, 500]].sort());
+  expect(read("later")).toEqual([["standard", "high", 1, 20, 2000], ["fast", "ultra", 1, 400, 4000], ["standard", null, 1, 30, 3000]].sort());
+  db.exec("UPDATE events SET effort='max' WHERE source_offset=2"); drain();
+  expect(read("main")).toEqual([["standard", "high", 1, 300, 1000], ["fast", "max", 1, 10, 500]].sort());
+  expect(db.query("SELECT id,api_whole,api_fraction_hi,api_fraction_lo FROM codex_price_ledger_events ORDER BY id").all()).toEqual(prices);
+  const writes = db.query("SELECT total_changes() n").get();
+  read("main"); read("later"); drain();
+  expect(db.query("SELECT total_changes() n").get()).toEqual(writes);
+}, db => db.exec("UPDATE events SET speed='fast',service_tier='priority' WHERE source_offset IN (2,4)")));

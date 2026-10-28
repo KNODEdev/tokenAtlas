@@ -17,10 +17,21 @@ export type SingleSourceKind = "register" | "producer" | "ingest" | "detail" | "
 export interface SingleSourceEntry { reads: number; sums: number; kind: SingleSourceKind; reason: string }
 
 export const SINGLE_SOURCE_ALLOWED: Readonly<Record<string, SingleSourceEntry>> = {
+  "db/activity-intervals.ts": { reads: 2, sums: 0, kind: "producer", reason: "persists machine interval unions from published call gaps for changed ledger days" },
+  "db/codex-context-details.ts": { reads: 2, sums: 0, kind: "producer", reason: "updates dirty context day contributions and queues their affected windows from stored ledger facts" },
+  "db/codex-context-producer.ts": { reads: 3, sums: 0, kind: "producer", reason: "advances bounded event cursors and dirty model scopes into durable context prices" },
+  "db/subscription-capacity.ts": { reads: 1, sums: 0, kind: "register", reason: "joins prepared window usage to stored capacity results without reading raw events" },
+  "server/codex-context-final-producer.ts": { reads: 2, sums: 0, kind: "producer", reason: "publishes queued final context views from prepared window and cycle inputs" },
+  "server/codex-context-final-read.ts": { reads: 1, sums: 0, kind: "register", reason: "checks whether dirty context ranges overlap an account's prepared windows; never rebuilds them" },
+  "server/codex-context-final-window.ts": { reads: 1, sums: 0, kind: "producer", reason: "joins indexed event boundaries to stored context deltas for a queued window computation" },
+  "server/codex-context-model-producer.ts": { reads: 2, sums: 0, kind: "producer", reason: "publishes one queued model window from saved context deltas and prepared window usage" },
+  "server/codex-context-read.ts": { reads: 2, sums: 0, kind: "register", reason: "reads saved context aggregates and bounded boundary or copy-path metadata without repricing" },
+  "server/context-price-read.ts": { reads: 1, sums: 0, kind: "register", reason: "reads interval measures already prepared in limit windows and window usage" },
+  "server/conversation-course.ts": { reads: 8, sums: 0, kind: "detail", reason: "bounded conversation call details from stored ledger facts, canonical copies and source identities" },
   "db/first-token.ts": { reads: 8, sums: 0, kind: "producer", reason: "atomically canonicalizes turn timing copies and updates only their exact hourly histogram contributions" },
   "server/first-token-read.ts": { reads: 2, sums: 0, kind: "register", reason: "reads prepared TTFT histograms and bounded canonical turns only at dated ownership boundaries" },
   // Read modules of the ledgers and window sums.
-  "server/ledger-sums.ts": { reads: 41, sums: 12, kind: "register", reason: "the one read module of day and hour sums of both ledgers (timed sums included, the Codex owned timed hours of Speed among them), of their missing-rate valuations, of an account's stored activity and Codex calls, tokens and activity per owner (facts only across an ownership boundary or for mixed sessions), of the day rows' rate keys (a row the project cost cannot split from its sums read from its own calls) and of the calls' stored gaps of selected day rows (wall-clock activity per computer)" },
+  "server/ledger-sums.ts": { reads: 40, sums: 12, kind: "register", reason: "the one read module of day and hour sums of both ledgers (timed sums included, the Codex owned timed hours of Speed among them), of their missing-rate valuations, of an account's stored activity and Codex calls, tokens and activity per owner (facts only across an ownership boundary or for mixed sessions), of the day rows' rate keys (a row the project cost cannot split from its sums read from its own calls) and of the calls' stored gaps of selected day rows (wall-clock activity per computer)" },
   "server/window-usage-read.ts": { reads: 5, sums: 0, kind: "register", reason: "stored window sums, prepared model-capacity samples and model usage share behind the window-usage read API" },
   "server/window-usage-events.ts": { reads: 1, sums: 0, kind: "register", reason: "the ledger sources an account reads for bounded window computations" },
   "server/window-usage-producer.ts": { reads: 6, sums: 0, kind: "producer", reason: "publishes window sums from shared ledgers and compares stored rows before writing" },
@@ -80,7 +91,7 @@ export const SINGLE_SOURCE_ALLOWED: Readonly<Record<string, SingleSourceEntry>> 
   "server/project-cost-daily.ts": { reads: 1, sums: 0, kind: "detail", reason: "presence check of Codex inputs before returning a project aggregate memo hit" },
   "server/subscription-usage.ts": { reads: 1, sums: 0, kind: "detail", reason: "day span of the Codex ledger aggregates" },
   "server/account-scope.ts": { reads: 1, sums: 0, kind: "detail", reason: "indexed source homes for account-scoped reports" },
-  "server/api-events.ts": { reads: 5, sums: 0, kind: "detail", reason: "bounded call lists and their stored source/account evidence (formerly handleEvents in api.ts)" },
+  "server/api-events.ts": { reads: 6, sums: 0, kind: "detail", reason: "bounded call lists and their stored source/account evidence (formerly handleEvents in api.ts)" },
   "server/api-health.ts": { reads: 1, sums: 0, kind: "detail", reason: "health presence checks for the event and observation tables" },
   "server/api-accounts.ts": { reads: 3, sums: 0, kind: "detail", reason: "account source identities and stored first/last call and call counts" },
   "server/server-sync.ts": { reads: 1, sums: 0, kind: "detail", reason: "index emptiness check before synchronization and startup remap" },
@@ -88,7 +99,7 @@ export const SINGLE_SOURCE_ALLOWED: Readonly<Record<string, SingleSourceEntry>> 
   "server/api-cycle-settings.ts": { reads: 2, sums: 0, kind: "detail", reason: "stored window and source presence for editable cycle settings" },
   "server/api-provider-limits.ts": { reads: 1, sums: 0, kind: "detail", reason: "latest stored Grok credit-pool reading for reset-anchor settings" },
 
-  "projects/parents.ts": { reads: 2, sums: 0, kind: "detail", reason: "stored source and conversation provenance for parent project inheritance; no raw calls or repricing" },
+  "projects/parents.ts": { reads: 5, sums: 0, kind: "detail", reason: "stored source and conversation provenance for parent project inheritance; no raw calls or repricing" },
   "server/claude-limit.ts": { reads: 1, sums: 0, kind: "detail", reason: "bounded probe evidence for Claude observation metadata; traffic comes from stored window usage" },
 
   // Maintenance outside screens.

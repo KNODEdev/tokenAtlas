@@ -1,5 +1,5 @@
 import type { SumVendor } from "./ledger-sums";
-import { projectMatcher, readLedgerSums, localHour, sumTokens, ledgerLastCall, readOwnedLedgerHours, readCodexOwnedTimedHours } from "./ledger-sums";
+import { projectMatcher, readLedgerSums, localHour, sumTokens, ledgerLastCall, readOwnedLedgerHours } from "./ledger-sums";
 import type { AppContext } from "./app-context-types";
 import { HOUR_MS, round2 } from "./api-report-values";
 import { apiCodexLedgerRows, apiHasCodexHistory, apiCodexLedgerContext } from "./api-codex-ledger";
@@ -7,8 +7,10 @@ import type { AccountScope } from "./account-scope";
 import { accountResolverOf, resolveAccountScope, knownAccountIds } from "./account-scope";
 import { parseCommonDateParams } from "./api-request-params";
 import { eventAccountScope } from "./api-events";
-import { modelSpeedSeries, readModelSpeed } from "./model-speed";
+import { modelSpeedSeries } from "./model-speed";
 import { attachFirstTokenTimes, readFirstTokenTimes } from "./first-token-read";
+import { readModeSpeedHours } from "./model-speed-read";
+import { codexLedgerReadContext } from "../db/codex-ledger-adapters";
 import { ledgerProviderOf } from "./subscription-accounting-adapters";
 import { LONG_CALL_OUT } from "../db/usage-ledger";
 
@@ -212,7 +214,7 @@ export function handleActivity(ctx: AppContext, url: URL): Response {
 }
 
 /**
- * Output speed per model over time for one Claude subscription (model-speed.ts): `account` (required), `since`/`until`
+ * Timings per model/speed/effort for one subscription: `account` (required), `since`/`until`
  * (UTC days, inclusive) and `grain` (`day`, default, or `hour`). Stored ledger rows only; no parsing, no event scan.
  */
 export function handleModelSpeed(ctx: AppContext, url: URL): Response {
@@ -229,16 +231,16 @@ export function handleModelSpeed(ctx: AppContext, url: URL): Response {
     return Response.json({ error: `No usage adapter for '${scope.vendor}'.` }, { status: 400 });
   const { since, until } = dateParams;
   const range = { ...(since ? { since } : {}), ...(until ? { until } : {}) };
-  let models: ReturnType<typeof modelSpeedSeries> = [];
-  if (scope.vendor !== "codex") models = readModelSpeed(ctx.sqlite, scope.vendor, accountResolverOf(ctx).plan(scope.vendor, scope.id), { grain, ...range });
-  else if (apiHasCodexHistory(ctx)) {
-    // The readiness of the ledger's priced readers (a preparing ledger answers "preparing"), then the account's canonical
-    // Codex calls by hour, owned through the periods as /api/activity owns them, read without valuing them.
+  if (scope.vendor === "codex" && apiHasCodexHistory(ctx)) {
+    // Keep the published-ledger readiness contract; timing reads never value calls.
     const dependencyBases = ["api_equivalent_usd"] as const;
     apiCodexLedgerContext(ctx, { grain: "hour", ...range, dependencyBases });
-    models = modelSpeedSeries(readCodexOwnedTimedHours(ctx.sqlite, accountResolverOf(ctx), scope.id, { ...range, dependencyBases }), grain);
   }
-  const timing = readFirstTokenTimes(ctx.sqlite, accountResolverOf(ctx), scope.vendor, scope.id, { grain, ...range });
+  const policy = scope.vendor === "codex" ? codexLedgerReadContext(ctx.rateCards).policy : null;
+  const classify = policy ? (tier: string | null, day: string) => policy.classify(tier, day) : undefined;
+  const prepared = readModeSpeedHours(ctx.sqlite, accountResolverOf(ctx), scope.vendor, scope.id, { ...range, classify });
+  const models = modelSpeedSeries(prepared.hours, grain);
+  const timing = readFirstTokenTimes(ctx.sqlite, accountResolverOf(ctx), scope.vendor, scope.id, { grain, ...range, classify });
   return Response.json({ account: scope.id, provider: scope.vendor, grain, since: since ?? null, until: until ?? null,
-    long_out_min: LONG_CALL_OUT, first_token_pending: timing.pending, models: attachFirstTokenTimes(models, timing) });
+    long_out_min: LONG_CALL_OUT, speed_pending: prepared.pending, first_token_pending: timing.pending, models: attachFirstTokenTimes(models, timing) });
 }

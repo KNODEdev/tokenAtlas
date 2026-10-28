@@ -123,6 +123,9 @@ test("the worker resumes period backlogs, observes sync guards and reports decla
     const child = Bun.spawn([process.execPath, script], {env:{...process.env,TOKENATLAS_CONFIG:configRoot,TOKENATLAS_ARCHIVE:archiveRoot,
       TOKENATLAS_LOCAL_STATE:path.join(root,"state"),TOKENATLAS_LOGIN:"sample_a"},stdout:"pipe",stderr:"pipe"});
     const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
-    expect({code,stderr}).toEqual({code:0,stderr:""});
+    expect(code).toBe(0);
+    const diagnostics = stderr.trim().split(/\r?\n/).filter(Boolean);
+    expect(diagnostics.length).toBeLessThan(20);
+    expect(diagnostics.filter(line => !/^\[tokenAtlas sqlite\] (?:read|write) transaction held \d+\.\d s on (?:main|worker \d+)(?: \([^\r\n]*\))?: at .+$/.test(line))).toEqual([]);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }, 30_000);

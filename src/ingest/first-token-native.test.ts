@@ -19,6 +19,11 @@ test("shared native scan matches the timing reference in full and compact modes,
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-native-ttft-")), file = path.join(dir, "f.jsonl");
   const pool = new ParsePool(2, { binary });
   const records = [
+    { type: "thread_settings_applied", payload: { thread_settings: { service_tier: "priority", reasoning_effort: "ultra" } } },
+    ...turn("fast-ultra", 1500),
+    { type: "event_msg", payload: { type: "thread_settings_applied", thread_settings: { service_tier: "default", reasoning_effort: "high" } } },
+    ...turn("standard-high", 2500),
+    { type: "thread_settings_applied", payload: { thread_settings: { service_tier: null, reasoning_effort: "medium" } } },
     ...[0, 1000, null, -1, 1.5, "42", true, 11001, Number.MAX_SAFE_INTEGER + 1].flatMap((ms, i) => turn(`t${i}`, ms)),
     ...turn("offset", 500, "2026-10-25T12:00:00.000+02:00"), ...turn("conflict", 1000), turn("conflict", 2000)[3],
     ...turn("unfinished", 2000).slice(0, 3),

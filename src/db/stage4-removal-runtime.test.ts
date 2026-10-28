@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test";
 import { Database } from "./sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
+import { migrate as migrateDrizzle } from "drizzle-orm/bun-sqlite/migrator";
+import { migrationFixtureThrough } from "./migration-range.fixture";
 import { applyDrizzleMigrations } from "./migrate";
 import { installAnalysisTracking } from "./analysis";
 import { compareDays, fillUsageLedger, ledgerDays, referenceDays } from "../server/usage-ledger.fixture";
@@ -10,8 +12,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const REPO = path.resolve(import.meta.dir, "../..");
-const PRE_W9 = "a74fad86cf609bfac05054eb74718fd613d91da5";
 const EVENTS = [
   { account: "selected", call: "selected-one", ts: "2026-09-01T12:00:00.000Z", input: 1_000_000 },
   { account: "selected", call: "selected-two", ts: "2026-09-02T12:00:00.000Z", input: 2_000_000 },
@@ -45,55 +45,31 @@ function prepare(db: Database, archiveRoot: string): void {
   fillUsageLedger(db, "claude", RATES, archiveRoot, 100);
 }
 
-function command(args: string[], cwd: string): void {
-  const result = Bun.spawnSync(args, { cwd, stdout: "pipe", stderr: "pipe" });
-  if (result.exitCode !== 0) throw new Error(`${args[0]} failed: ${result.stderr.toString()}`);
-}
-
 test("a pre-W9 database upgrades to the usage ledger and one later correction stays incremental", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-w9-price-upgrade-"));
-  const oldRoot = path.join(root, "pre-w9"), dbFile = path.join(root, "register.sqlite");
-  const archiveRoot = path.join(root, "archive"), dumpFile = path.join(root, "pre-w9.json");
-  const dependencies = path.join(oldRoot, "node_modules");
+  const dbFile = path.join(root, "register.sqlite"), archiveRoot = path.join(root, "archive");
   let db: Database | null = null;
   try {
-    fs.mkdirSync(oldRoot);
     fs.mkdirSync(archiveRoot);
-    const tar = path.join(root, "pre-w9.tar");
-    command(["git", "archive", "--format=tar", `--output=${tar}`, PRE_W9, "src", "drizzle", "rate-cards.json", "package.json"], REPO);
-    // GNU tar treats a drive-letter archive path as a remote host. Both paths are local to root.
-    command(["tar", "-xf", "pre-w9.tar", "-C", "pre-w9"], root);
-    fs.symlinkSync(path.join(REPO, "node_modules"), dependencies, process.platform === "win32" ? "junction" : "dir");
-    const script = path.join(oldRoot, "seed.ts");
-    fs.writeFileSync(script, `import {Database} from "./src/db/sqlite";
-      import {drizzle} from "drizzle-orm/bun-sqlite";
-      import {applyDrizzleMigrations} from "./src/db/migrate";
-      import {installAnalysisTracking} from "./src/db/analysis";
-      import {prepareSubscriptionFacts} from "./src/db/subscription-facts";
-      import {prepareUsagePriceTotals} from "./src/db/usage-price-totals";
-      import fs from "node:fs"; import path from "node:path";
-      const db=new Database(${JSON.stringify(dbFile)}), archiveRoot=${JSON.stringify(archiveRoot)};
-      const events=${JSON.stringify(EVENTS)}, rates=${JSON.stringify(RATES)};
-      try { applyDrizzleMigrations(drizzle(db)); installAnalysisTracking(db);
-        for(const account of ["selected","foreign"]) db.query("INSERT INTO account_periods(provider,source,from_ts,account,origin,evidence) VALUES('claude',?,'2020-01-01',?,'declared','test')").run("claude/"+account,account);
-        for(const event of events) db.query("INSERT INTO claude_events(store,call_id,path,ts,model,in_uncached,out_total) VALUES(?,?,?,?,?,?,0)").run(event.account,event.call,path.join(archiveRoot,"claude",event.account,"session.jsonl"),event.ts,"fixture",event.input);
-        for(let n=0;n<100;n++) if(prepareSubscriptionFacts(db,"claude",archiveRoot,100).complete) break;
-        let ready=false; for(let n=0;n<100;n++){const result=prepareUsagePriceTotals(db,"claude",{rates,archiveRoot},{limit:100});if(result.reason)throw Error(result.reason);if(result.complete){ready=true;break;}}
-        if(!ready)throw Error("old register did not settle");
-        const values=db.query("SELECT provider,identity,variant,day,facts_stamp,rules_stamp,source_stamp,value FROM event_valuations ORDER BY provider,identity,variant").all();
-        const days=db.query("SELECT d.day,m.home AS source,d.calls,d.tokens,d.tokens_reported,d.counts,d.quality FROM usage_price_days d JOIN usage_price_dims m USING(scope,dim) ORDER BY d.day,m.home,d.counts").all();
-        fs.writeFileSync(${JSON.stringify(dumpFile)},JSON.stringify({values,days}));
-      } finally {db.close();}`);
-    const child = Bun.spawnSync([process.execPath, script], { cwd: oldRoot,
-      env: { ...process.env, TOKENATLAS_ARCHIVE: archiveRoot, TOKENATLAS_DB: dbFile,
-        TOKENATLAS_CONFIG: path.join(root, "config"), TOKENATLAS_LOCAL_STATE: path.join(root, "state") },
-      stdout: "pipe", stderr: "pipe" });
-    if (child.exitCode !== 0) throw new Error(child.stderr.toString());
-    expect(child.exitCode).toBe(0);
-    const old = JSON.parse(fs.readFileSync(dumpFile, "utf8")) as { values: unknown[]; days: unknown[] };
+    db = new Database(dbFile);
+    migrateDrizzle(drizzle(db), { migrationsFolder: migrationFixtureThrough(root, "0040_account_periods") });
+    seed(db, archiveRoot, false);
+    // Freeze a populated retired register independently of the replacement producer and private Git history.
+    const scope = "usage-price-8-claude";
+    db.query("INSERT INTO usage_price_scopes(scope,provider,version,cursor,phase,status,bookmark,rules_digest,sources,attribution,mirror_policy) VALUES(?,'claude',8,3,'replay','ready','','fixture','fixture','',1)").run(scope);
+    for (const event of EVENTS) {
+      db.query("INSERT OR IGNORE INTO usage_price_dims(scope,dim,account,home,model,speed) VALUES(?,?,?,?,'fixture','standard')")
+        .run(scope,event.account,event.account,"claude/"+event.account);
+      db.query("INSERT INTO usage_price_days(scope,day,dim,calls,first_ts,last_ts,tokens,tokens_reported,counts,quality) VALUES(?,?,?,1,?,?,?,?,'{}','{}')")
+        .run(scope,event.ts.slice(0,10),event.account,event.ts,event.ts,JSON.stringify([event.input]),JSON.stringify([event.input]));
+      db.query("INSERT INTO event_valuations(provider,identity,variant,day,facts_stamp,rules_stamp,source_stamp,value) VALUES('claude',?,'dated-actual-api',?,'fixture','fixture','fixture',?)")
+        .run(JSON.stringify([event.account,event.call]),event.ts.slice(0,10),JSON.stringify({usd:event.input/1_000_000}));
+    }
+    const old = { values: db.query("SELECT value FROM event_valuations").all() as Array<{value:string}>,
+      days: db.query("SELECT * FROM usage_price_days").all() };
     expect(old.values.length).toBeGreaterThan(0);
     expect(old.days.length).toBeGreaterThan(0);
-    db = new Database(dbFile);
+    expect(old.values.reduce((sum,row)=>sum+JSON.parse(row.value).usd,0)).toBe(12);
     applyDrizzleMigrations(drizzle(db));
     // The old register is dropped with its data; the ledger values the retained source rows.
     expect(legacyTables(db)).toEqual([]);
@@ -131,7 +107,6 @@ test("a pre-W9 database upgrades to the usage ledger and one later correction st
     } finally { reference.close(); }
   } finally {
     db?.close();
-    if (fs.existsSync(dependencies)) fs.unlinkSync(dependencies);
     const resolved = path.resolve(root), temporary = path.resolve(os.tmpdir()) + path.sep;
     if (!resolved.startsWith(temporary)) throw new Error("Temporary fixture escaped its root");
     Bun.gc(true);

@@ -54,6 +54,7 @@ export function database(): Database {
     CREATE TABLE events(home TEXT,path TEXT,source_offset INTEGER,ts TEXT,model TEXT,in_tok INTEGER,cached_in INTEGER,
       cache_write INTEGER,out_tok INTEGER,reasoning_out INTEGER,speed TEXT,billing_mode TEXT,meter_reset INTEGER,plan_type TEXT)`);
   db.exec(LIMIT_WINDOW_SCHEMA_SQL);
+  db.exec("ALTER TABLE limit_windows ADD COLUMN activity TEXT");
   db.exec(fs.readFileSync(path.resolve(import.meta.dir, "../../drizzle/0040_account_periods.sql"), "utf8"));
   db.query("INSERT INTO account_periods(provider,source,account,from_ts,origin,evidence) VALUES('codex','codex/fixture','codex1','2000-01-01T00:00:00Z','declared','fixture')").run();
   for (const event of EVENTS) addEvent(db, event);

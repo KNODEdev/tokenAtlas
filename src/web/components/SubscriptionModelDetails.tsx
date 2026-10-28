@@ -6,6 +6,7 @@ import { full, usd } from "../lib/format";
 import { useI18n } from "../lib/i18n";
 import { AccountPeriodDrawer } from "./AccountPeriodDrawer";
 import { TableRow, HelpBlock, HelpDot, EmptyState, Fact, Facts, GhostButton, Table, Td, Th } from "./ui";
+import { modelVersionSortValue, useTableSort } from "../lib/table-sort";
 
 const PAGE_SIZE = 50;
 
@@ -204,16 +205,24 @@ export interface SubscriptionModelDetailsProps {
 }
 
 export function SubscriptionModelDetails({ rows, openDataSettings, account }: SubscriptionModelDetailsProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [open, setOpen] = useState<{ key: string; opener: HTMLElement | null } | null>(null);
   const rowKey = (row: SubscriptionModelDetail, index: number) => `${account}:${row.day}:${row.model}:${row.speed}:${row.source}:${index}`;
   const shown = rows.find((row, index) => rowKey(row, index) === open?.key);
   const pricingColumn = rows.some(hasMissingActualPricing);
   const visibleBuckets = BUCKETS.filter(({ key }) => !key.startsWith("in_cache_write_") || rows.some(row => { const value = rowQuantity(row, key); return value === null || value !== 0; }));
   const [page, setPage] = useState(0);
+  // Retain the original identity when sorting changes the row's page or position.
+  const { rows: sorted, sorting } = useTableSort(rows.map((row, index) => ({ row, key: rowKey(row, index) })), {
+    c0: item => item.row.day, c1: item => modelVersionSortValue(item.row.model), c2: item => item.row.speed, c3: item => item.row.source,
+    c4: item => finite(item.row.calls), c6: item => finite(item.row.tokens),
+    c7: item => finite(item.row.api_standard), c8: item => finite(item.row.api_actual),
+    ...Object.fromEntries(BUCKETS.map(({ key }) => [`token:${key}`, (item: { row: SubscriptionModelDetail }) => rowQuantity(item.row, key)])),
+  }, locale, { column: "c0", direction: "desc" }, () => setPage(0));
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
-  const pageRows = rows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const pageItems = sorted.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const pageRows = pageItems.map(item => item.row);
   const pageSummary = useMemo(() => summarize(pageRows), [pageRows]);
   const totalSummary = useMemo(() => summarize(rows), [rows]);
   const firstRow = rows.length ? currentPage * PAGE_SIZE + 1 : 0;
@@ -227,7 +236,7 @@ export function SubscriptionModelDetails({ rows, openDataSettings, account }: Su
     </p>
     {!rows.length && <EmptyState title={t("No model detail rows", "Brak wierszy szczegółów modeli")} detail={t("There is no subscription model traffic in the selected data.", "W wybranych danych nie ma ruchu modeli subskrypcji.")} />}
     {!!rows.length && <>
-      <Table tableId="SubscriptionModelDetails:0">
+      <Table tableId="SubscriptionModelDetails:0" sorting={sorting}>
         <thead><TableRow header>
           <Th columnId="c0">{t("Day", "Dzień")}</Th>
           <Th columnId="c1">{t("Model", "Model")}</Th>
@@ -241,9 +250,8 @@ export function SubscriptionModelDetails({ rows, openDataSettings, account }: Su
           {pricingColumn && <Th columnId="c9">{t("Pricing", "Wycena")}</Th>}
         </TableRow></thead>
         <tbody>
-          {pageRows.map((row, index) => {
+          {pageItems.map(({ row, key }) => {
             const missing = hasMissingActualPricing(row);
-            const key = rowKey(row, currentPage * PAGE_SIZE + index);
             const choose = (opener: HTMLElement | null) => setOpen({ key, opener });
             return <TableRow key={key} className={`ui-open-row${open?.key === key ? " is-selected" : ""}`}
               onClick={event => choose(event.currentTarget.querySelector<HTMLButtonElement>(".ui-open-row-button"))}>

@@ -96,7 +96,7 @@ test("stored era day, canonical UTC day, family pricing, mirrored selector and b
     expect(activity).toMatchObject({ day: "2026-09-01", tokens: 10, calls: 1, active_seconds: 300 });
     const subjects = listSubjects(f.db, 15, range, { eras, rateCards: edgeRates });
     expect(subjects.find((row) => row.id === "alpha")).toMatchObject({
-      tokens: 1_000_010, calls: 2, active_seconds: 300, repos: ["repo-alpha"],
+      tokens: 1_000_010, calls: 2, active_seconds: 180, session_seconds: 300, repos: ["repo-alpha"],
     });
 
     f.db.query("UPDATE grok_events SET ts=? WHERE store=? AND prompt_id=?")
@@ -105,6 +105,9 @@ test("stored era day, canonical UTC day, family pricing, mirrored selector and b
     f.reopen();
     const corrected = storedHistoryUsage(f.db, "grok", edgeRates, { ...range, idleGapMinutes: 15 });
     expect(corrected.rows.find((row) => row.account === "grok-activity")!.active_seconds).toBe(900);
+    // The longer session gap remains mostly before the selected UTC day.
+    expect(listSubjects(f.db, 15, range, { eras, rateCards: edgeRates }).find(row => row.id === "alpha"))
+      .toMatchObject({ active_seconds: 180, session_seconds: 900 });
   } finally { f.close(); }
 });
 

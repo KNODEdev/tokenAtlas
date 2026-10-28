@@ -5,8 +5,7 @@ import { useAsync } from "../lib/useAsync";
 import { useI18n } from "../lib/i18n";
 import { pct, usageModelLabel } from "../lib/format";
 import { calendarTimeTicks, chartDateFormatter } from "../lib/chart-dates";
-import { DISTINCT_INKS } from "../lib/model-colors";
-import { seriesStroke } from "../lib/model-speed";
+import { modelStrokes } from "../lib/model-colors";
 import { ChartExport } from "./ChartExport";
 import { useWidth } from "./WindowStatusCard";
 import { EmptyState, ErrorState, HelpBlock, HelpDot, LegendAllToggle, LoadingCard, Tabs } from "./ui";
@@ -43,11 +42,12 @@ export function ModelUsageShare({ provider, account, counter, since, until, data
   if (!data) return <LoadingCard label={t("Usage by model", "Zużycie według modeli")} shape="chart" />;
   if (!data.windows.length) return <EmptyState title={t("No cycles in the selected dates", "Brak cykli w wybranych datach")} />;
 
-  // One subscription's models mostly share a vendor, whose shades blur together in a stack: distinct inks by
-  // API value over the range keep the largest neighbours apart.
+  // One subscription's models take its vendor's shades (user, 2026-10-28), handed out by API value over the range;
+  // the shade steps alternate darker and lighter, so the largest neighbours in a stack stay apart.
   const ranked = data.models.map((_, index) => index)
     .sort((a, b) => data.windows.reduce((sum, cycle) => sum + cycle.api_usd[b]!, 0) - data.windows.reduce((sum, cycle) => sum + cycle.api_usd[a]!, 0) || a - b);
-  const strokes = new Map(ranked.map((index, rank) => [index, seriesStroke(rank, DISTINCT_INKS)]));
+  const rankedStrokes = modelStrokes(ranked.map(index => data.models[index]!), provider);
+  const strokes = new Map(ranked.map((index, rank) => [index, rankedStrokes[rank]!]));
   const used = data.models.map((_, index) => data.windows.some(cycle => cycle.pct[index]! > 0 || cycle.api_usd[index]! > 0));
   const series: Series[] = data.models.flatMap((model, index) => used[index] ? [{ key: model ?? "", index,
     label: model === null ? t("unknown model", "nieznany model") : usageModelLabel(model), ...strokes.get(index)! }] : []);

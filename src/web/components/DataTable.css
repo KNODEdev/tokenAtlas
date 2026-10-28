@@ -1,3 +1,11 @@
 .data-table-last-heading { position: relative; padding-right: calc(var(--s-10) + var(--s-5)) !important; }
 .data-table-columns-button { padding: var(--s-2) var(--s-3); }
 .data-table-last-heading > .data-table-columns-button { position: absolute; right: var(--s-2); top: 50%; transform: translateY(-50%); }
+.data-table-sort-button { display: inline; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; }
+.data-table-sort-button:hover, .data-table-sort-button:focus-visible { color: var(--accent); }
+.data-table-sort-button:focus-visible { outline: var(--rule); outline-offset: var(--s-2); }
+.data-table-sort-mark { margin-left: var(--s-2); color: var(--faint); white-space: nowrap; }
+.data-table-sort-mark::before { content: "↕"; }
+[aria-sort="ascending"] .data-table-sort-mark::before { content: "↑"; }
+[aria-sort="descending"] .data-table-sort-mark::before { content: "↓"; }
+[aria-sort="ascending"] .data-table-sort-mark, [aria-sort="descending"] .data-table-sort-mark { color: var(--accent); }

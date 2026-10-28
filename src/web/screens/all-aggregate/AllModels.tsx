@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { api, type BreakdownRow } from "../../lib/api";
 import { Bar, Card, CardTitle, ErrorState, LoadingCard, Table, TableColGroup, TableRow, Tabs, Td, Th } from "../../components/ui";
 import { compact, pct, usd as fmtUsd } from "../../lib/format";
@@ -7,20 +6,21 @@ import { surfaceName } from "../../lib/surfaces";
 import { useAsync } from "../../lib/useAsync";
 import { formatNumber } from "./format";
 import { Kpi } from "./presentation";
+import { modelVersionSortValue, useTableSort } from "../../lib/table-sort";
 
-type ModelSort = "tokens" | "usd" | "unit";
 const MODEL_SORTS = [
-  { value: "tokens", en: "Tokens", pl: "Tokeny" },
-  { value: "usd", en: "API-eq", pl: "API-eq" },
-  { value: "unit", en: "$/M", pl: "$/M" },
+  { value: "c0", en: "Newest", pl: "Najnowsze" },
+  { value: "c1", en: "Tokens", pl: "Tokeny" },
+  { value: "c2", en: "API-eq", pl: "API-eq" },
+  { value: "c3", en: "$/M", pl: "$/M" },
 ];
+const unitOf = (r: BreakdownRow) => (r.tokens > 0 ? r.usd / (r.tokens / 1e6) : 0);
 function cachedOf(td: Record<string, number | undefined> | undefined): number {
   if (!td) return 0;
   return td.cached_in ?? td.in_cache_read ?? 0;
 }
 export function AllModels({ money }: { money: boolean }) {
   const { t, locale } = useI18n();
-  const [sort, setSort] = useState<ModelSort>(money ? "usd" : "tokens");
   const state = useAsync(
     signal =>
       Promise.all([
@@ -29,18 +29,19 @@ export function AllModels({ money }: { money: boolean }) {
       ]),
     []
   );
+  const rows = (state.data?.[0].rows ?? []).filter((r) => r.tokens > 0);
+  const { rows: sorted, sorting } = useTableSort(rows, {
+    c0: r => modelVersionSortValue(r.name), c1: r => r.tokens, c2: r => r.usd,
+    c3: unitOf, c4: r => r.tokens > 0 ? cachedOf(r.token_details) / r.tokens : null,
+    c5: r => r.calls, c6: r => r.tokens,
+  }, locale, { column: "c0", direction: "desc" });
   if (state.error) return <ErrorState message={state.error} onRetry={state.reload} />;
   if (!state.data) return <div className="ui-tab-page"><LoadingCard label={t("Loading models for all subscriptions", "Wczytuję modele wszystkich subskrypcji")} height={420} shape="chart" /></div>;
-  const [models, surfaces] = state.data;
-  const rows = models.rows.filter((r) => r.tokens > 0);
+  const surfaces = state.data[1];
   const totTokens = rows.reduce((s, r) => s + r.tokens, 0);
   const totUsd = rows.reduce((s, r) => s + r.usd, 0);
   const totCalls = rows.reduce((s, r) => s + r.calls, 0);
   const totCached = rows.reduce((s, r) => s + cachedOf(r.token_details), 0);
-  const unitOf = (r: BreakdownRow) => (r.tokens > 0 ? r.usd / (r.tokens / 1e6) : 0);
-  const sorted = [...rows].sort((a, b) =>
-    sort === "usd" ? b.usd - a.usd : sort === "unit" ? unitOf(b) - unitOf(a) : b.tokens - a.tokens
-  );
   const maxTokens = Math.max(...rows.map((r) => r.tokens), 1);
   const maxUsd = Math.max(...rows.map((r) => r.usd), 1);
   return (
@@ -62,8 +63,8 @@ export function AllModels({ money }: { money: boolean }) {
           />
           <div style={{ marginLeft: "auto" }}>
             <Tabs
-              value={sort}
-              onChange={(v) => setSort(v as ModelSort)}
+              value={sorting.sort?.column ?? ""}
+              onChange={column => sorting.onSort({ column, direction: "desc" })}
               options={MODEL_SORTS.map(({ value, en, pl }) => ({ value, label: t(en, pl) }))}
             />
           </div>
@@ -80,7 +81,7 @@ export function AllModels({ money }: { money: boolean }) {
             right={<BarLegend />}
           />
         </div>
-        <Table tableId="AllAggregate:0">
+        <Table tableId="AllAggregate:0" sorting={sorting}>
           <TableColGroup>
             <col style={{ width: "21%" }} />
             <col style={{ width: "12%" }} />
@@ -106,7 +107,7 @@ export function AllModels({ money }: { money: boolean }) {
             </TableRow>
           </thead>
           <tbody>
-            {sorted.slice(0, 30).map((r) => {
+            {sorted.map((r) => {
               const cached = cachedOf(r.token_details);
               return (
                 <TableRow key={`${r.vendor}:${r.name}`}>

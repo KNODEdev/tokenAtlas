@@ -1,5 +1,5 @@
 export interface DataSettingsTarget {
-  returnScreen?: "capacity" | "models" | "model-traffic" | "periods";
+  returnScreen?: "capacity" | "models" | "model-traffic" | "model-cost" | "periods";
   area: "rates" | "subscriptions" | "periods" | "data" | "cadence" | "windows";
   account: string;
   cycle?: { start: string; end: string };

@@ -196,7 +196,7 @@ export async function syncClaudeCloudSessions(options: CloudSyncOptions = {}): P
     } catch (error) { outcome.errors.push(describe(error)); continue; }
     outcome.sessions = sessions.length;
     if (sessions.length && !auth.trustedDevice) {
-      outcome.errors.push("session history needs a trusted device: enrol this Claude profile at claude.ai (Trusted devices)");
+      outcome.errors.push("session history needs a trusted device: run /login in this Claude Code profile to renew its device credential");
       continue;
     }
     const checkpoints = (state.profiles[profileKey(profile)] ??= { sessions: {} }).sessions;

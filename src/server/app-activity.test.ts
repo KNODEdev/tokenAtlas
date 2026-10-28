@@ -160,7 +160,7 @@ test("dedicated activity endpoint bypasses analytical preparation and preserves 
     const ctx = { sqlite: db, homeConflict: { message: "private conflict" }, databaseRelocating: true } as AppContext;
     const fetch = createFetchHandler(ctx);
     db.exec("PRAGMA query_only=ON");
-    const response = await fetch(new Request("http://local/api/app-activity"));
+    const response = await fetch(new Request("http://127.0.0.1/api/app-activity"));
     expect(response.status).toBe(200);
     expect((await response.json()).providers).toHaveLength(5);
     expect(DATA_VIEWS["/api/activity"]).toBeDefined();

@@ -3,6 +3,8 @@ import type { AccountResolver } from "../../server/account-resolver";
 export interface FirstTokenTurn {
   id: string;
   model: string | null;
+  service_tier?: string | null;
+  effort?: string | null;
   ts: string;
   ms: number | null;
   billing: string;

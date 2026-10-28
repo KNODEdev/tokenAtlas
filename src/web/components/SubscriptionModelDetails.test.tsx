@@ -137,14 +137,20 @@ test("paginates at fifty rows while retaining the all-row total", async () => {
     expect(rendered.host.textContent).toContain("51 rows");
     expect(rendered.host.textContent).toContain("1–50 / 51");
     expect(rendered.host.textContent).toContain("All rows total");
-    expect(rendered.host.textContent).toContain("model-50");
-    expect(rendered.host.textContent).not.toContain("model-51");
+    expect(rendered.host.textContent).toContain("model-51");
+    expect(rendered.host.textContent).not.toContain("model-29standard");
 
     const next = nodes(rendered.host).find(node => node.tagName === "BUTTON" && node.textContent === "Next");
     if (!next) throw new Error("Next button not found");
     await invoke(next, "onClick");
     expect(rendered.host.textContent).toContain("51–51 / 51");
-    expect(rendered.host.textContent).toContain("model-51");
+    expect(rendered.host.textContent).toContain("model-29");
+    const tokens = nodes(rendered.host).find(node => node.className === "data-table-sort-button" && node.textContent.startsWith("Tokens"))!;
+    await invoke(tokens, "onClick", { stopPropagation() {} });
+    expect(rendered.host.textContent).toContain("1–50 / 51");
+    const tableRows = nodes(rendered.host).find(node => node.tagName === "TBODY")!.children;
+    expect(tableRows[0]!.textContent).toContain("model-51");
+    expect(tableRows[49]!.textContent).toContain("model-2");
   } finally {
     await cleanup(rendered);
   }

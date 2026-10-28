@@ -101,10 +101,12 @@ test("an account whose plan periods cover its whole span is fully priced", () =>
 }));
 
 /** The project history bills the account's only project (`a`, every call) with the same plan cost, or leaves it unknown. */
-function historyBilled(db: Database, card: RateCard): number | null {
-  const history = buildRepoHistory(db, { repo: null, projectId: "a", granularity: "day", by: "none", idleGapMinutes: 15,
+function historyRead(db: Database, card: RateCard) {
+  return buildRepoHistory(db, { repo: null, projectId: "a", granularity: "day", by: "none", idleGapMinutes: 15,
     rateCards: card, homeToSubId: new Map(), plansCatalog: catalog });
-  return history.totals.by_sub.accounta?.billed_usd ?? null;
+}
+function historyBilled(db: Database, card: RateCard): number | null {
+  return historyRead(db, card).totals.by_sub.accounta?.billed_usd ?? null;
 }
 
 test("rule D: an account with plan periods leaves its breaks unknown, never at the rate-card price", () => fixture((db, card) => {
@@ -115,7 +117,9 @@ test("rule D: an account with plan periods leaves its breaks unknown, never at t
   expect(row.gaps.map((gap) => [gap.from, gap.until, gap.plans])).toEqual([["2026-04-01", "2026-04-04", []], ["2026-04-15", "2026-04-25", []]]);
   expect(row.usd).toBeNull();
   expectSameAsProjectCost(db, card);
-  expect(historyBilled(db, card)).toBeNull();
+  // The unknown full fee does not erase the ten known days from the project's subtotal.
+  expect(historyBilled(db, card)).toBe(Math.round(20 * 10 / 30.44 * 100) / 100);
+  expect(historyRead(db, card).totals.billed_complete).toBe(false);
 }));
 
 test("rule D: an account with no plan period at all keeps the rate-card price", () => fixture((db, card) => {
@@ -162,7 +166,8 @@ test("fix E: a call earlier that day than the first period still leaves a gap, f
   expect(row.gaps).toEqual([{ from: "2026-04-01", until: "2026-04-01", days: 0.25,
     from_ts: "2026-04-01T12:00:00.000Z", until_ts: "2026-04-01T18:00:00.000Z", plans: [] }]);
   expectSameAsProjectCost(db, card);
-  expect(historyBilled(db, card)).toBeNull();
+  expect(historyBilled(db, card)).toBe(Math.round(20 * 24.25 / 30.44 * 100) / 100);
+  expect(historyRead(db, card).totals.billed_complete).toBe(false);
 }));
 
 test("fix E leaves a first period that starts on a later day alone: the days before it stay a gap", () => fixture((db, card) => {

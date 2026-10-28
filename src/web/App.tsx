@@ -101,7 +101,7 @@ function readTheme(): "dark" | "light" {
 const ACCOUNT_FREE_SCREENS = new Set<ScreenId>(["projects", "sources", "data-problems", "data-operations", "events", "settings", "usage",
   "usage-history", "usage-pace", "structure", "structure-models", "activity"]);
 /** Views read independently of the shell's cycle history and do not wait for it. */
-const INDEPENDENT_SCREENS = new Set<ScreenId>(["capacity", "sources", "data-problems", "data-operations", "speed", "periods", "plans", "shares"]);
+const INDEPENDENT_SCREENS = new Set<ScreenId>(["capacity", "sources", "data-problems", "data-operations", "speed", "models", "model-traffic", "model-cost", "periods", "plans", "shares"]);
 /** Account-scoped views whose scope line shows the shell's counter (IA-42). Models pages name it in their own Counter control. */
 const COUNTER_SCREENS = new Set<ScreenId>(["overview", "history", "compare", "analytics", "patterns"]);
 function RailSkeleton({ width, rows, rowHeight }: { width: number; rows: number; rowHeight: number }) {
@@ -408,7 +408,7 @@ export function App() {
     setMobileNav(false);
   }, []);
   const openDataSettings = useCallback((target: DataSettingsTarget) => {
-    setDataSettings({ ...target, returnScreen: screen === "models" || screen === "model-traffic" || screen === "periods" ? screen : "capacity" });
+    setDataSettings({ ...target, returnScreen: screen === "models" || screen === "model-traffic" || screen === "model-cost" || screen === "periods" ? screen : "capacity" });
     setAccount(target.account);
     setScreen("settings");
     setPalette(false);
@@ -641,6 +641,8 @@ export function App() {
         return t("Usage by model and surface", "Zużycie według modeli i kontekstów");
       case "model-traffic":
         return t("Traffic per reset cycle, model appearances and your markers", "Ruch w cyklach resetu, pojawienie się modeli i własne znaczniki");
+      case "model-cost":
+        return t("What 1M tokens of each model cost at API prices, against its list prices", "Ile kosztuje 1M tokenów każdego modelu po cenach API, na tle jego cennika");
       case "speed":
         return t("Output tokens per second per model · from sending the request to the end of the response · ratio of sums, never an average of calls",
           "Tokeny wyjścia na sekundę według modeli · od wysłania żądania do końca odpowiedzi · iloraz sum, nigdy średnia wywołań");
@@ -896,10 +898,6 @@ export function App() {
                 {screen === "compare" ? t("Usage › Structure", "Zużycie › Struktura") : screen === "patterns" ? t("Usage › Activity", "Zużycie › Aktywność") : t("Usage › Trend", "Zużycie › Przebieg")}
               </GhostButton>} />
           )}
-          {screenProps && isAll && (screen === "models" || screen === "model-traffic") && (
-            <EmptyState title={t("The model ranking of all subscriptions is in Usage › Structure.", "Ranking modeli wszystkich subskrypcji jest w Zużycie › Struktura.")}
-              action={<GhostButton onClick={() => openView("structure-models")}>{t("Usage › Structure › Models", "Zużycie › Struktura › Modele")}</GhostButton>} />
-          )}
           {screenProps && isGemini && gaugeScreenUnavailable && !genericWindowScreen && (
             <EmptyState
               title={t("{0} has no cycle series. Only a live counter is available.", `${account} nie ma serii cykli — jest sam licznik, bez historii`, [account])}
@@ -947,8 +945,9 @@ export function App() {
           )}
           {screenProps && legacyCycleDetail && screen === "compare" && <Compare {...screenProps} />}
           {screenProps && isInsightsScreen(screen) && !isAll && (insightsNote || gaugeScreenAvailable) && <Insights {...screenProps} tab={screen} cards={rosterCards} showTabs={false} />}
-          {screenProps && !isAll && screen === "models" && <Models {...screenProps} />}
-          {screenProps && !isAll && screen === "model-traffic" && <Models {...screenProps} view="trends" />}
+          {screenProps && screen === "models" && <Models {...screenProps} />}
+          {screenProps && screen === "model-traffic" && <Models {...screenProps} view="trends" />}
+          {screenProps && screen === "model-cost" && <Models {...screenProps} view="cost" />}
           {screenProps && screen === "speed" && <Speed {...screenProps} cards={rosterCards} />}
           {screenProps && screen === "capacity" && <Capacity {...screenProps} cards={rosterCards} />}
           {screenProps && (screen === "periods" || screen === "plans" || screen === "shares") && <Value {...screenProps} view={screen} cards={rosterCards} />}

@@ -135,7 +135,7 @@ test("local acceptance: independent producers, restarted delivery, real sync pub
       }
       return result;
     };
-    const get = () => router(db!)(new Request("http://fixture/api/subscriptions/one/current"));
+    const get = () => router(db!)(new Request("http://127.0.0.1/api/subscriptions/one/current"));
     const usage = db.query("SELECT data_revision FROM sync_revisions").get();
     expect((await sync()).status).toBe("success");
     expect((await (await get()).json()).data.limits[0]).toMatchObject({ used_percent: 42, machine: "MAIN" });
