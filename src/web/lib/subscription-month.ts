@@ -152,16 +152,21 @@ export interface MonthSummary {
   unpriced: number;
   /** Points used and windows of the cycles with % readings: their ratio is the average use of one window before its end. */
   pointsUsed: number; pointWindows: number;
+  /** Of the cycles with a capacity: Σ capacity with every reset kind and Σ windows (idle time included); their ratio is one reset's worth. */
+  allCapacity: number | null; capacityWindows: number;
 }
 const noBonuses = () => Object.fromEntries(RESET_KINDS.map(({ id }) => [id, 0])) as Record<ResetKind, number>;
 const sortPaid = (paid: Iterable<PaidAmount>) => [...paid].sort((a, b) => a.currency.localeCompare(b.currency) || Number(a.catalog) - Number(b.catalog));
 
 export function summarize(cycles: readonly BillingCycle[], unit: MonthUnit, enabled: ReadonlySet<ResetKind>): MonthSummary {
   let capacity = 0, used = 0, base = 0, counted = 0, uncalibrated = 0, usageUnknown = 0, unpriced = 0, pointsUsed = 0, pointWindows = 0;
+  let allCapacity = 0, capacityWindows = 0, valued = 0;
   let paidUsd = 0, paidUsdMissing = 0;
   const bonuses = noBonuses(), paid = new Map<string, PaidAmount>();
   for (const cycle of cycles) {
     const row = monthRow(cycle, unit, enabled);
+    // A window is worth the same whichever kinds are counted: the whole capacity over every window, idle time included.
+    if (row.capacity.value !== null) { allCapacity += row.capacity.value; capacityWindows += cycle.windows.share + cycle.windows.idle; valued++; }
     // Like for like: a cycle without a capacity, or without its usage, is left out of both sums.
     if (row.total === null) uncalibrated++;
     else if (row.used.value === null) usageUnknown++;
@@ -184,7 +189,7 @@ export function summarize(cycles: readonly BillingCycle[], unit: MonthUnit, enab
     capacity: counted ? capacity : null, used: counted ? used : null, base: counted ? base : null, bonuses,
     unused: counted ? capacity - used : null, utilisation: counted && capacity > 0 ? used / capacity * 100 : null,
     uncalibrated, usageUnknown, paid: sortPaid(paid.values()), paidUsd: paid.size && !paidUsdMissing ? paidUsd : null, paidUsdMissing,
-    unpriced, pointsUsed, pointWindows };
+    unpriced, pointsUsed, pointWindows, allCapacity: valued ? allCapacity : null, capacityWindows };
 }
 
 /** Several subscriptions' summaries as one: sums (the unit must be summable across them), paid kept per currency. */
@@ -209,7 +214,9 @@ export function combineSummaries(summaries: readonly MonthSummary[]): MonthSumma
     paidUsdMissing: sum(summaries, (summary) => summary.paidUsdMissing),
     paidUsd: summaries.some((summary) => summary.paid.length) && summaries.every((summary) => !summary.paid.length || summary.paidUsd !== null)
       ? sum(summaries, (summary) => summary.paidUsd ?? 0) : null,
-    pointsUsed: sum(summaries, (summary) => summary.pointsUsed), pointWindows: sum(summaries, (summary) => summary.pointWindows) };
+    pointsUsed: sum(summaries, (summary) => summary.pointsUsed), pointWindows: sum(summaries, (summary) => summary.pointWindows),
+    allCapacity: summaries.some((summary) => summary.allCapacity !== null) ? sum(summaries, (summary) => summary.allCapacity ?? 0) : null,
+    capacityWindows: sum(summaries, (summary) => summary.capacityWindows) };
 }
 
 /**
@@ -226,6 +233,8 @@ export function pointsFallback(cycles: readonly BillingCycle[], unit: MonthUnit,
 
 /** Average % of one window used before its end: points used ÷ windows; null without % readings. */
 export const perWindowPct = (summary: MonthSummary) => summary.pointWindows > 0 ? summary.pointsUsed / summary.pointWindows : null;
+/** What one reset gives on average: the whole capacity over its windows, the same whichever reset kinds are counted. */
+export const perResetCapacity = (summary: MonthSummary) => summary.allCapacity !== null && summary.capacityWindows > 0 ? summary.allCapacity / summary.capacityWindows : null;
 
 /** A cycle's price in USD: the stored NBP conversion, or the amount itself in USD; null while unknown. */
 export function cycleUsdPaid(cycle: BillingCycle): number | null {

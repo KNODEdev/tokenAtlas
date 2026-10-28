@@ -7,7 +7,7 @@ import { billingAccountWithContextPreview } from "../lib/window-context-preview"
 import { useI18n, type MessageTranslator } from "../lib/i18n";
 import { capacityUnitFormat } from "../lib/codex-capacity";
 import {
-  RESET_KINDS, allSubscriptions, billingAccountOf, cycleUsdPaid, kindCounts, monthRow, perDollar, perWindowPct, periodCycles, pointsFallback, readMonthState, summarize, tokenSplit, writeMonthState,
+  RESET_KINDS, allSubscriptions, billingAccountOf, cycleUsdPaid, kindCounts, monthRow, perDollar, perResetCapacity, perWindowPct, periodCycles, pointsFallback, readMonthState, summarize, tokenSplit, writeMonthState,
   type AllUnit, type MonthAmount, type MonthPeriod, type MonthRow, type MonthState, type MonthSummary, type MonthUnit, type PerDollar, type ResetKind,
 } from "../lib/subscription-month";
 import { providerColor, subscriptionName, type RosterCard } from "../lib/roster";
@@ -225,6 +225,8 @@ function CapacitySummary({ summary: unitSummary, points, heading, span, amount: 
   const amount = points ? formats.windows : unitAmount, usedAmount = points ? formats.points : unitAmount;
   const over = summary.unused !== null && summary.unused < 0;
   const average = perWindowPct(summary);
+  // One reset's worth: in window points it is a whole window by definition, so it is shown in the unit only.
+  const perReset = points ? null : perResetCapacity(summary);
   const projection = current?.current && current.to_date
     ? `${t("to date", "do dziś")} ${pctText(current.to_date.used_pct)}${current.projection ? ` · ${t("minimal projection", "projekcja minimalna")} ${pctText(current.projection.used_pct)}` : ""}`
     : null;
@@ -245,8 +247,13 @@ function CapacitySummary({ summary: unitSummary, points, heading, span, amount: 
     </div>
     <div className="ui-toolbar subscription-month-summary-controls"><PeriodChoice period={period} pinned={pinned} onChoose={onPeriod} /></div>
     {!summary.cycles.length ? <p className="subscription-month-summary-note" data-no-cycle>{t("No cycle in this period.", "Brak cyklu w tym okresie.")}</p>
-    : <KpiStrip columns={6} items={[
+    : <KpiStrip columns={7} items={[
       { label: t("Total capacity", "Pojemność razem"), value: amount(summary.capacity), absent: summary.capacity === null, title: split },
+      { label: t("Per reset", "Na reset"), value: amount(perReset), absent: perReset === null,
+        note: perReset === null ? undefined : t("one window · {0} windows", `jedno okno · ${summary.capacityWindows.toLocaleString(locale, { maximumFractionDigits: 1 })} okien`,
+          [summary.capacityWindows.toLocaleString(locale, { maximumFractionDigits: 1 })]),
+        title: t("The whole capacity, every reset kind included, over the windows of these cycles: what one reset gives on average.",
+          "Cała pojemność, ze wszystkimi rodzajami resetów, podzielona przez okna tych cykli: ile średnio daje jeden reset.") },
       { label: t("Used", "Zużyto"), value: usedAmount(summary.used), absent: summary.used === null, title: unused },
       { label: t("Utilisation", "Wykorzystanie"), value: pctText(summary.utilisation), absent: summary.utilisation === null,
         color: over ? toneColor("warn") : undefined, title: perWindow,

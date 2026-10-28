@@ -8,7 +8,7 @@ import { installTestDom, flushUntil, invoke, findByAttribute, type TestNode } fr
 import { emptyModel } from "../lib/cycle";
 import type { RosterCard } from "../lib/roster";
 import type { ScreenProps } from "../lib/screens";
-import { allSubscriptions, monthRow, perDollar, perWindowPct, periodCycles, pointsFallback, readMonthState, summarize, writeMonthState, MONTH_STATE_KEY } from "../lib/subscription-month";
+import { allSubscriptions, monthRow, perDollar, perResetCapacity, perWindowPct, periodCycles, pointsFallback, readMonthState, summarize, writeMonthState, MONTH_STATE_KEY } from "../lib/subscription-month";
 import { SubscriptionMonth } from "./SubscriptionMonth";
 import { Capacity } from "../screens/Capacity";
 import { Value } from "../screens/Value";
@@ -307,6 +307,18 @@ test("periods: the current cycle only when current now; the previous one before 
   expect(periodCycles([ended("2026-09-18T00:00:00.000Z")], "previous", NOW).length).toBe(1);
   expect(periodCycles([ended("2026-09-01T00:00:00.000Z")], "previous", NOW)).toEqual([]);
   expect(periodCycles([endedCycle], "all", NOW)).toEqual([endedCycle]);
+});
+
+test("one reset is worth the whole capacity over its windows, whichever reset kinds are counted", () => {
+  const all = new Set(["automatic", "unidentified", "banked", "single"] as const);
+  // $4000 over 3.9 windows and 0.1 idle: $1000 a window; switching the provider resets off changes the total, not a window's worth.
+  expect(perResetCapacity(summarize([current], "api", all))).toBeCloseTo(1000, 6);
+  const withoutAutomatic = summarize([current], "api", new Set(["banked", "single"] as const));
+  expect(withoutAutomatic.capacity).toBe(3000);
+  expect(perResetCapacity(withoutAutomatic)).toBeCloseTo(1000, 6);
+  // A cycle without a capacity adds neither capacity nor windows; none at all leaves it unknown, never 0.
+  expect(perResetCapacity(summarize([older, current], "api", all))).toBeCloseTo(1000, 6);
+  expect(perResetCapacity(summarize([older], "api", all))).toBeNull();
 });
 
 test("usage not stored in the unit reads as unknown, never 0, and leaves the cycle out of both sums", () => {
