@@ -1,5 +1,27 @@
 # Initial source snapshot — 25 October 2026
 
+## First-run browser handoff — 29 October 2026
+
+A clean-PC trial reported a blank first page, with the folder wizard appearing
+after a second launch. The log showed successful preparation and server startup.
+The launcher could open the browser from the temporary preparation listener,
+then retire that listener while the first uncached frontend assets were loading.
+
+New installations now wait for the normal server's lightweight setup summary
+before opening the browser. The launcher resolves this mode before preparation,
+using the shared first-run decision and checking for a missing local database,
+including a new computer connected to an existing archive configuration. Existing
+installations retain the early preparation progress screen.
+
+The Windows-script regression reproduced the premature root-page readiness
+before the fix. After the fix, 29 launcher/preparation tests pass (118 assertions),
+including a gap between the preparation and application listeners, fresh and
+unfinished installations, existing installations and cloud configuration without
+a local database. Readiness detection leaves the fixture database bytes unchanged.
+TypeScript checking passes. The unchanged built frontend also rendered its folder
+wizard against a fresh isolated database with a synthetic detected Codex account.
+The live installation and its database were not restarted or modified.
+
 ## Public Windows installation preparation — 29 October 2026
 
 Verification used a clean `git archive` of `2a8dd02` with a frozen Bun install,

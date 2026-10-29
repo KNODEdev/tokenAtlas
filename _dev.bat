@@ -93,6 +93,11 @@ for /f "delims=" %%p in ('bun scripts\dev\active-paths.ts database') do set "DB_
 if not defined DB_PATH (echo [X] Cannot resolve the active database & pause & exit /b 1)
 set "TOKENATLAS_DB=%DB_PATH%"
 
+REM A new installation must load its first bundle after the preparation listener hands over the port.
+set "BROWSER_READY_MODE="
+for /f "delims=" %%p in ('bun scripts\dev\active-paths.ts browser-ready') do set "BROWSER_READY_MODE=%%p"
+if not defined BROWSER_READY_MODE (echo [X] Cannot resolve browser readiness & pause & exit /b 1)
+
 REM --- Front-end bundle -------------------------------------------------
 REM The server serves public/assets/*, NOT src/web - so a source change is
 REM invisible until this runs. Skipping it once cost an afternoon of "the new
@@ -108,8 +113,12 @@ if errorlevel 1 (echo [X] build:web failed - fix the error above, the page would
 echo [OK] Bundle rebuilt.
 echo.
 
-echo [4] Opening the application - database preparation appears there...
-start "" /B cmd /c "scripts\dev\wait-and-open.bat %PORT_APP%"
+if "%BROWSER_READY_MODE%"=="setup" (
+  echo [4] Opening setup when the application server is ready...
+) else (
+  echo [4] Opening the application - database preparation appears there...
+)
+start "" /B cmd /c "scripts\dev\wait-and-open.bat %PORT_APP% %BROWSER_READY_MODE%"
 echo.
 echo [5] Preparing the database and checking configuration...
 call bun "%CD%\scripts\dev\prepare-app.ts"
