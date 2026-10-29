@@ -22,8 +22,8 @@ async function child(code:string,env:Record<string,string|undefined>,args:string
 
 test("pure resolution creates nothing and a missing selected archive never falls back",async()=>{
   const f=fixture();const absentState=path.join(f.root,"absent-state");
-  expect(resolveArchiveRootFromEnv({...f.env,TOKENATLAS_LOCAL_STATE:absentState}))
-    .toBe(path.join(f.root,"OneDrive","_Hub","02_PRODUCTS","tokenUsage"));
+  expect(resolveArchiveRootFromEnv({...f.env,TOKENATLAS_LOCAL_STATE:absentState,USERPROFILE:path.join(f.root,"home")}))
+    .toBe(path.join(f.root,"home","tokenAtlas"));
   expect(fs.existsSync(absentState)).toBe(false);
   persistLocalArchiveSelection({root:f.archive,archiveId:f.id},f.env);
   fs.renameSync(f.archive,path.join(f.root,"offline"));
@@ -32,6 +32,12 @@ test("pure resolution creates nothing and a missing selected archive never falls
   const result=await child(`import {resolveArchiveRootFromEnv} from ${module};console.log(resolveArchiveRootFromEnv(process.env));`,f.env);
   expect({exit:result.exit,stderr:result.stderr,root:result.stdout}).toEqual({exit:0,stderr:"",root:path.resolve(f.archive)});
   expect(fs.existsSync(f.archive)).toBe(false);
+});
+
+test("an archive at the legacy guess keeps being found without a local choice",()=>{
+  const f=fixture();const legacy=path.join(f.root,"OneDrive","_Hub","02_PRODUCTS","tokenUsage");
+  fs.mkdirSync(legacy,{recursive:true});
+  expect(resolveArchiveRootFromEnv({...f.env,TOKENATLAS_LOCAL_STATE:path.join(f.root,"absent-state")})).toBe(legacy);
 });
 
 test("killed and concurrent first publishers never expose an empty public database",async()=>{

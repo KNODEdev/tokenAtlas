@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { api, type SetupState, type SuggestedSubscription } from "../lib/api";
+import type { ArchiveMoveStatus } from "../../shared/archive-move";
 import { useAsync } from "../lib/useAsync";
 import { DataTable, TableRow, Card, CardTitle, Dropdown, ErrorState, GhostButton, LoadingCard, Pill } from "../components/ui";
 import { polishPlural } from "../lib/mixFormat";
@@ -187,6 +188,7 @@ export function Setup({ onDone, heading }: { onDone: () => void; heading?: strin
         <div style={{ marginTop: 8, fontSize: "var(--fs-3)", color: "var(--muted)" }}>
           {t("Empty means no change; snapshots default beside the database. An entered path goes to", "Puste = bez zmiany; snapshoty domyślnie leżą obok bazy. Wpisana ścieżka trafi do")} <span className="mono">.env</span> {t("and takes effect after the server restarts - these values are read once at startup.", "i zacznie obowiązywać po restarcie serwera — te wartości czytane są raz, przy starcie.")}
         </div>
+        <ArchiveMoveLocation archive={data.archive.root} disabled={busy} />
         <DatabaseLocation database={data.snapshot.database} disabled={busy} />
         {data.temporary && <TemporaryLocation root={data.temporary.root} disabled={busy} />}
         <CloudSessionsInterval disabled={busy} />
@@ -438,6 +440,76 @@ function DatabaseLocation({ database, disabled }: { database: string; disabled: 
         "Wyniki i postęp przetwarzania są trwałe. Przeniesienie kopiuje i sprawdza bazę bez przeliczania historii. Wybierz lokalny folder poza archiwum i temp. Oryginał pozostanie jako kopia awaryjna; po restarcie strona odświeży się automatycznie.")}
     </div>
     {error && <div role="alert" style={{ marginTop: 6, fontSize: "var(--fs-4)", color: "var(--warn)" }}>{error}</div>}
+  </div>;
+}
+const samePath = (a: string, b: string) => a.replace(/[\\/]+$/, "").replace(/\\/g, "/").toLowerCase() === b.replace(/[\\/]+$/, "").replace(/\\/g, "/").toLowerCase();
+const gigabytes = (bytes: number) => (bytes / 1e9).toLocaleString(undefined, { maximumFractionDigits: bytes < 1e9 ? 2 : 1 });
+/**
+ * Moving the archive copies and verifies it while the app keeps working, then restarts onto the new
+ * folder and reloads the page. The old folder stays untouched as a copy.
+ */
+function ArchiveMoveLocation({ archive, disabled }: { archive: string; disabled: boolean }) {
+  const { t } = useI18n();
+  const [destination, setDestination] = useState("");
+  const [status, setStatus] = useState<ArchiveMoveStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const job = status?.job ?? null;
+  const active = job != null && ["copying", "verifying", "ready-to-switch", "activating"].includes(job.phase);
+  useEffect(() => { api.archiveMove().then(setStatus).catch(() => { /* not under the supervisor: the move reports why */ }); }, []);
+  useEffect(() => {
+    if (!active) return;
+    let live = true, checking = false;
+    const timer = window.setInterval(async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const next = await api.archiveMove(AbortSignal.timeout(5000));
+        if (!live) return;
+        // The restarted server answers from the new folder; reload so every screen reads it.
+        if (job && samePath(next.archive, job.destination) && !next.result?.error) { window.location.reload(); return; }
+        setStatus(next);
+      } catch { /* The server is restarting while the archive is switched. */ }
+      finally { checking = false; }
+    }, 1500);
+    return () => { live = false; window.clearInterval(timer); };
+  }, [active, job?.destination]);
+  const choose = async () => {
+    setBusy(true); setError(null);
+    try { const result = await api.chooseArchiveDirectory(); if (result.path) setDestination(result.path); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); }
+    finally { setBusy(false); }
+  };
+  const move = async () => {
+    setBusy(true); setError(null);
+    try { setStatus(await api.startArchiveMove(destination.trim())); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); }
+    finally { setBusy(false); }
+  };
+  const progress = !job || !active ? null
+    : job.phase === "ready-to-switch" || job.phase === "activating"
+      ? t("Copied and verified. Switching and restarting…", "Skopiowane i sprawdzone. Przełączam i restartuję…")
+      : job.files === 0 ? t("Listing files…", "Liczę pliki…")
+      : t("Copying {0} of {1} files ({2} of {3} GB)…", "Kopiuję {0} z {1} plików ({2} z {3} GB)…")
+        .replace("{0}", job.copiedFiles.toLocaleString()).replace("{1}", job.files.toLocaleString())
+        .replace("{2}", gigabytes(job.copiedBytes)).replace("{3}", gigabytes(job.bytes));
+  const failure = error ?? (job?.phase === "failed" ? job.error : null);
+  return <div style={{ marginTop: 14 }}>
+    <Field label={t("Move the archive", "Przenieś archiwum")}>
+      <div className="mono" style={{ fontSize: "var(--fs-3)", marginBottom: 6 }}>{status?.archive ?? archive}</div>
+      <input aria-label={t("New archive folder", "Nowy folder archiwum")} value={destination}
+        onChange={event => setDestination(event.target.value)} disabled={disabled || busy || active}
+        placeholder={t("empty or new folder", "pusty albo nowy folder")} className="ui-input" style={{ width: 380, maxWidth: "100%" }} />
+      <GhostButton onClick={choose} disabled={disabled || busy || active}>{t("Choose folder…", "Wybierz folder…")}</GhostButton>
+      <GhostButton onClick={() => void move()} disabled={disabled || busy || active || !destination.trim()}>
+        {active ? t("Moving…", "Przenoszę…") : t("Move archive", "Przenieś archiwum")}
+      </GhostButton>
+    </Field>
+    <div style={{ marginTop: 6, fontSize: "var(--fs-3)", color: "var(--muted)" }}>
+      {progress ?? t("Copies everything to the new folder and checks every file while you keep working, then restarts once. The old folder stays untouched as a copy; delete it yourself when you no longer need it. Several computers: choose a shared network folder.",
+        "Kopiuje wszystko do nowego folderu i sprawdza każdy plik, a Ty pracujesz dalej; potem jeden restart. Stary folder zostaje nietknięty jako kopia; usuń go sam, gdy nie będzie potrzebny. Kilka komputerów: wskaż wspólny folder sieciowy.")}
+    </div>
+    {failure && <div role="alert" style={{ marginTop: 6, fontSize: "var(--fs-4)", color: "var(--warn)" }}>{failure}</div>}
   </div>;
 }
 /** The temporary folder takes effect at once; `choose` fills the field, `save` applies it. */

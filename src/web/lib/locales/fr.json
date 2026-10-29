@@ -4634,5 +4634,20 @@
   "No plan": "Aucun forfait",
   "Readings show here": "Les relevés indiquent ici",
   "Remove this period? Between your other periods its dates become a gap; outside them the readings apply.": "Supprimer cette période ? Entre vos autres périodes, ses dates deviennent une interruption ; en dehors, les relevés s'appliquent.",
-  "✎ changes exactly this period, Remove deletes it. Between your periods a gap stays a gap: readings never fill it or extend a period past its end.": "✎ modifie exactement cette période, Supprimer l'efface. Entre vos périodes, une interruption reste une interruption : les relevés ne la comblent jamais et ne prolongent pas une période au-delà de sa fin."
+  "✎ changes exactly this period, Remove deletes it. Between your periods a gap stays a gap: readings never fill it or extend a period past its end.": "✎ modifie exactement cette période, Supprimer l'efface. Entre vos périodes, une interruption reste une interruption : les relevés ne la comblent jamais et ne prolongent pas une période au-delà de sa fin.",
+  "The defaults are ready: save to create the archive and start.": "Les valeurs par défaut sont prêtes : enregistrez pour créer l’archive et démarrer.",
+  "Source data": "Données sources",
+  "One computer: keep the default folder. Several computers: choose a network or synced folder, the same one on each computer; the configuration follows the archive.": "Un seul ordinateur : gardez le dossier par défaut. Plusieurs ordinateurs : choisissez un dossier réseau ou synchronisé, le même sur chaque ordinateur ; la configuration suit l’archive.",
+  "not empty": "non vide",
+  "Created on save. Several computers? Choose a shared network folder (Change…).": "Créée à l’enregistrement. Plusieurs ordinateurs ? Choisissez un dossier réseau partagé (Modifier…).",
+  "This folder holds other files. Choose an empty folder (Change…).": "Ce dossier contient d’autres fichiers. Choisissez un dossier vide (Modifier…).",
+  "Copied and verified. Switching and restarting…": "Copiée et vérifiée. Bascule et redémarrage…",
+  "Listing files…": "Comptage des fichiers…",
+  "Copying {0} of {1} files ({2} of {3} GB)…": "Copie de {0} sur {1} fichiers ({2} sur {3} Go)…",
+  "Move the archive": "Déplacer l’archive",
+  "New archive folder": "Nouveau dossier d’archive",
+  "empty or new folder": "dossier vide ou nouveau",
+  "Moving…": "Déplacement…",
+  "Move archive": "Déplacer l’archive",
+  "Copies everything to the new folder and checks every file while you keep working, then restarts once. The old folder stays untouched as a copy; delete it yourself when you no longer need it. Several computers: choose a shared network folder.": "Copie tout dans le nouveau dossier et vérifie chaque fichier pendant que vous continuez à travailler, puis redémarre une fois. L’ancien dossier reste intact comme copie ; supprimez-le vous-même quand il n’est plus utile. Plusieurs ordinateurs : choisissez un dossier réseau partagé."
 }

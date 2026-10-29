@@ -22,10 +22,14 @@ export interface SetupState {
   machine: string;
   login: string;
   profile: string;
+  /** The user's home folder; the screens shorten paths under it to `~`. */
+  home?: string;
   archive: {
     root: string;
     explicit: boolean;
     exists: boolean;
+    /** missing / empty: one click creates the archive there; other: unknown files, never written on its own. */
+    kind?: "missing" | "empty" | "archive" | "other";
     vendors: Array<{ vendor: string; profiles: string[] }>;
   };
   config: {

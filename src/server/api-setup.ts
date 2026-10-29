@@ -118,7 +118,7 @@ export async function handleSetupSave(ctx: AppContext, req: Request): Promise<Re
       return Response.json({ error: e.message }, { status: 400 });
     }
     return Response.json(
-      { error: `zapis konfiguracji nie powiodl sie: ${e instanceof Error ? e.message : String(e)}` },
+      { error: `Zapis konfiguracji nie powiódł się: ${e instanceof Error ? e.message : String(e)}` },
       { status: 500 }
     );
   }

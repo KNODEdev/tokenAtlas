@@ -2040,9 +2040,9 @@ describe("Setup handler home conflict", () => {
       expect(fs.existsSync(path.join(derived, "accounts.json"))).toBe(true);
       expect(wrote.wrote).toContain(path.join(localState, "archive-location.sqlite"));
       expectWroteOnlyUnder(wrote.wrote, tmp);
-      expect(wrote.wrote).toContain(envFile);
-      const envText = fs.readFileSync(envFile, "utf-8");
-      expect(envText).not.toContain("TOKENATLAS_CONFIG=");
+      // Nothing to record in .env, so no blank file is written (it would only force a restart).
+      expect(wrote.wrote).not.toContain(envFile);
+      expect(fs.existsSync(envFile)).toBe(false);
       expect(resolveConfigRootFromEnv({ TOKENATLAS_LOCAL_STATE: localState })).toBe(derived);
     } finally {
       if (prevArchive === undefined) delete process.env.TOKENATLAS_ARCHIVE;

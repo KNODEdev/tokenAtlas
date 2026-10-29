@@ -75,3 +75,53 @@ test("an inherited archive override blocks a different requested root before it 
     expect(fs.existsSync(requested)).toBe(false);
   } finally {fs.rmSync(root,{recursive:true,force:true,maxRetries:5,retryDelay:50});}
 },30000);
+
+// The first-run screen sends "create" for a missing or empty default folder and nothing otherwise.
+async function firstSave(prepare:(archive:string)=>void){
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),"atlas-setup-first-"));
+  const home=path.join(root,"home"),archive=path.join(home,"tokenAtlas"),envFile=path.join(root,"launcher.env");
+  fs.mkdirSync(home);fs.writeFileSync(envFile,"FOREIGN_SETTING=keep\n");prepare(archive);
+  const script=path.join(root,"first.ts");fs.writeFileSync(script,`
+    import {saveSetup,buildSetupState} from ${JSON.stringify(path.join(import.meta.dir,"setup.ts"))};
+    const db=process.env.DB!,state=buildSetupState(db),kind=state.archive.kind;
+    const create=kind==="missing"||kind==="empty";
+    let result=null,refused="";
+    try{result=saveSetup({...(create?{archive:state.archive.root,archiveAction:"create" as const}:{}),subscriptions:[]},
+      {envFile:process.env.ENV_FILE!,dbPath:db});}catch(e){refused=String(e);}
+    console.log(JSON.stringify({root:state.archive.root,kind,result,refused}));`);
+  try {
+    const run1=await run(script,{...process.env,NODE_ENV:"test",TOKENATLAS_ARCHIVE:"",TOKENATLAS_CONFIG:"",TOKENATLAS_DB:"",
+      USERPROFILE:home,OneDrive:"",ONEDRIVE:"",LOCALAPPDATA:path.join(root,"local"),TOKENATLAS_LOCAL_STATE:path.join(root,"state"),
+      ENV_FILE:envFile,DB:path.join(root,"db","atlas.sqlite")});
+    expect({exit:run1.exit,stderr:run1.stderr}).toEqual({exit:0,stderr:""});
+    const value=JSON.parse(run1.stdout);
+    expect(value.root).toBe(archive);
+    expect(fs.readFileSync(envFile,"utf8")).toBe("FOREIGN_SETTING=keep\n");
+    return {...value,archive,accounts:path.join(archive,"config","accounts.json"),files:fs.existsSync(archive)?fs.readdirSync(archive).sort():null};
+  } finally {fs.rmSync(root,{recursive:true,force:true,maxRetries:5,retryDelay:50});}
+}
+
+test("first save creates a local default archive in one step without a restart",async()=>{
+  const value=await firstSave(()=>{});
+  expect(value.kind).toBe("missing");expect(value.refused).toBe("");
+  expect(value.result.restart_required).toBe(false);expect(value.result.wrote).toContain(value.accounts);
+},30000);
+
+test("first save adopts an empty default folder",async()=>{
+  const value=await firstSave(archive=>fs.mkdirSync(archive));
+  expect(value.kind).toBe("empty");expect(value.refused).toBe("");
+  expect(value.result.restart_required).toBe(false);expect(value.result.wrote).toContain(value.accounts);
+},30000);
+
+test("first save leaves a folder of unknown files untouched and says why",async()=>{
+  const value=await firstSave(archive=>{fs.mkdirSync(archive);fs.writeFileSync(path.join(archive,"notes.txt"),"mine");});
+  expect(value.kind).toBe("other");expect(value.result).toBeNull();
+  expect(value.refused).toContain("nie jest pusty");expect(value.files).toEqual(["notes.txt"]);
+},30000);
+
+test("first save keeps using an archive that is already there",async()=>{
+  const value=await firstSave(archive=>{fs.mkdirSync(path.join(archive,"config"),{recursive:true});
+    fs.writeFileSync(path.join(archive,"config","accounts.json"),JSON.stringify({version:2,sources:[],subscriptions:[]}));});
+  expect(value.kind).toBe("archive");expect(value.refused).toBe("");
+  expect(value.result.restart_required).toBe(false);expect(value.result.wrote).toContain(value.accounts);
+},30000);

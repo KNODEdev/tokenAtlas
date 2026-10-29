@@ -1,7 +1,7 @@
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { api, type SetupState } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
-import { Disclosure, Dropdown, ErrorState, GhostButton, Pill } from "../components/ui";
+import { Disclosure, Dropdown, ErrorState, GhostButton, HelpDot, Pill } from "../components/ui";
 import { LoadingStatus } from "../components/LoadingStatus";
 import { Brand } from "../components/Sidebar";
 import { LANGUAGE_OPTIONS, useI18n } from "../lib/i18n";
@@ -11,9 +11,18 @@ import "./FirstRun.css";
 
 type FolderKey = "archive" | "config" | "database" | "temporary" | "snapshot";
 
+/** Paths under the home folder read as `~\…`; the full path stays in the tooltip. */
+function shortPath(value: string, home?: string): string {
+  const base = home?.replace(/[\\/]+$/, "");
+  if (!base) return value;
+  const rest = value.slice(base.length);
+  return value.slice(0, base.length).toLowerCase() === base.toLowerCase() && /^[\\/]/.test(rest) ? `~${rest}` : value;
+}
+
 /**
- * The view before the application: one centred panel with every folder the app uses, each beside a
- * short explanation. Rows only collect changes; the one button at the bottom applies them all.
+ * The view before the application: one centred panel with every folder the app uses. Purposes sit
+ * in HelpDots so the paths stay readable. Rows only collect changes; the one button applies them all,
+ * and on a clean machine it also creates the suggested archive.
  */
 export function FirstRun({ onDone }: { onDone: () => void }) {
   const { language, setLanguage, t } = useI18n();
@@ -31,13 +40,15 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
   const databaseMove = useDatabaseMove();
   useEffect(() => {
     if (!data) return;
+    // Detected sources are saved as suggested; the advanced section is only for corrections.
     const initial = data.suggestion.map((s) => ({ ...s, editedId: s.id, include: true }));
     setRows(initial);
     setInitialSources(JSON.stringify(setupDeclarations(initial)));
-    // Without declared accounts the sources are the one thing left to answer, so they start open.
-    setAdvanced(!data.configured);
   }, [data]);
   const value = (key: FolderKey) => pending[key].trim();
+  // Saving on a clean machine is the explicit choice to create the suggested archive (missing or empty folder).
+  const archiveKind = data ? data.archive.kind ?? (data.archive.exists ? "archive" : "missing") : null;
+  const createDefault = (archiveKind === "missing" || archiveKind === "empty") && !value("archive");
   const folderChanged = Boolean(value("archive") || value("config") || value("snapshot"));
   const restarts = folderChanged || Boolean(value("database"));
   const sourcesEdited = data != null && JSON.stringify(setupDeclarations(rows)) !== initialSources;
@@ -61,12 +72,18 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
       if (value("temporary")) await api.saveTemporaryDirectory(value("temporary"));
       let restartReason: string | null = null, wrote: string[] = [];
       if (folderChanged || sourcesEdited || !data.configured) {
+        const archive = value("archive") || (createDefault ? data.archive.root : "");
+        // Accounts come from each provider's login; a subscription that names no account would never
+        // match one and only shadow the real account, so the first save declares sources alone.
+        const declarations = setupDeclarations(rows);
         const res = await api.setupSave({
-          archive: value("archive") || null,
-          ...(value("archive") ? { archiveAction } : {}),
-          config: value("config") || null,
+          archive: archive || null,
+          ...(archive ? { archiveAction: value("archive") ? archiveAction : "create" } : {}),
+          // An inherited configuration folder must be named, or choosing the archive would move it.
+          config: value("config") || (createDefault && data.config.explicit ? data.config.root : null),
           snapshot: value("snapshot") || null,
-          ...setupDeclarations(rows),
+          ...declarations,
+          subscriptions: declarations.subscriptions.filter((subscription) => subscription.account),
         });
         wrote = res.wrote;
         if (res.restart_required) restartReason = res.restart_reason;
@@ -85,11 +102,12 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
       setBusy(false);
     }
   };
-  const row = (key: FolderKey, props: { path: string; missing?: boolean; placeholder?: string; explanation: ReactNode; extra?: ReactNode }) => (
-    <LocationRow label={labels[key]} {...props} pending={pending[key]} editing={editing === key}
+  const row = (key: FolderKey, props: { path: string; status?: ReactNode; note?: ReactNode; placeholder?: string; explanation: ReactNode; extra?: ReactNode }) => (
+    <LocationRow label={labels[key]} {...props} home={data?.home} pending={pending[key]} editing={editing === key}
       disabled={busy || !!databaseMove.moving} onEdit={(open) => setEditing(open ? key : null)}
       onPending={(next) => setPending((current) => ({ ...current, [key]: next }))} choose={chooseFolder} />
   );
+  const error = err ?? databaseMove.error;
   return (
     <div className="first-run">
       <div className="ui-card first-run-panel">
@@ -113,22 +131,24 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
               <span className="first-run-machine">{data.machine} / {data.login}</span>
             </div>
             <p className="first-run-lead">
-              {t("Check the folders before the first import; the defaults usually fit.",
-                "Sprawdź foldery przed pierwszym importem; domyślne zwykle pasują.")}
+              {createDefault
+                ? t("The defaults are ready: save to create the archive and start.", "Domyślne ustawienia są gotowe: zapisz, aby utworzyć archiwum i zacząć.")
+                : t("Check the folders before the first import; the defaults usually fit.", "Sprawdź foldery przed pierwszym importem; domyślne zwykle pasują.")}
             </p>
-            {data.reason && <p className="first-run-reason" role="alert">{data.reason}</p>}
+            {/* A missing archive is said on its row; the server's reason then only repeats it. */}
+            {data.reason && data.archive.exists && <p className="first-run-reason" role="alert">{data.reason}</p>}
             <div className="first-run-rows">
-              <div className="first-run-row is-head" aria-hidden="true">
-                <span>{t("Folder", "Folder")}</span>
-                <span>{t("What it holds", "Co przechowuje")}</span>
-                <span>{t("Location", "Lokalizacja")}</span>
-                <span />
-              </div>
-              <Group tone="accent" badge={t("synced", "synchronizowane")} title={t("Shared by all computers", "Wspólne dla wszystkich komputerów")}
-                hint={t("Keep them in OneDrive or another synced folder and point every computer at the same place.",
-                  "Trzymaj je w OneDrive lub innym synchronizowanym folderze i wskaż to samo miejsce na każdym komputerze.")} />
+              <Group title={t("Source data", "Dane źródłowe")}
+                hint={t("One computer: keep the default folder. Several computers: choose a network or synced folder, the same one on each computer; the configuration follows the archive.",
+                  "Jeden komputer: zostaw domyślny folder. Kilka komputerów: wskaż folder sieciowy lub synchronizowany, ten sam na każdym komputerze; konfiguracja idzie za archiwum.")} />
               {row("archive", {
-                path: data.archive.root, missing: !data.archive.exists,
+                path: data.archive.root,
+                status: archiveKind === "missing" || archiveKind === "empty" ? <Pill tone="accent">{t("new", "nowe")}</Pill>
+                  : archiveKind === "other" ? <Pill tone="warn">{t("not empty", "niepusty")}</Pill> : null,
+                note: createDefault ? t("Created on save. Several computers? Choose a shared network folder (Change…).",
+                  "Powstanie przy zapisie. Kilka komputerów? Wskaż wspólny folder sieciowy (Zmień…).")
+                  : archiveKind === "other" && !value("archive") ? t("This folder holds other files. Choose an empty folder (Change…).",
+                  "Ten folder zawiera inne pliki. Wskaż pusty folder (Zmień…).") : null,
                 extra: (
                   <Dropdown ariaLabel={t("Archive operation", "Operacja archiwum")} value={archiveAction} disabled={busy}
                     onChange={value => setArchiveAction(value as "create" | "connect")} className="ui-input" options={[
@@ -140,7 +160,10 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
                   "Oryginały od dostawców ze wszystkich komputerów; z nich odtwarza się całą historię. Warto mieć kopię."),
               })}
               {row("config", {
-                path: data.config.root, missing: data.config.present.length === 0,
+                path: data.config.root,
+                status: data.config.present.length > 0 ? null : createDefault
+                  ? <Pill tone="accent">{t("new", "nowa")}</Pill>
+                  : <Pill tone="warn">{t("missing", "brak")}</Pill>,
                 explanation: t("Subscriptions, projects, account periods: the same rules on every computer. Inside the archive by default.",
                   "Subskrypcje, projekty, okresy kont: te same zasady na każdym komputerze. Domyślnie w archiwum."),
               })}
@@ -160,13 +183,19 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
               {row("snapshot", {
                 path: data.snapshot.root,
                 explanation: t("Database copy taken before a migration. Beside the database.",
-                  "Kopia bazy przed migracją. Obok bazy, nigdy w OneDrive."),
+                  "Kopia bazy przed migracją. Obok bazy."),
               })}
               <div className="first-run-row">
-                <div className="first-run-label">{t("Sources", "Źródła")}{data.live.some((l) => l.exists) ? null : <Pill tone="warn">{t("missing", "brak")}</Pill>}</div>
-                <div className="first-run-explain">{t("Detected provider folders; new sessions are copied to the archive.",
-                  "Wykryte foldery dostawców; nowe sesje trafiają do archiwum.")}</div>
-                <div className="mono first-run-path">{data.live.filter((l) => l.exists).map((l) => l.vendor).join(", ") || t("none found", "nie znaleziono")}</div>
+                <div className="first-run-label">
+                  {t("Sources", "Źródła")}
+                  <HelpDot label={t("Sources", "Źródła")}>{t("Detected provider folders; new sessions are copied to the archive.",
+                    "Wykryte foldery dostawców; nowe sesje trafiają do archiwum.")}</HelpDot>
+                </div>
+                <div className="first-run-sources">
+                  {data.live.some((l) => l.exists)
+                    ? data.live.filter((l) => l.exists).map((l) => <span key={l.vendor} title={l.path}><Pill dot>{l.vendor}</Pill></span>)
+                    : <Pill tone="warn">{t("none found", "nie znaleziono")}</Pill>}
+                </div>
                 <div />
               </div>
             </div>
@@ -182,7 +211,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
                 </Section>}
               </div>}
             </div>
-            {(err ?? databaseMove.error) && <ErrorState message={(err ?? databaseMove.error)!} onRetry={() => setErr(null)} />}
+            {error && <p className="first-run-error" role="alert">{error}</p>}
             <div className="first-run-foot">
               <span className="first-run-foot-note">
                 {editing !== null
@@ -198,7 +227,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
                 {databaseMove.moving ? t("Moving the database…", "Przenoszę bazę…")
                   : busy ? t("Saving…", "Zapisuję…")
                   : restarts ? t("Save and restart", "Zapisz i uruchom ponownie")
-                  : changedLabels.length ? t("Save and start", "Zapisz i zacznij")
+                  : changedLabels.length || !data.configured ? t("Save and start", "Zapisz i zacznij")
                   : t("Start with these folders", "Zacznij z tymi folderami")}
               </GhostButton>
             </div>
@@ -208,13 +237,13 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** A heading inside the folder list that says whether the folders below are shared or local. */
-function Group({ tone, badge, title, hint }: { tone: "accent" | "neutral"; badge: string; title: string; hint: string }) {
+/** A heading inside the folder list that says whether the folders below are shared or local; the advice sits in its HelpDot. */
+function Group({ tone = "neutral", badge, title, hint }: { tone?: "accent" | "neutral"; badge?: string; title: string; hint: string }) {
   return (
     <div className="first-run-group">
       <span className="first-run-group-title">{title}</span>
-      <Pill tone={tone}>{badge}</Pill>
-      <span className="first-run-group-hint">{hint}</span>
+      {badge && <Pill tone={tone}>{badge}</Pill>}
+      <HelpDot label={title}>{hint}</HelpDot>
     </div>
   );
 }
@@ -224,13 +253,15 @@ function Section({ children }: { children: ReactNode }) {
 }
 
 /**
- * One folder: name, purpose, location and "Change…". Editing happens in a recessed well on a draft;
+ * One folder: name (purpose in its HelpDot), location and "Change…". Editing happens in a recessed well on a draft;
  * "Done" keeps it as a pending change, "Cancel" (or Esc) drops the draft. Nothing is written here.
  */
-function LocationRow({ label, path, missing, placeholder, explanation, extra, pending, editing, disabled, onEdit, onPending, choose }: {
+function LocationRow({ label, path, home, status, note, placeholder, explanation, extra, pending, editing, disabled, onEdit, onPending, choose }: {
   label: string;
   path: string;
-  missing?: boolean;
+  home?: string;
+  status?: ReactNode;
+  note?: ReactNode;
   placeholder?: string;
   explanation: ReactNode;
   extra?: ReactNode;
@@ -253,11 +284,15 @@ function LocationRow({ label, path, missing, placeholder, explanation, extra, pe
   };
   return (
     <div className={`first-run-row${editing ? " is-editing" : ""}`}>
-      <div className="first-run-label">{label}{!next && missing ? <Pill tone="warn">{t("missing", "brak")}</Pill> : null}</div>
-      <div className="first-run-explain">{explanation}</div>
-      <div className="mono first-run-path">
-        <span className={next ? "is-replaced" : undefined}>{path}</span>
-        {next && <span className="is-next">→ {next}</span>}
+      <div className="first-run-label">
+        {label}
+        <HelpDot label={label}>{explanation}</HelpDot>
+        {!next && status}
+      </div>
+      <div className="first-run-path">
+        <span className={`mono${next ? " is-replaced" : ""}`} title={path}>{shortPath(path, home)}</span>
+        {next && <span className="mono is-next" title={next}>→ {shortPath(next, home)}</span>}
+        {!next && note && <span className="first-run-note">{note}</span>}
       </div>
       <div className="first-run-change">
         {!editing && <GhostButton onClick={open} disabled={disabled}>{t("Change…", "Zmień…")}</GhostButton>}

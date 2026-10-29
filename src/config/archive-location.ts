@@ -57,14 +57,14 @@ export function prepareArchiveConnection(root: string, action: ArchiveConnection
   const identity = readArchiveIdentity(target);
   const changing = options.currentRoot && realArchiveLocation(options.currentRoot) !== target;
   if (hasIndexedFacts(options.sqlite) && ((bound && identity !== bound) || (!bound && changing)))
-    throw new Error("A different archive cannot be connected to this populated index. Move the current archive or use a separate empty index. / Innego archiwum nie można połączyć z tą bazą. Przenieś bieżące archiwum albo użyj oddzielnej pustej bazy.");
-  if (fs.existsSync(target) && !fs.statSync(target).isDirectory()) throw new Error("Archive location is not a directory");
+    throw new Error("A different archive cannot be connected to this populated index. Use Settings → Move archive to change its folder. / Innego archiwum nie można połączyć z tą bazą. Aby zmienić folder archiwum, użyj „Przenieś archiwum” w Ustawieniach.");
+  if (fs.existsSync(target) && !fs.statSync(target).isDirectory()) throw new Error("Archive location is not a directory / Wskazana ścieżka archiwum nie jest folderem.");
   const entries = fs.existsSync(target) ? fs.readdirSync(target) : [];
-  if (action === "create" && entries.length) throw new Error("Create requires an empty directory; connect an existing archive instead");
+  if (action === "create" && entries.length) throw new Error("Create requires an empty directory; connect an existing archive instead / Nowe archiwum wymaga pustego folderu. Wybierz pusty folder albo „Podłącz istniejące archiwum”.");
   if (action === "connect" && !identity && !hasAccountsConfiguration(target))
-    throw new Error("This directory is not a recognized archive; no files were changed");
+    throw new Error("This directory is not a recognized archive; no files were changed / Ten folder nie jest archiwum tokenAtlas; nic nie zostało zmienione. Wybierz „Utwórz w pustym folderze” albo wskaż właściwy folder.");
   if (!fs.existsSync(target)) {
-    if (action !== "create") throw new Error("Archive unavailable; connection cannot recreate it");
+    if (action !== "create") throw new Error("Archive unavailable; connection cannot recreate it / Tego archiwum nie ma pod wskazaną ścieżką. Sprawdź, czy folder jest dostępny i zsynchronizowany.");
     fs.mkdirSync(target, {recursive:true});
   }
   return withArchiveWriter(target, () => {

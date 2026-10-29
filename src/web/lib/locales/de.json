@@ -4634,5 +4634,20 @@
   "No plan": "Kein Plan",
   "Readings show here": "Messwerte zeigen hier",
   "Remove this period? Between your other periods its dates become a gap; outside them the readings apply.": "Diesen Zeitraum entfernen? Zwischen Ihren anderen Zeiträumen werden seine Daten zur Lücke; außerhalb gelten die Messwerte.",
-  "✎ changes exactly this period, Remove deletes it. Between your periods a gap stays a gap: readings never fill it or extend a period past its end.": "✎ ändert genau diesen Zeitraum, Entfernen löscht ihn. Zwischen Ihren Zeiträumen bleibt eine Lücke eine Lücke: Messwerte füllen sie nie und verlängern keinen Zeitraum über sein Ende hinaus."
+  "✎ changes exactly this period, Remove deletes it. Between your periods a gap stays a gap: readings never fill it or extend a period past its end.": "✎ ändert genau diesen Zeitraum, Entfernen löscht ihn. Zwischen Ihren Zeiträumen bleibt eine Lücke eine Lücke: Messwerte füllen sie nie und verlängern keinen Zeitraum über sein Ende hinaus.",
+  "The defaults are ready: save to create the archive and start.": "Die Standardwerte sind bereit: Speichern legt das Archiv an und startet.",
+  "Source data": "Quelldaten",
+  "One computer: keep the default folder. Several computers: choose a network or synced folder, the same one on each computer; the configuration follows the archive.": "Ein Computer: Standardordner beibehalten. Mehrere Computer: einen Netzwerk- oder synchronisierten Ordner wählen, auf jedem Computer denselben; die Konfiguration folgt dem Archiv.",
+  "not empty": "nicht leer",
+  "Created on save. Several computers? Choose a shared network folder (Change…).": "Wird beim Speichern angelegt. Mehrere Computer? Gemeinsamen Netzwerkordner wählen (Ändern…).",
+  "This folder holds other files. Choose an empty folder (Change…).": "Dieser Ordner enthält andere Dateien. Wählen Sie einen leeren Ordner (Ändern…).",
+  "Copied and verified. Switching and restarting…": "Kopiert und geprüft. Umschalten und Neustart…",
+  "Listing files…": "Dateien werden gezählt…",
+  "Copying {0} of {1} files ({2} of {3} GB)…": "Kopiere {0} von {1} Dateien ({2} von {3} GB)…",
+  "Move the archive": "Archiv verschieben",
+  "New archive folder": "Neuer Archivordner",
+  "empty or new folder": "leerer oder neuer Ordner",
+  "Moving…": "Wird verschoben…",
+  "Move archive": "Archiv verschieben",
+  "Copies everything to the new folder and checks every file while you keep working, then restarts once. The old folder stays untouched as a copy; delete it yourself when you no longer need it. Several computers: choose a shared network folder.": "Kopiert alles in den neuen Ordner und prüft jede Datei, während Sie weiterarbeiten; danach ein Neustart. Der alte Ordner bleibt unverändert als Kopie; löschen Sie ihn selbst, wenn er nicht mehr gebraucht wird. Mehrere Computer: gemeinsamen Netzwerkordner wählen."
 }

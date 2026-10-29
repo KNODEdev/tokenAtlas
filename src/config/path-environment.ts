@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { readLocalArchiveSelection } from "./archive-locator";
@@ -7,9 +8,14 @@ import {
   readCanonicalArchiveRoot,
 } from "./archive-paths";
 
-const ARCHIVE_SUFFIX = ["_Hub", "02_PRODUCTS", "tokenUsage"] as const;
+const LEGACY_ARCHIVE_SUFFIX = ["_Hub", "02_PRODUCTS", "tokenUsage"] as const;
+const ARCHIVE_FOLDER = "tokenAtlas";
 
-/** Explicit process configuration wins; the legacy guess is used only without a durable local choice. */
+/**
+ * Explicit process configuration wins, then the durable local choice. Without either, an archive
+ * already at the legacy OneDrive guess is kept; a clean machine gets a plain local folder in the
+ * home directory. Sharing between computers is the user's choice of a network or synced folder.
+ */
 export function resolveArchiveRootFromEnv(
   env: Record<string, string | undefined> = process.env,
 ): string {
@@ -17,9 +23,11 @@ export function resolveArchiveRootFromEnv(
   if (explicit) return path.resolve(explicit);
   const selected = readLocalArchiveSelection(env);
   if (selected) return selected.root;
+  const home = env.USERPROFILE?.trim() || os.homedir();
   const oneDrive = (env.OneDrive || env.ONEDRIVE)?.trim();
-  if (oneDrive) return path.join(oneDrive, ...ARCHIVE_SUFFIX);
-  return path.join(os.homedir(), "OneDrive", ...ARCHIVE_SUFFIX);
+  const legacy = path.join(oneDrive || path.join(home, "OneDrive"), ...LEGACY_ARCHIVE_SUFFIX);
+  if (fs.existsSync(legacy)) return legacy;
+  return path.join(home, ARCHIVE_FOLDER);
 }
 
 export interface EnvironmentPathValues {

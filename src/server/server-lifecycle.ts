@@ -7,6 +7,7 @@ import { configFile, ARCHIVE_ROOT, CONFIG_ROOT, MACHINE, archive, PROFILE } from
 import { assertExistingAtlasSchemaCurrent, pendingAtlasBootstrapRecovery, pendingAtlasBootstrapVendors, finishAtlasBootstrapRecovery } from "../db/bootstrap";
 import { mainThreadStallCheck } from "./main-thread-stall";
 import { startArchiveRelocationVerification } from "../sync/archive-relocation-startup";
+import { createArchiveMove } from "./archive-move";
 import { scanCodexProfiles } from "../providers/codex-identity";
 import { scanVendorProfiles } from "../providers/vendor-identity";
 import type { VendorProfile } from "../providers/vendor-identity";
@@ -561,20 +562,22 @@ export function startServer(
     void archiveCompression?.close();
     void cloudSessions?.close();
     void relocationVerification?.close();
+    void ctx.archiveMove?.close();
     void ctx.analysisReader?.close(); void ctx.directReader?.close();
     const stoppable = server as typeof server & { stop?: (closeActiveConnections?: boolean) => void };
     stoppable.stop?.(true);
     if (ownsContext) ctx.sqlite.close();
   };
   if (ownsContext && process.send && process.argv.includes("--atlas-server-child")) {
-    ctx.relocateDatabase = destination => {
+    // Both moves hand the supervisor a request and stop this process; it switches and starts a new one.
+    const restartFor = (message: import("./supervisor").DatabaseRestartRequest | import("./supervisor").ArchiveSwitchRequest) => {
       const rebuild = analysisRebuildStatus(ctx.sqlite);
       if (ctx.databaseRelocating || activeSyncCompletion || getRemapState().running
         || liveReadings.running || vendorProbesInFlight.size || rebuild?.state === "queued" || rebuild?.state === "running") {
         throw new Error("Wait for synchronization or recalculation to finish. / Poczekaj na zakończenie synchronizacji lub przeliczania.");
       }
       ctx.databaseRelocating = true;
-      process.send!({ type: "relocate-database", destination });
+      process.send!(message);
       closed = true;
       for (const handle of timeoutHandles) rawClearTimeout(handle);
       for (const handle of intervalHandles) rawClearInterval(handle);
@@ -584,12 +587,20 @@ export function startServer(
       // Allow the accepted response to reach the browser before shutting down the listener.
       rawSetTimeout(() => {
         void (async () => {
-          await Promise.all([analysisMaintenance?.close(), archiveCompression?.close(), cloudSessions?.close(), relocationVerification?.close()]);
+          await Promise.all([analysisMaintenance?.close(), archiveCompression?.close(), cloudSessions?.close(),
+            relocationVerification?.close(), ctx.archiveMove?.close()]);
           ctx.sqlite.close();
           process.exit(75);
         })().catch(error => { console.error("[tokenAtlas] Shutdown failed:", error); process.exit(1); });
       }, 250);
     };
+    ctx.relocateDatabase = destination => restartFor({ type: "relocate-database", destination });
+    ctx.archiveMove = createArchiveMove({
+      archiveRoot: ARCHIVE_ROOT, database: ctx.dbPath ?? resolveDbPath(customDbPath),
+      activate: (jobId, stateDirectory) => restartFor({ type: "activate-archive", jobId, stateDirectory }),
+      previousResult: JSON.parse(process.env.TOKENATLAS_ARCHIVE_MOVE_RESULT || "null"),
+    });
+    ctx.archiveMove.resume();
   }
   return { server, ctx, close };
 }

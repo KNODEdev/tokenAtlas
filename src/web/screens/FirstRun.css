@@ -36,30 +36,27 @@
   line-height: 1.5;
 }
 
-/* One line per folder: what | what it holds | location | change; rows split by the dashed rule. */
-.first-run-rows { margin-top: var(--s-6); border-top: var(--rule); }
+/* One line per folder: name | location | change; purposes live in HelpDots, rows split by the dashed rule. */
+.first-run-rows { margin-top: var(--s-4); }
 .first-run-row {
   display: grid;
-  grid-template-columns: 130px minmax(0, 1fr) minmax(0, 1.2fr) 76px;
+  grid-template-columns: 190px minmax(0, 1fr) auto;
   align-items: center;
   column-gap: var(--s-8);
   padding: var(--s-3) 0;
   border-bottom: var(--rule);
-  min-height: 40px;
+  min-height: 44px;
 }
-.first-run-row.is-head { min-height: 0; padding: var(--s-2) 0; font-size: var(--fs-2); color: var(--faint); }
 .first-run-group {
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--s-2) var(--s-4);
+  align-items: center;
+  gap: var(--s-4);
   padding: var(--s-7) 0 var(--s-3);
   border-bottom: var(--rule);
 }
 /* A group after other rows starts well apart, so shared and local read as two blocks. */
-.first-run-row:not(.is-head) + .first-run-group { margin-top: var(--s-11); }
+.first-run-row + .first-run-group { margin-top: var(--s-8); }
 .first-run-group-title { font-size: var(--fs-5); font-weight: var(--fw-semibold); }
-.first-run-group-hint { flex-basis: 100%; font-size: var(--fs-2); color: var(--muted); }
 .first-run-label {
   display: flex;
   align-items: center;
@@ -67,10 +64,12 @@
   font-size: var(--fs-4);
   font-weight: var(--fw-semibold);
 }
-.first-run-path { font-size: var(--fs-3); overflow-wrap: anywhere; line-height: 1.4; }
+.first-run-path { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; font-size: var(--fs-4); line-height: 1.4; }
+.first-run-path .mono { overflow-wrap: anywhere; }
 .first-run-path .is-replaced { color: var(--faint); text-decoration: line-through; }
-.first-run-path .is-next { display: block; color: var(--accent); }
-.first-run-explain { font-size: var(--fs-2); line-height: 1.4; color: var(--muted); }
+.first-run-path .is-next { color: var(--accent); }
+.first-run-note { font-size: var(--fs-2); color: var(--muted); }
+.first-run-sources { display: flex; flex-wrap: wrap; gap: var(--s-3); }
 .first-run-change { justify-self: end; }
 /* The row being edited becomes a recessed well (paper-atlas: a well uses --sunk, no frame). */
 .first-run-row.is-editing {
@@ -92,7 +91,16 @@
 .first-run-editor-field .ui-input:first-child { flex: 1 1 240px; min-width: 0; }
 .first-run-editor-actions { margin-left: auto; display: flex; align-items: center; gap: var(--s-6); }
 .first-run-editor-actions .ui-button.is-primary { font-size: var(--fs-4); padding: var(--s-2) var(--s-7); }
-.first-run-error { grid-column: 2 / -1; font-size: var(--fs-3); color: var(--warn); }
+.first-run-error {
+  margin: var(--s-6) 0 0;
+  padding: var(--s-4) var(--s-6);
+  border-radius: var(--r-chip);
+  background: var(--crit-soft);
+  color: var(--crit);
+  font-size: var(--fs-3);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
 
 .first-run-advanced { margin-top: var(--s-6); }
 .first-run-section { margin-top: var(--s-6); padding-top: var(--s-6); border-top: var(--rule); }

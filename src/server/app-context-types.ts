@@ -39,6 +39,8 @@ export interface AppContext {
   waitForBackgroundWriters?: () => Promise<void>;
   databaseRelocating?: boolean;
   relocateDatabase?: (destination: string) => void;
+  /** Settings → move archive (`archive-move.ts`); present only under the supervisor that performs the switch. */
+  archiveMove?: import("./archive-move").ArchiveMove;
   /** The first-run screen's "Start with these folders": releases a fresh database's first import. */
   confirmLocations?: () => void;
   snapshotPublisher?: (mode: "automatic" | "manual") => AtlasSnapshotPublishResult;

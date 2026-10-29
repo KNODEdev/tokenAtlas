@@ -18,6 +18,7 @@ import {
   PRIVATE_CONFIG_FILES,
   PROFILE,
   REPO_ROOT,
+  HOME_DIR,
   archiveProfiles,
   atlasIndexSnapshotPool,
   configFile,
@@ -96,10 +97,12 @@ export interface SetupState {
   machine: string;
   login: string;
   profile: string;
+  home: string;
   archive: {
     root: string;
     explicit: boolean;
     exists: boolean;
+    kind: ArchiveFolderKind;
     vendors: Array<{ vendor: string; profiles: string[] }>;
   };
   config: {
@@ -126,6 +129,18 @@ function safeExists(p: string): boolean {
     return fs.existsSync(p);
   } catch {
     return false;
+  }
+}
+/** What a folder offered as the archive holds: decides whether one click may create the archive there. */
+export type ArchiveFolderKind = "missing" | "empty" | "archive" | "other";
+export function archiveFolderKind(root: string): ArchiveFolderKind {
+  if (!safeExists(root)) return "missing";
+  try {
+    if (!fs.statSync(root).isDirectory()) return "other";
+    if (safeExists(path.join(root, ".archive-inventory", "identity.json")) || safeExists(path.join(root, "config", "accounts.json"))) return "archive";
+    return fs.readdirSync(root).length === 0 ? "empty" : "other";
+  } catch {
+    return "other";
   }
 }
 function accountsDeclared(): { ok: boolean; file: string; count: number } {
@@ -259,25 +274,25 @@ export function buildSetupState(database: string = resolveDbPath()): SetupState 
   }
   let reason: string | null = null;
   if (!archiveExists) {
-    reason = `Archiwum nie istnieje pod ${ARCHIVE_ROOT}. To z niego czytane sa wszystkie transkrypty, wiec bez niego nie ma czego liczyc.`;
+    reason = `Archiwum jeszcze nie istnieje: ${ARCHIVE_ROOT}. Zapis utworzy je w tym folderze; jeśli masz archiwum z innego komputera, podłącz je.`;
   } else if (!accounts.ok) {
     reason =
       vendors.some((v) => v.vendor === "codex")
-        ? "Archiwum ma rollouty Codeksa, ale zadna subskrypcja nie jest zadeklarowana. Rollouty nie niosa identyfikatora konta, wiec przypisanie musi byc recznie potwierdzone."
-        : "Brak accounts.json. Nawet bez Codeksa plik musi istniec, zeby aplikacja wiedziala, ze pytanie zostalo zadane i zamkniete.";
+        ? "Archiwum ma rollouty Codeksa, ale żadna subskrypcja nie jest zadeklarowana. Rollouty nie niosą identyfikatora konta, więc przypisanie trzeba potwierdzić ręcznie."
+        : "Brak accounts.json. Zapis utworzy go z wykrytymi źródłami.";
   }
   if (conflicts.length > 0) {
     notes.push(
-      `OneDrive zostawil kopie konfliktowe: ${conflicts.join(", ")}. Aplikacja czyta wersje podstawowa i NIE scala ich sama - porownaj je i usun zbedna, inaczej czesc regul zniknie bez sladu.`
+      `OneDrive zostawił kopie konfliktowe: ${conflicts.join(", ")}. Aplikacja czyta wersję podstawową i nie scala ich sama: porównaj je i usuń zbędną, inaczej część reguł zniknie bez śladu.`
     );
   }
   if (!ARCHIVE_ROOT_IS_EXPLICIT && !readLocalArchiveSelection() && !archiveExists) {
     notes.push(
-      "Sciezka archiwum jest zgadywana z %OneDrive%. Jesli archiwum lezy gdzie indziej, wybierz je jawnie - wybor zostanie zapisany lokalnie dla tej maszyny."
+      "Ścieżka archiwum jest domyślna. Jeśli archiwum leży gdzie indziej, wskaż je; wybór zostanie zapisany lokalnie dla tej maszyny."
     );
   }
   if (accounts.ok && accounts.count === 0) {
-    notes.push("accounts.json istnieje, ale nie deklaruje zadnej subskrypcji - ekrany Codeksa zostana puste.");
+    notes.push("accounts.json istnieje, ale nie deklaruje żadnej subskrypcji: ekrany Codeksa zostaną puste.");
   }
   return {
     profiles: [
@@ -290,7 +305,8 @@ export function buildSetupState(database: string = resolveDbPath()): SetupState 
     machine: MACHINE,
     login: LOGIN,
     profile: PROFILE,
-    archive: { root: ARCHIVE_ROOT, explicit: ARCHIVE_ROOT_IS_EXPLICIT, exists: archiveExists, vendors },
+    home: HOME_DIR,
+    archive: { root: ARCHIVE_ROOT, explicit: ARCHIVE_ROOT_IS_EXPLICIT, exists: archiveExists, kind: archiveFolderKind(ARCHIVE_ROOT), vendors },
     config: {
       root: CONFIG_ROOT,
       explicit: CONFIG_ROOT_IS_EXPLICIT,
@@ -385,6 +401,10 @@ function setupRootsFor(
 }
 function rootKey(root: string): string {
   return path.resolve(root).replace(/\\/g, "/").toLowerCase();
+}
+function locationInside(root: string, candidate: string): boolean {
+  const base = rootKey(root), key = rootKey(candidate);
+  return key === base || key.startsWith(`${base}/`);
 }
 export function assertConfigRootNotShadowed(
   input: Pick<SetupSaveInput, "archive" | "config">
@@ -490,7 +510,8 @@ export function saveSetup(input: SetupSaveInput, persist: SetupPersistTargets = 
       .filter(line=>!replaced.has(line.trim().split("=")[0]!)).join("\n").trimEnd();
     const managed = envLines.length ? "\n"+marker+"\n"+envLines.join("\n")+"\n" : "\n";
     const next = (kept ? kept+"\n" : "")+managed;
-    if (next === existing) return;
+    // Trailing blank lines change nothing the next process reads, so they never force a restart.
+    if (next.trimEnd() === existing.trimEnd()) return;
     atomicArchiveWrite(envFile,next);
     wrote.push(envFile);
     environmentChanged = true;
@@ -523,6 +544,13 @@ export function saveSetup(input: SetupSaveInput, persist: SetupPersistTargets = 
     return {ok:true,wrote,restart_required:restartRequired,restart_reason:restartRequired
       ? "Archiwum podłączone. Uruchom aplikację ponownie, aby użyć wybranej lokalizacji.":null};
   }
+  // Configuration lives in the archive by default; never write it into a folder nobody chose to create.
+  if (!archiveConnection && !safeExists(archiveRoot) && locationInside(archiveRoot, configRoot))
+    throw new Error(`Archiwum nie istnieje: ${archiveRoot}. Wybierz „Utwórz nowe” albo wskaż istniejące archiwum.`);
+  // A first save into unknown files could fork an archive OneDrive is still downloading.
+  if (!archiveConnection && locationInside(archiveRoot, configRoot) && !safeExists(path.join(configRoot, "accounts.json"))
+      && archiveFolderKind(archiveRoot) === "other")
+    throw new Error(`Folder archiwum nie jest pusty i nie wygląda na archiwum tokenAtlas: ${archiveRoot}. Jeśli to folder synchronizowany z innym komputerem, poczekaj na koniec synchronizacji i spróbuj ponownie; w przeciwnym razie wskaż pusty folder.`);
   const targetConfigRoot = configRoot;
   const accountsFile = path.join(targetConfigRoot, "accounts.json");
   const targetDocument = readAccountsDocument(accountsFile);
@@ -570,7 +598,7 @@ export function saveSetup(input: SetupSaveInput, persist: SetupPersistTargets = 
     wrote,
     restart_required: restartRequired,
     restart_reason: restartRequired
-      ? "Sciezki i lokalny wybor archiwum sa czytane raz, przy starcie - uruchom _dev.bat ponownie."
+      ? "Ścieżki i lokalny wybór archiwum są czytane raz, przy starcie: uruchom aplikację ponownie."
       : null,
   };
 }

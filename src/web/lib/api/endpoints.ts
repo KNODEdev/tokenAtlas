@@ -1,5 +1,6 @@
 import type { AccountPeriodsView, PeriodEdit, PeriodEditPreview, PeriodEditResult } from "../../../shared/account-periods";
 import type { ClaudeLoginResponse, ClaudeLoginView } from "../../../shared/claude-login";
+import type { ArchiveMoveStatus } from "../../../shared/archive-move";
 import type { CloudSessionsResponse } from "../../../shared/cloud-sessions";
 import type { CodexPricingEdit, CodexPricingSettings } from "../../../shared/codex-pricing-settings";
 import type { CreditNoticeView } from "../../../shared/credit-notices";
@@ -138,6 +139,8 @@ export const api = {
   relocateDatabaseToFolder: (directory: string) => post<{destination:string}>("/api/setup/database", { directory }),
   chooseArchiveDirectory: () => post<{path:string|null}>("/api/setup/directory", {}),
   relocateDatabase: (destination: string) => post<{ destination: string }>("/api/setup/database", { destination }),
+  archiveMove: (signal?: AbortSignal) => get<ArchiveMoveStatus>("/api/setup/archive-move", undefined, signal),
+  startArchiveMove: (directory: string) => post<ArchiveMoveStatus>("/api/setup/archive-move", { directory }),
   databaseLocation: (signal?: AbortSignal) => get<{ database: string; result: { destination: string; error: string | null } | null }>("/api/setup/database", undefined, signal),
   setupStatus: () => get<Pick<SetupState, "configured"> & { locations_confirmed?: boolean }>("/api/setup", { summary: 1 }),
   confirmLocations: () => post<{ ok: true; locations_confirmed: boolean }>("/api/setup/confirm", {}),

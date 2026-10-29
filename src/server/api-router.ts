@@ -148,6 +148,18 @@ export function createFetchHandler(ctx: AppContext) {
         return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 409 });
       }
     }
+    if (url.pathname === "/api/setup/archive-move") {
+      try {
+        if (!ctx.archiveMove) throw new Error("Restart the server using bun run serve to enable moving the archive. / Uruchom serwer przez bun run serve, aby przenieść archiwum.");
+        if (req.method === "GET") return Response.json(ctx.archiveMove.status());
+        if (req.method !== "POST") return Response.json({ error: "Method not allowed" }, { status: 405 });
+        const body = await req.json() as { directory?: unknown };
+        if (typeof body.directory !== "string") throw new Error("Choose the new archive folder. / Wybierz nowy folder archiwum.");
+        return Response.json(ctx.archiveMove.start(body.directory), { status: 202 });
+      } catch (error) {
+        return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 409 });
+      }
+    }
     if (url.pathname === "/api/setup/database" && req.method === "GET") {
       return Response.json({ database: ctx.dbPath, result: JSON.parse(process.env.TOKENATLAS_DB_RELOCATION_RESULT || "null") });
     }
