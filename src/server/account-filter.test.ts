@@ -1,6 +1,7 @@
 import { splitProbeReaderFixtureConfig } from "./probe-reader.fixture";
 import { expect, test } from "bun:test";
 import { Database } from "../db/sqlite";
+import { MODEL_SPEED_SCHEMA, advanceModelSpeeds } from "../db/model-speed-register";
 import { handleActivity, handleEvents, handleModelSpeed, type AppContext } from "./api";
 import { ARCHIVE_LOGICAL_ROOT } from "../config/paths";
 import { declareCodexEraPeriods } from "./codex-periods.fixture";
@@ -203,9 +204,18 @@ test("every Claude event names its account, and the filter follows the periods",
   }
 });
 
+function prepareModelSpeedFixture(sqlite: Database): void {
+  sqlite.exec(MODEL_SPEED_SCHEMA);
+  for (let step = 0; step < 100; step++) {
+    if (!advanceModelSpeeds(sqlite, { budgetMs: 10_000 }).pending) return;
+  }
+  throw new Error("Timing fixture did not finish preparing");
+}
+
 test("model speed of a Codex account sums the timed calls its periods own, per model and hour", async () => {
   const ctx = fixture();
   try {
+    prepareModelSpeedFixture(ctx.sqlite);
     const read = async (query: string) => { const response = handleModelSpeed(ctx, new URL(`http://local/api/model-speed?${query}`));
       return { status: response.status, body: await response.json() as { provider: string; models: Array<{ model: string;
         total: Record<string, number | null>; points: Array<{ at: string }> }> } }; };
@@ -240,6 +250,7 @@ test("model speed of a Codex account splits an hour a period boundary cuts, and 
     homeToSubId: new Map([["c:/source", "main"]]), rateCards: RATES } as unknown as AppContext;
   prepareCodexLedgerFixture(sqlite, ctx.rateCards, ctx.homeToSubId, ctx.accounts.sources);
   try {
+    prepareModelSpeedFixture(sqlite);
     const read = async (account: string) => (await handleModelSpeed(ctx, new URL(`http://local/api/model-speed?account=${account}&grain=hour`))
       .json()) as { models: Array<{ total: Record<string, number | null>; points: Array<{ at: string }> }> };
     expect((await read("main")).models.map(model => model.total)).toEqual([expect.objectContaining({ calls: 1, timed_out: 10, timed_ms: 1000 })]);

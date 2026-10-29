@@ -36,7 +36,7 @@ function expectedResult(entry: typeof stored.cases[number], replacements: Array<
       try { return [JSON.parse(line)]; } catch { return []; }
     });
     // Keep the stored usage golden exact and verify companion timing through the independent reader.
-    expected.parse.firstToken = { version: 1, turns: codexFirstTokenAdapter.parse(records) };
+    expected.parse.firstToken = { version: codexFirstTokenAdapter.version, turns: codexFirstTokenAdapter.parse(records) };
   }
   return expected;
 }

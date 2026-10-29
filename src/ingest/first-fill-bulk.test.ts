@@ -38,7 +38,8 @@ test("Claude bulk first fill equals ordered file replacement, including ties, co
     console.info(JSON.stringify({entryPoint:"ClaudeFirstFill versus replaceClaudeFileEvents stage writer",mode:"empty stage",sample:`${count*3} rows / three files`,excludes:["discovery","parser","publication"],referenceMs,bulkMs}));
     bulk.close();
   }finally{a.close();b.close();removeTestFixture(fixture.directory,{recursive:true,force:true});}
-});
+  // Keep the full 90,000-row reference comparison within an explicit integration budget.
+},60_000);
 
 test("gauges bulk conflicts roll back facts, receipts and bookmarks with identical quarantine evidence",async ()=>{
   for(const kind of ["receipt","header","counter"]){

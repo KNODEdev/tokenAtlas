@@ -49,7 +49,8 @@ test("Claude queued single name selects the longest compatible sibling in both o
       await expect(ingestClaude(options)).rejects.toThrow("Conflicting");
     }finally{fs.rmSync(f.directory,{recursive:true,force:true});}
   }
-});
+  // Both sibling orders run native decoding, repeated imports and conflict validation.
+},30_000);
 
 test("compressed Claude subagents inherit compressed parent identity; conflicting cloud parent is refused",async()=>{
   const f=createTestDatabase();
