@@ -482,6 +482,15 @@ export interface BillingCyclesAccount {
   counter: string | null;
   /** The stored rows wait for the background producer (new readings, an edit, a cycle that has just rolled over). */
   stale: boolean;
+  /** Why the rows are stale and from when; null when current. Absent from servers before it was added. */
+  pending?: BillingCyclesPending | null;
   cycles: BillingCycle[];
 }
+/**
+ * - `rules`: new calculation rules, every cycle is recomputed (dates and prices may change);
+ * - `periods`: a plan period changed (an edit or a reading of another plan): dates and prices may change from `from`;
+ * - `rollover`: the current cycle ended at `from`, the next one is being added;
+ * - `figures`: new readings, sums, point values, rates: the figures refresh, the dates stay.
+ */
+export interface BillingCyclesPending { reason: "rules" | "periods" | "rollover" | "figures"; from: string | null }
 export interface BillingCyclesView { accounts: BillingCyclesAccount[] }

@@ -7,6 +7,7 @@ import { advanceWindowEndCauses } from "./window-end-causes";
 import { buildBillingCyclesView } from "./billing-cycles-view";
 import { CATALOG, MAIN, NOW, database, seed } from "./billing-cycles.fixture";
 import { markWindowAnswersDirty } from "../db/window-answers";
+import { PLAN_PERIODS, replaceDeclaredPeriods } from "../db/period-store";
 import type { BillingCycle, BillingCyclesAccount, BillingCyclesView } from "../shared/billing-cycles";
 
 afterEach(() => setSystemTime());
@@ -60,7 +61,7 @@ test("one read of the stored rows answers §6: prices, shares, percentages, unkn
   seed(db);
   // Before the producer has run, an account's answer is empty and stale, never computed here.
   expect(buildBillingCyclesView(db, { provider: "codex", account: "codex1" }, NOW).accounts).toEqual([
-    { provider: "codex", account: "codex1", counter: null, stale: true, cycles: [] }]);
+    { provider: "codex", account: "codex1", counter: null, stale: true, pending: { reason: "rules", from: null }, cycles: [] }]);
   resetBillingCycleClock();
   advanceWindowPointValues(db, { plans: { capacity_regimes: [] }, catalog: CATALOG, now: NOW, budgetMs: 10_000 });
   advanceWindowEndCauses(db, { now: NOW, budgetMs: 10_000 });
@@ -86,6 +87,28 @@ test("one read of the stored rows answers §6: prices, shares, percentages, unkn
   markWindowAnswersDirty(db, { provider: "codex", account: "codex1", fromMs: NOW - 1000, untilMs: NOW });
   expect(buildBillingCyclesView(db, { provider: "codex", account: "codex1" }, NOW).accounts[0]!.stale).toBe(true);
   expect(buildBillingCyclesView(db, { provider: "codex", account: "codex2" }, NOW).accounts[0]!.stale).toBe(false);
+});
+
+test("pending says why: a plan period edit names where dates may change, readings only refresh figures", () => {
+  const db = database();
+  seed(db);
+  resetBillingCycleClock();
+  advanceWindowPointValues(db, { plans: { capacity_regimes: [] }, catalog: CATALOG, now: NOW, budgetMs: 10_000 });
+  advanceWindowEndCauses(db, { now: NOW, budgetMs: 10_000 });
+  advanceBillingCycles(db, { catalog: CATALOG, now: NOW, budgetMs: 10_000 });
+  const pendingOf = (account: string) => buildBillingCyclesView(db, { provider: "codex", account }, NOW).accounts[0]!.pending;
+  expect(pendingOf("codex1")).toBeNull();
+  markWindowAnswersDirty(db, { provider: "codex", account: "codex1", fromMs: NOW - 1000, untilMs: NOW });
+  expect(pendingOf("codex1")).toEqual({ reason: "figures", from: null });
+  replaceDeclaredPeriods(db, PLAN_PERIODS, [{ provider: "codex", subject: "codex1", from: "2026-09-16T00:00:00.000Z", until: "2026-10-16T00:00:00.000Z",
+    value: "pro", origin: "declared", firstSeen: null, lastSeen: null, readings: 0, evidence: "invoice", amountMinor: 81300, currency: "PLN" }]);
+  // The edit outranks the readings and names its earliest start; another account is untouched.
+  expect(pendingOf("codex1")).toEqual({ reason: "periods", from: "2026-09-16T00:00:00.000Z" });
+  expect(pendingOf("codex2")).toBeNull();
+  // The producer's turn consumes the edit; the re-resolved windows may still refresh figures, never dates.
+  advanceBillingCycles(db, { catalog: CATALOG, now: NOW, budgetMs: 10_000 });
+  expect([null, "figures"]).toContain(pendingOf("codex1")?.reason ?? null);
+  db.close();
 });
 
 test("one account's view lists each cycle's main-counter windows from stored rows; the unfiltered view leaves them out", async () => {

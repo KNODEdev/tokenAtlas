@@ -47,6 +47,31 @@ export function markBillingCyclesDirty(db: Database, provider: string, account: 
     .run(provider.toLowerCase(), account === BILLING_ALL_ACCOUNTS ? account : account.toLowerCase(), from, until);
 }
 
+/**
+ * A plan period edit of `account` (the only input that moves cycle dates besides the clock): marks its cycles like any
+ * change and keeps the earliest edited start in `meta` until the producer consumes the account's entry, so the screen can
+ * say "dates may change from …" instead of a plain "updating". Inside the writer's transaction, as the mark itself.
+ */
+const periodsKey = (provider: string, account: string) => `billing_cycles_periods:${provider.toLowerCase()}|${account.toLowerCase()}`;
+export function markBillingPeriodsChanged(db: Database, provider: string, account: string, fromMs: number): void {
+  if (!hasBillingCycles(db) || Number.isNaN(fromMs)) return;
+  markBillingCyclesDirty(db, provider, account, fromMs);
+  const from = Math.max(BILLING_BEGINNING, Math.floor(Number.isFinite(fromMs) ? fromMs : BILLING_BEGINNING));
+  db.run("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)");
+  db.query(`INSERT INTO meta(key,value) VALUES(?,?)
+    ON CONFLICT(key) DO UPDATE SET value=CAST(MIN(CAST(value AS INTEGER), CAST(excluded.value AS INTEGER)) AS TEXT)`).run(periodsKey(provider, account), String(from));
+}
+/** The earliest plan period edit of `account` the producer has not consumed yet; null without one. */
+export function billingPeriodsChangedFrom(db: Database, provider: string, account: string): number | null {
+  if (!db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get()) return null;
+  const row = db.query("SELECT value FROM meta WHERE key=?").get(periodsKey(provider, account)) as { value: string } | null;
+  return row ? Number(row.value) : null;
+}
+/** Called by the producer in the transaction that removes the account's consumed entry. */
+export function clearBillingPeriodsChanged(db: Database, provider: string, account: string): void {
+  if (db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get()) db.query("DELETE FROM meta WHERE key=?").run(periodsKey(provider, account));
+}
+
 /** A stored cycle's price as plan costs read it; `usd` absent (undefined) on a row stored before rules 13. */
 export interface StoredCyclePrice {
   provider: string; account: string; start_ts: string; end_ts: string; plan: string; basis: string; price_source: string;

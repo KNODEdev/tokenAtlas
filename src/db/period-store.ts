@@ -3,7 +3,7 @@ import { normEraKey, normEraVendor } from "../server/eras";
 import { closedAfter, effectiveDatedPeriods, periodInstant, periodSubjectKey, planPeriodsShape, validatePeriods, type DatedPeriod, type PeriodReading } from "../server/account-periods";
 import { markLimitWindowsDirty } from "./limit-windows";
 import { markWindowUsageDirty } from "./window-usage";
-import { BILLING_BEGINNING, markBillingCyclesDirty } from "./billing-cycles";
+import { BILLING_BEGINNING, markBillingPeriodsChanged } from "./billing-cycles";
 
 /** The two period tables of migration 0040 share one shape; only the subject and value columns differ. */
 export interface PeriodTable { table: "account_periods" | "plan_periods"; subject: "source" | "account"; value: "account" | "plan" }
@@ -96,7 +96,7 @@ function planPeriodsChanged(sqlite: Database, before: readonly DatedPeriod[], af
     const changed = [...rows(before).filter(p => !is.has(billingShape(p))), ...rows(after).filter(p => !was.has(billingShape(p)))];
     if (!changed.length) continue;
     const from = Math.min(...changed.flatMap(p => [periodInstant(p.from, "from"), ...(p.anchor ? [periodInstant(p.anchor, "anchor")] : [])]));
-    markBillingCyclesDirty(sqlite, provider, account, Number.isFinite(from) ? from : BILLING_BEGINNING);
+    markBillingPeriodsChanged(sqlite, provider, account, Number.isFinite(from) ? from : BILLING_BEGINNING);
   }
   if (changedProviders.size) sqlite.run("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)");
   for (const provider of changedProviders) sqlite.query(`INSERT INTO meta(key,value) VALUES (?, '1')
@@ -147,13 +147,24 @@ export function loadPeriods(sqlite: Database, t: PeriodTable): DatedPeriod[] {
   return loadPeriodRows(sqlite, t).map(({ id: _id, ...period }) => period);
 }
 
-function insertPeriod(sqlite: Database, t: PeriodTable, p: DatedPeriod): void {
+/** The stored columns of a period and their values, in one order for INSERT and UPDATE. */
+function periodColumns(sqlite: Database, t: PeriodTable, p: DatedPeriod): { names: string[]; values: Array<string | number | null> } {
   const cycles = t === PLAN_PERIODS && hasCycleColumns(sqlite);
-  const extra = t === PLAN_PERIODS ? `, amount_minor, currency${cycles ? ", anchor_ts, cycle_months" : ""}` : "";
-  const values = t === PLAN_PERIODS ? [p.amountMinor ?? null, p.currency ?? null, ...(cycles ? [p.anchor ?? null, p.cycleMonths ?? null] : [])] : [];
-  sqlite.query(`INSERT INTO ${t.table} (provider, ${t.subject}, from_ts, until_ts, ${t.value}, origin, first_seen, last_seen, readings, evidence${extra})
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?${values.map(() => ", ?").join("")})`)
-    .run(normEraVendor(p.provider), p.subject, p.from, p.until, p.value, p.origin, p.firstSeen, p.lastSeen, p.readings, p.evidence, ...values);
+  const names = ["provider", t.subject, "from_ts", "until_ts", t.value, "origin", "first_seen", "last_seen", "readings", "evidence",
+    ...(t === PLAN_PERIODS ? ["amount_minor", "currency", ...(cycles ? ["anchor_ts", "cycle_months"] : [])] : [])];
+  const values = [normEraVendor(p.provider), p.subject, p.from, p.until, p.value, p.origin, p.firstSeen, p.lastSeen, p.readings, p.evidence,
+    ...(t === PLAN_PERIODS ? [p.amountMinor ?? null, p.currency ?? null, ...(cycles ? [p.anchor ?? null, p.cycleMonths ?? null] : [])] : [])];
+  return { names, values };
+}
+
+function insertPeriod(sqlite: Database, t: PeriodTable, p: DatedPeriod): void {
+  const { names, values } = periodColumns(sqlite, t, p);
+  sqlite.query(`INSERT INTO ${t.table} (${names.join(", ")}) VALUES (${names.map(() => "?").join(", ")})`).run(...values);
+}
+
+function updatePeriod(sqlite: Database, t: PeriodTable, id: number, p: DatedPeriod): void {
+  const { names, values } = periodColumns(sqlite, t, p);
+  sqlite.query(`UPDATE ${t.table} SET ${names.map((name) => `${name} = ?`).join(", ")} WHERE id = ?`).run(...values, id);
 }
 
 export type ReadingOutcome = "extended" | "opened" | "switched" | "out-of-order";
@@ -201,8 +212,9 @@ export function recordPeriodReading(sqlite: Database, t: PeriodTable, reading: P
 
 /**
  * Makes the table's declared rows equal to the declarations file. The file is the source of these
- * rows, so the whole set is compared and, only when it differs, replaced; observed rows stay.
- * Returns whether anything changed.
+ * rows, so the whole set is compared and, only when it differs, brought in line row by row: a row
+ * keyed by its subject and start keeps its id (editors name rows by id), changed rows are updated,
+ * missing ones deleted, new ones inserted. Observed rows stay. Returns whether anything changed.
  */
 export function replaceDeclaredPeriods(sqlite: Database, t: PeriodTable, periods: readonly DatedPeriod[]): boolean {
   if (periods.some((p) => p.origin !== "declared")) throw new Error("replaceDeclaredPeriods: rows of another origin");
@@ -215,10 +227,18 @@ export function replaceDeclaredPeriods(sqlite: Database, t: PeriodTable, periods
   const current = loadPeriods(sqlite, t).filter((p) => p.origin === "declared").sort(order).map(shape);
   const next = [...periods].sort(order).map(shape);
   if (JSON.stringify(current) === JSON.stringify(next)) return false;
+  const keyOf = (p: DatedPeriod) => JSON.stringify([normEraVendor(p.provider), p.subject, p.from]);
   sqlite.transaction(() => {
     const before = loadPeriods(sqlite, t);
-    sqlite.query(`DELETE FROM ${t.table} WHERE origin = 'declared'`).run();
-    for (const period of periods) insertPeriod(sqlite, t, period);
+    const stored = new Map(loadPeriodRows(sqlite, t).filter((p) => p.origin === "declared").map((p) => [keyOf(p), p]));
+    const wanted = new Map(periods.map((p) => [keyOf(p), p]));
+    // Deletes first: a removed row may hold the start a new row of the same subject takes.
+    for (const [key, row] of stored) if (!wanted.has(key)) sqlite.query(`DELETE FROM ${t.table} WHERE id = ?`).run(row.id);
+    for (const [key, period] of wanted) {
+      const row = stored.get(key);
+      if (!row) insertPeriod(sqlite, t, period);
+      else if (JSON.stringify(shape(row)) !== JSON.stringify(shape(period))) updatePeriod(sqlite, t, row.id, period);
+    }
     periodsChanged(sqlite, t, before);
   }).immediate();
   return true;

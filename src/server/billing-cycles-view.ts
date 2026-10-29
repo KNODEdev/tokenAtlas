@@ -2,7 +2,7 @@ import {withFinalContext} from "./codex-context-final-read";
 import type { Database } from "bun:sqlite";
 import { normEraKey, normEraVendor } from "./eras";
 import { hasBillingCycles } from "../db/billing-cycles";
-import { billingCyclesStale, type CycleDetail, type StoredCycleRow } from "./billing-cycle-producer";
+import { billingCyclesPending, type CycleDetail, type StoredCycleRow } from "./billing-cycle-producer";
 import type { BillingCycle, BillingCyclesAccount, BillingCyclesView } from "../shared/billing-cycles";
 import { billingContextPrice, readContextRows } from "./context-price-read";
 import { matchingContextPrice } from "../shared/context-price";
@@ -11,7 +11,7 @@ import { withReadSnapshot } from "../db/analysis";
 /**
  * `GET /api/billing-cycles` (docs/billing-cycles-design-2026-10-08.md §6): one SELECT of the stored cycles, divided into
  * percentages for presentation. Nothing is derived or priced here; rows the producer still has to update are returned as
- * they are with `stale: true`, and an account it has not filled yet has no cycles and `stale: true`.
+ * they are with `stale: true` and the reason in `pending`, and an account it has not filled yet has no cycles and `stale: true`.
  */
 const round = (value: number, digits: number) => Math.round(value * 10 ** digits) / 10 ** digits;
 const pct = (used: number | null, windows: number | null) => used === null || !windows ? null : round(used / windows, 1);
@@ -75,6 +75,9 @@ function billingCyclesView(db: Database, filter: { provider?: string | null; acc
   }
   // An account the producer has queued but not filled yet is listed without cycles.
   if (provider && account && !groups.size) groups.set(`${provider}|${account}`, { provider, account, counter: null, stale: true, cycles: [] });
-  for (const group of groups.values()) group.stale = billingCyclesStale(db, group, now);
+  for (const group of groups.values()) {
+    group.pending = billingCyclesPending(db, group, now);
+    group.stale = group.pending !== null;
+  }
   return { accounts: [...groups.values()] };
 }

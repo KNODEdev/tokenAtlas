@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import type { BillingCycle, BillingCycleWindow } from "../../shared/billing-cycles";
+import type { BillingCycle, BillingCycleWindow, BillingCyclesAccount } from "../../shared/billing-cycles";
 import { api } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useContextPreview } from "../lib/context-premium";
@@ -15,7 +15,7 @@ import type { DataSettingsTarget } from "../lib/data-settings";
 import { causeLabel, causeTone, durationText } from "../lib/window-end-cause";
 import { subscriptionPlan } from "../lib/subscription-plan";
 import { TableRow, Bar, Card, EmptyState, ErrorState, Field, GhostButton, HelpDot, KpiStrip, LoadingCard, Pill, Table, Td, Th, toneColor } from "./ui";
-import { cycleMarks, cycleMoney, cyclePrice, priceKind } from "./BillingCycles";
+import { cycleMarks, cycleMoney, cyclePrice, pendingNotice, priceKind } from "./BillingCycles";
 import { productName } from "./SubscriptionCards";
 import { planName } from "./AccountHistoryTimeline";
 import { ValueChart, type ValueBar } from "./ValueChart";
@@ -316,6 +316,7 @@ function OneSubscriptionMonth({ vendor, account, dataRevision, initialCycle, ope
   const summaryCycles = pinned ? [pinned] : periodCycles(cycles, state.period);
   const summary = summarize(summaryCycles, unit, enabled), points = pointsFallback(summaryCycles, unit, enabled);
   const perText = perFormat(unit, format.value, locale), color = providerColor(key.provider);
+  const notice = entry ? pendingNotice(entry, t, locale) : null;
   const bars: ValueBar[] = rows.map((row) => {
     const per = perDollar([row.cycle], unit, enabled);
     return { key: row.cycle.start, label: `${dayMonth(row.cycle.start, locale)}–${dayMonth(row.cycle.end, locale)}`,
@@ -332,8 +333,9 @@ function OneSubscriptionMonth({ vendor, account, dataRevision, initialCycle, ope
       <ResetChoice enabled={enabled} counts={counts} state={state} update={update} />
       <HelpDot label={t("How a cycle is counted", "Jak liczymy cykl")}>{t("Each billing cycle's capacity: base windows + early-reset bonuses by kind = total; used is measured against the total. Return and potential divide what was used and the capacity by the USD paid for the cycle. Newest cycle first; click a row for its details.",
         "Pojemność każdego okresu rozliczeniowego: okna bazowe + premie z wczesnych resetów według rodzaju = razem; zużycie liczone względem całości. Zwrot i potencjał dzielą zużycie i pojemność przez kwotę w USD zapłaconą za cykl. Najnowszy cykl na górze; kliknij wiersz, aby zobaczyć szczegóły.")}</HelpDot>
+      <PendingSpinner notice={notice} />
     </div>
-    {entry?.stale && <p role="status" className="global-capacity-status">{t("Updating in the background — figures may change shortly.", "Aktualizacja w tle — liczby mogą się zaraz zmienić.")}</p>}
+    <PendingLine notice={notice} />
     <div className="global-capacity-body">
       {!rows.length ? entry?.stale
         ? <EmptyState title={t("Preparing billing cycles", "Przygotowywanie okresów rozliczeniowych")}
@@ -531,6 +533,25 @@ function CycleWindows({ cycle, windows, onEdit }: { cycle: BillingCycle; windows
   </div>;
 }
 
+type PendingNotice = ReturnType<typeof pendingNotice>;
+/** The producer's state when dates or prices may move: a sentence under the controls, its reason in the tooltip. */
+const PendingLine = ({ notice }: { notice: PendingNotice }) => notice?.text
+  ? <p role="status" className="global-capacity-status" title={notice.title || undefined}>{notice.text}</p> : null;
+/** New readings only: a spinner beside the controls, the explanation in its tooltip. */
+const PendingSpinner = ({ notice }: { notice: PendingNotice }) => notice && !notice.text
+  ? <span role="status" className="ui-loading-spinner" title={notice.title} aria-label={notice.title} /> : null;
+
+const PENDING_RANK = { rules: 0, periods: 1, rollover: 2, figures: 3 } as const;
+/** Every subscription's state in one: the most disruptive sentence, named by its subscription, with the others in the tooltip. */
+function allPendingNotice(accounts: readonly BillingCyclesAccount[], nameOf: (provider: string, account: string) => string, t: T, locale: string): PendingNotice {
+  const notices = accounts.flatMap((entry) => { const notice = pendingNotice(entry, t, locale); return notice ? [{ entry, notice }] : []; })
+    .sort((a, b) => PENDING_RANK[a.entry.pending?.reason ?? "figures"] - PENDING_RANK[b.entry.pending?.reason ?? "figures"]);
+  const loud = notices.filter(({ notice }) => notice.text);
+  if (!loud.length) return notices[0]?.notice ?? null;
+  const named = loud.map(({ entry, notice }) => `${nameOf(entry.provider, entry.account)}: ${notice.text}`);
+  return { text: `${named[0]}${loud.length > 1 ? ` (+${loud.length - 1})` : ""}`, title: [loud[0]!.notice.title, ...named.slice(1)].filter(Boolean).join("\n") };
+}
+
 /** "All subscriptions": the period's sum over every subscription and one row per subscription. */
 function AllSubscriptionsMonth({ cards, select, dataRevision }: { cards: RosterCard[]; select: (id: string) => void; dataRevision?: number }) {
   const { t, locale } = useI18n();
@@ -558,6 +579,7 @@ function AllSubscriptionsMonth({ cards, select, dataRevision }: { cards: RosterC
   const cardOf = (provider: string, account: string) => cards.find((card) => card.id.toLowerCase() === account
     && billingAccountOf(card.vendor, card.id).provider === provider) ?? cards.find((card) => card.id.toLowerCase() === account) ?? null;
   const nameOf = (provider: string, account: string) => { const card = cardOf(provider, account); return card ? subscriptionName(card) : account; };
+  const notice = allPendingNotice(billing.data.accounts, nameOf, t, locale);
   const perText = perFormat(unit, format.value, locale);
   // Each row's subscription: its rail card, vendor ink and the plan of its newest cycle in the period (what was paid for).
   const lines = rows.map((row) => {
@@ -579,8 +601,9 @@ function AllSubscriptionsMonth({ cards, select, dataRevision }: { cards: RosterC
       <ResetChoice enabled={enabled} counts={counts} state={state} update={update} />
       <HelpDot label={t("How subscriptions are summed", "Jak sumujemy abonamenty")}>{t("Each subscription's own cycles of the period, summed. Capacity includes the counted reset bonuses; used is measured against it. Return and potential divide what was used and the capacity by the USD paid. Click a row to open that subscription.",
         "Własne cykle każdego abonamentu w wybranym okresie, zsumowane. Pojemność obejmuje liczone premie z resetów; zużycie liczone względem niej. Zwrot i potencjał dzielą zużycie i pojemność przez zapłaconą kwotę w USD. Kliknij wiersz, aby otworzyć ten abonament.")}</HelpDot>
+      <PendingSpinner notice={notice} />
     </div>
-    {stale && <p role="status" className="global-capacity-status">{t("Updating in the background — figures may change shortly.", "Aktualizacja w tle — liczby mogą się zaraz zmienić.")}</p>}
+    <PendingLine notice={notice} />
     <div className="global-capacity-body">
       {!anyCycles ? <EmptyState title={t("No billing cycles", "Brak okresów rozliczeniowych")}
         detail={t("No subscription has plan periods with cycles yet. Plans are set in Settings → Accounts.", "Żaden abonament nie ma jeszcze okresów planu z cyklami. Plany ustawisz w Ustawieniach → Konta.")} />

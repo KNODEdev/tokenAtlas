@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { BillingCycle } from "../../shared/billing-cycles";
+import type { BillingCycle, BillingCyclesAccount } from "../../shared/billing-cycles";
 import { useI18n } from "../lib/i18n";
 import { planName } from "./AccountHistoryTimeline";
 
@@ -20,6 +20,27 @@ export function cycleMoney(amount: number | null, currency: string | null, local
 /** Day and month on this computer's clock, as every date of the subscription table. */
 const dayMonth = (value: string, locale: string) => new Date(value).toLocaleDateString(locale, { day: "2-digit", month: "2-digit" });
 const number = (value: number, locale: string, digits = 2) => value.toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
+/**
+ * What the screen says while the producer catches up: a sentence only when dates or prices may move (an edit, new rules,
+ * a new cycle); new readings get none, just `quiet` (a spinner with `title`). An older server without `pending` keeps the
+ * former sentence. Null when the account is current.
+ */
+export function pendingNotice(account: Pick<BillingCyclesAccount, "stale" | "pending">, t: T, locale: string): { text: string | null; title: string } | null {
+  if (!account.stale) return null;
+  const pending = account.pending;
+  if (!pending) return { text: t("Updating in the background — figures may change shortly.", "Aktualizacja w tle — liczby mogą się zaraz zmienić."), title: "" };
+  const from = pending.from ? dayMonth(pending.from, locale) : null;
+  const moves = t("dates and prices may change", "daty i ceny mogą się zmienić");
+  if (pending.reason === "rules") return { text: `${t("Recalculating cycles under new rules", "Przeliczam cykle według nowych zasad")} — ${moves}.`,
+    title: t("The calculation rules changed; every cycle is computed again.", "Zmieniły się zasady obliczeń; każdy cykl jest liczony od nowa.") };
+  if (pending.reason === "periods") return { text: `${from ? `${t("Recalculating from", "Przeliczam od")} ${from}` : t("Recalculating cycles", "Przeliczam cykle")} — ${moves}.`,
+    title: t("A plan period changed (your entry or a reading of another plan); the cycles from this date are computed again.",
+      "Zmienił się okres planu (Twój wpis albo odczyt innego planu); cykle od tej daty są liczone od nowa.") };
+  if (pending.reason === "rollover") return { text: from ? `${t("New cycle from", "Nowy cykl od")} ${from} — ${t("adding it", "dodaję go")}.` : t("Adding the new cycle.", "Dodaję nowy cykl."),
+    title: t("The current cycle has ended; the next one is being added.", "Bieżący cykl się skończył; dodaję następny.") };
+  return { text: null, title: t("New readings — the figures refresh shortly; cycle dates stay.", "Nowe odczyty — liczby odświeżą się za chwilę; daty cykli się nie zmienią.") };
+}
 
 /** "≈" an uncertain payment day; "?" a cycle inferred from readings (§7). */
 export function cycleMarks(cycle: BillingCycle): string {

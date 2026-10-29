@@ -2,9 +2,9 @@ import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { normEraKey, normEraVendor } from "./eras";
 import { PLAN_PERIODS, loadPeriods } from "../db/period-store";
-import { BILLING_ALL_ACCOUNTS, BILLING_BEGINNING, hasBillingCycles, markBillingCyclesDirty } from "../db/billing-cycles";
+import { BILLING_ALL_ACCOUNTS, BILLING_BEGINNING, billingPeriodsChangedFrom, clearBillingPeriodsChanged, hasBillingCycles, markBillingCyclesDirty } from "../db/billing-cycles";
 import { ANSWER_SCOPE_ALL, ANSWER_SCOPE_NONE } from "../db/window-answers";
-import { cycleIdentity, deriveBillingCycles, type BillingCycleBankedGrants, type BillingCycleCapacity, type BillingCycleResets, type BillingCycleWindow, type CatalogCyclePrice, type CyclePlanRow,
+import { cycleIdentity, deriveBillingCycles, type BillingCycleBankedGrants, type BillingCycleCapacity, type BillingCyclesPending, type BillingCycleResets, type BillingCycleWindow, type CatalogCyclePrice, type CyclePlanRow,
   type CycleFx, type DerivedCycle, type FxLookup } from "../shared/billing-cycles";
 import { storedFxLookup } from "../db/fx-rates";
 import { readWindowEndCauses, type WindowEndCauseRow } from "../db/window-end-causes";
@@ -518,7 +518,9 @@ export function advanceBillingCycles(db: Database, options: BillingCycleOptions)
         for (const row of write.rows) put.run(...COLUMNS.map((column) => row[column]));
         turn.cycles += write.rows.length;
       }
-      db.query("DELETE FROM billing_cycle_dirty WHERE provider=? AND account=? AND sequence=?").run(entry.provider, entry.account, entry.sequence);
+      const consumed = db.query("DELETE FROM billing_cycle_dirty WHERE provider=? AND account=? AND sequence=?").run(entry.provider, entry.account, entry.sequence);
+      // A later edit bumped the sequence: its entry, and the note of where dates may change, wait for the next turn.
+      if (consumed.changes > 0 && entry.account !== BILLING_ALL_ACCOUNTS) clearBillingPeriodsChanged(db, entry.provider, entry.account);
     }).immediate();
     turn.accounts += targets.length;
     turn.progressed = true;
@@ -596,16 +598,28 @@ function queueChanges(db: Database, accounts: readonly AccountKey[], now: number
 
 /** Billing producer state the screen read reports as `stale` (never computed there). */
 export function billingCyclesStale(db: Database, key: AccountKey, now: number): boolean {
-  if (!hasBillingCycles(db)) return true;
+  return billingCyclesPending(db, key, now) !== null;
+}
+
+/** Why the account's stored cycles wait for the producer, the most disruptive reason first; null when they are current. */
+export function billingCyclesPending(db: Database, key: AccountKey, now: number): BillingCyclesPending | null {
+  if (!hasBillingCycles(db)) return { reason: "rules", from: null };
   const meta = (name: string) => (db.query("SELECT value FROM meta WHERE key=?").get(name) as { value: string } | null)?.value ?? null;
-  if (meta(RULES_KEY) !== String(BILLING_CYCLES_VERSION)) return true;
-  if (db.query("SELECT 1 FROM billing_cycle_dirty WHERE provider=? AND account IN (?, '*') LIMIT 1").get(key.provider, key.account)) return true;
-  if (db.query("SELECT 1 FROM billing_cycles WHERE provider=? AND account=? AND is_current=1 AND end_ts <= ? LIMIT 1").get(key.provider, key.account, iso(now))) return true;
+  if (meta(RULES_KEY) !== String(BILLING_CYCLES_VERSION)) return { reason: "rules", from: null };
+  const edited = billingPeriodsChangedFrom(db, key.provider, key.account);
+  if (edited !== null) return { reason: "periods", from: edited <= BILLING_BEGINNING ? null : iso(edited) };
+  const ended = db.query("SELECT end_ts FROM billing_cycles WHERE provider=? AND account=? AND is_current=1 AND end_ts <= ? LIMIT 1")
+    .get(key.provider, key.account, iso(now)) as { end_ts: string } | null;
+  if (ended) return { reason: "rollover", from: ended.end_ts };
+  const dirty = db.query("SELECT MIN(from_ms) AS from_ms FROM billing_cycle_dirty WHERE provider=? AND account IN (?, '*')")
+    .get(key.provider, key.account) as { from_ms: number | null };
+  if (dirty.from_ms !== null) return { reason: "figures", from: dirty.from_ms <= BILLING_BEGINNING ? null : iso(dirty.from_ms) };
   const hasMarks = !!db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='window_answer_marks'").get();
-  if (hasMarks && db.query(`SELECT 1 FROM window_answer_marks WHERE seq > ? AND (provider=? OR provider='*') AND (account=? OR account='*') LIMIT 1`)
-    .get(Number(meta(MARKS_KEY) ?? 0), key.provider, key.account)) return true;
+  const marked = hasMarks && db.query(`SELECT 1 FROM window_answer_marks WHERE seq > ? AND (provider=? OR provider='*') AND (account=? OR account='*') LIMIT 1`)
+    .get(Number(meta(MARKS_KEY) ?? 0), key.provider, key.account);
   // The capacity follows the account's stored point values, the reset bonuses its stored end causes.
-  return windowPointValuesStale(db, key.provider, key.account, now) || windowEndCausesStale(db, key.provider, key.account, now);
+  return marked || windowPointValuesStale(db, key.provider, key.account, now) || windowEndCausesStale(db, key.provider, key.account, now)
+    ? { reason: "figures", from: null } : null;
 }
 
 /** Test hook: the next turn derives every account again. */

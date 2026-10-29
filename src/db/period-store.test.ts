@@ -122,6 +122,25 @@ test("moving a declared boundary invalidates only the changed day and evidence-o
   expect(loadAccountResolver(db)).toBe(resolver);
 });
 
+test("saving the declarations keeps the ids of unchanged rows and updates a changed row in place", () => {
+  const db = migrated();
+  const plan = (from: string, until: string, amountMinor: number | null = null) => ({ provider: "codex", subject: "codex1", from, until, value: "pro",
+    origin: "declared" as const, firstSeen: null, lastSeen: null, readings: 0, evidence: "invoice", amountMinor, currency: "PLN" });
+  const ids = (): Record<string, [number, number | null]> => Object.fromEntries((db.query("SELECT id, from_ts, amount_minor FROM plan_periods WHERE origin='declared'").all() as
+    Array<{ id: number; from_ts: string; amount_minor: number | null }>).map((row) => [row.from_ts, [row.id, row.amount_minor]]));
+  replaceDeclaredPeriods(db, PLAN_PERIODS, [plan("2026-08-16", "2026-09-16", 81300), plan("2026-09-16", "2026-10-16")]);
+  const first = ids();
+  expect(replaceDeclaredPeriods(db, PLAN_PERIODS, [plan("2026-08-16", "2026-09-16", 81300), plan("2026-09-16", "2026-10-16", 81300),
+    plan("2026-10-16", "2026-11-16")])).toBe(true);
+  const second = ids();
+  expect(second["2026-08-16"]).toEqual(first["2026-08-16"]!);
+  expect(second["2026-09-16"]).toEqual([first["2026-09-16"]![0], 81300]);
+  expect(second["2026-10-16"]![0]).toBeGreaterThan(first["2026-09-16"]![0]);
+  replaceDeclaredPeriods(db, PLAN_PERIODS, [plan("2026-09-16", "2026-10-16", 81300)]);
+  expect(ids()).toEqual({ "2026-09-16": second["2026-09-16"]! });
+  db.close();
+});
+
 test("repeated readings of one account move last_seen on a single row", () => {
   const db = migrated();
   expect(recordPeriodReading(db, ACCOUNT_PERIODS, reading("2026-09-09T15:48:00.000Z", "a"))).toBe("opened");
