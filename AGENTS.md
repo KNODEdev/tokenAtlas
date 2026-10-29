@@ -27,8 +27,9 @@ out of Git. Use synthetic fixtures and preserve third-party license notices.
   The first-install/Settings database choice is saved in private `tokenatlas.local.json`;
   local machine state lives in `local-state/` beside the chosen database. Preserve that
   state when moving the database. Do not require users to configure these paths in `.env`.
-- Only the running server writes the live database. Tests and trials use isolated
-  copies. Live migrations, server restarts and installed bundle replacement need
+- Only the running server writes the live database. Tests that change real data use
+  fixtures or one isolated copy, deleted after verification; routine code work and
+  read-only checks require no database copy. Live migrations, server restarts and installed bundle replacement need
   the owner's decision; a source migration is not permission to activate it.
 - Keep comments brief and in English, explaining non-obvious constraints.
 
