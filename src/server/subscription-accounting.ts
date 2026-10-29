@@ -41,7 +41,7 @@ import { TOKEN_BUCKETS, subscriptionAccountingAdapter, priceSubscriptionEvent, t
 import { readSubscriptionUsagePriceDays, subscriptionUsagePriceReadiness,
   sumUsagePriceAmounts, USAGE_PRICE_SUBJECT_PROVIDERS,
   type UsagePriceAmount, type UsagePriceDay } from "../db/usage-price-read-subscription";
-import { preparedProbeAccountIndexReady, readPreparedProbeAccountRange,
+import { preparedProbeAccountIndexReady, readPreparedProbeAccountCatalogue, readPreparedProbeAccountRange,
   ProbeAccountIndexUnavailable, ProbeAccountReadLimitExceeded } from "./current/probe-account-reader";
 
 interface Context {
@@ -72,28 +72,55 @@ function amount(target: AmountCoverage, value: number | null, tokens: number, re
 
 type Probe = CodexProbe & { limit_group: string | null; counter: string; cadence_source: CadenceSource };
 export class SelectedCounterUnavailable extends Error {}
+/** Successful meter readings of the adapter's counters, as SQL (alias p); the row filter below still decides. */
+function usableProbeFilter(adapter: SubscriptionAccountingAdapter) {
+  return { where: `(p.ok IS NULL OR p.ok=1) AND p.used_percent BETWEEN 0 AND 100 AND p.kind IN (${adapter.counterKinds.map(() => "?").join(",")})`
+      + (adapter.id === "claude" ? " AND NOT (p.kind='weekly_all' AND COALESCE(p.scope,'')<>'')" : ""),
+    params: [...adapter.counterKinds] as Array<string | number | null> };
+}
+type CounterFields = { kind: string; ts: string; resets_at: string | null; extra: string | null; limit_group: string | null;
+  window_minutes: number; ok: number | null; used_percent: number | null; scope: string | null };
+/** A reading's accounting time and counter (kind, group, resolved duration); null when unusable or outside `[since, until)`. */
+function probeCounter<T extends CounterFields>(adapter: SubscriptionAccountingAdapter, account: string, since: string, until: string,
+  cycles: CyclesConfig, row: T) {
+  if (!((row.ok === null || row.ok === 1) && row.used_percent != null && row.used_percent >= 0 && row.used_percent <= 100
+    && adapter.counterKinds.includes(row.kind) && !(adapter.id === "claude" && row.kind === "weekly_all" && row.scope))) return null;
+  const ts = probeAccountingTime({ ...row, provider: adapter.id });
+  if (!(Date.parse(ts) >= Date.parse(since) && Date.parse(ts) < Date.parse(until))) return null;
+  const measured = Number.isFinite(row.window_minutes) && row.window_minutes > 0;
+  const nominalMinutes = measured ? row.window_minutes : adapter.defaultMinutes[row.kind];
+  const cadence = resolveCadenceForDay(cycles, account, row.kind, ts, {
+    periodHours: nominalMinutes ? nominalMinutes / 60 : null, anchorIso: row.resets_at, source: measured ? "probe" : "default",
+  });
+  const minutes = (cadence.periodHours ?? 0) * 60;
+  // A declared duration may fill a missing duration, but cannot invent a reset reading.
+  return { ...row, ts, window_minutes: minutes, cadence_source: cadence.periodSource, counter: JSON.stringify([row.kind, row.limit_group ?? "", minutes]) };
+}
+/**
+ * The counters of the range in reading order, from a narrow read: the full readings of the other
+ * counters never enter the bounded read. Only Claude's weekly share metadata moves accounting time.
+ */
+function probeCounterCatalogue(sqlite: Database, adapter: SubscriptionAccountingAdapter, account: string, since: string, until: string,
+  cycles: CyclesConfig) {
+  const rows = readPreparedProbeAccountCatalogue(sqlite, adapter.id, account, since, until, "accounting", { ...usableProbeFilter(adapter),
+    columns: "p.id,p.ts,p.kind,p.limit_group,p.scope,p.ok,p.used_percent,p.window_minutes,p.resets_at,CASE WHEN p.kind='weekly_all' THEN p.extra END AS extra" });
+  if (!rows) throw new ProbeAccountIndexUnavailable();
+  return (rows as unknown as CounterFields[]).flatMap(row => probeCounter(adapter, account, since, until, cycles, row) ?? []);
+}
+/** The readings of a catalogued counter; overflow of the bounded read stays unavailable. */
 function loadProbes(sqlite: Database, adapter: SubscriptionAccountingAdapter, account: string, since: string, until: string, cycles: CyclesConfig,
-  plans: PeriodIndex | null): Probe[] {
-  const prepared = readPreparedProbeAccountRange(sqlite, adapter.id, account, since, until, 20_000, "accounting");
+  plans: PeriodIndex | null, selected: { counter: string; kind: string; limit_group: string | null } | undefined): Probe[] {
+  if (!selected) return [];
+  const { counter } = selected, usable = usableProbeFilter(adapter);
+  const prepared = readPreparedProbeAccountRange(sqlite, adapter.id, account, since, until, 20_000, "accounting",
+    { where: `${usable.where} AND p.kind=? AND COALESCE(p.limit_group,'')=?`, params: [...usable.params, selected.kind, selected.limit_group ?? ""] });
   if (!prepared) throw new ProbeAccountIndexUnavailable();
-  const rows = prepared.rows as unknown as Array<CodexProbe & { limit_group: string | null; extra: string | null;
-    scope: string | null; ok: number | null }>;
-  return rows.filter(row => (row.ok === null || row.ok === 1) && row.used_percent != null
-    && row.used_percent >= 0 && row.used_percent <= 100
-    && adapter.counterKinds.includes(row.kind) && !(adapter.id === "claude" && row.kind === "weekly_all" && row.scope))
-    .map(row => ({ ...row, ts: probeAccountingTime({ ...row, provider: adapter.id }) }))
-    .filter(row => Date.parse(row.ts) >= Date.parse(since) && Date.parse(row.ts) < Date.parse(until)).map(row => {
-    const measured = Number.isFinite(row.window_minutes) && row.window_minutes > 0;
-    const nominalMinutes = measured ? row.window_minutes : adapter.defaultMinutes[row.kind];
-    const cadence = resolveCadenceForDay(cycles, account, row.kind, row.ts, {
-      periodHours: nominalMinutes ? nominalMinutes / 60 : null, anchorIso: row.resets_at, source: measured ? "probe" : "default",
-    });
-    const minutes = (cadence.periodHours ?? 0) * 60;
-    // A declared duration may fill a missing duration, but cannot invent a reset reading.
+  return (prepared.rows as unknown as Array<CodexProbe & CounterFields>).flatMap(row => {
+    const probe = probeCounter(adapter, account, since, until, cycles, row);
+    if (!probe || probe.counter !== counter) return [];
     // The plan is the account's plan period at the reading, never the label the reading carried:
     // readings only feed the periods (Claude's token label is not even a plan).
-    const plan = plans?.resolve(adapter.id, account, row.ts).value ?? null;
-    return { ...row, plan, window_minutes: minutes, cadence_source: cadence.periodSource, counter: JSON.stringify([row.kind, row.limit_group ?? "", minutes]) };
+    return [{ ...probe, plan: plans?.resolve(adapter.id, account, probe.ts).value ?? null }];
   });
 }
 
@@ -349,8 +376,8 @@ function computeSubscriptionAccountingReport(ctx: Context, provider: string, opt
   const { scanStart, scanEnd } = scanBounds(options, relevantMeasurements);
   const planIndex = planPeriodIndex(ctx.planPeriods ?? readPlanPeriods(ctx.sqlite));
   const probeEvidence = ctx.probeEvidence ?? loadProbeLimitEvidence(ctx.sqlite, adapter.id, account, ctx.resolver!);
-  const allProbes = loadProbes(ctx.sqlite, adapter, account, scanStart, scanEnd, ctx.cycles ?? {}, planIndex);
-  const counters = [...new Map(allProbes.map(row => [row.counter, { id: row.counter, label: [row.kind, row.limit_group, row.window_minutes ? `${row.window_minutes}m` : "duration unconfirmed"].filter(Boolean).join(" · ") }])).values()];
+  const catalogue = probeCounterCatalogue(ctx.sqlite, adapter, account, scanStart, scanEnd, ctx.cycles ?? {});
+  const counters = [...new Map(catalogue.map(row => [row.counter, { id: row.counter, label: [row.kind, row.limit_group, row.window_minutes ? `${row.window_minutes}m` : "duration unconfirmed"].filter(Boolean).join(" · ") }])).values()];
   for (const hit of probeEvidence.samples.filter(row => row.limitHit && Date.parse(row.ts) >= Date.parse(scanStart)
     && Date.parse(row.ts) < Date.parse(scanEnd))) {
     const counter = probeLimitCounter(hit, account, ctx.cycles ?? {});
@@ -361,10 +388,11 @@ function computeSubscriptionAccountingReport(ctx: Context, provider: string, opt
     if (!parts) throw new Error("Nieprawidłowy licznik ręcznego pomiaru");
     counters.push({ id: m.counter, label: parts.join(" · ") });
   }
-  const selectedCounter = options.counter ?? allProbes.find(p => p.kind === adapter.defaultCounter)?.counter ?? allProbes[0]?.counter
+  const selectedCounter = options.counter ?? catalogue.find(p => p.kind === adapter.defaultCounter)?.counter ?? catalogue[0]?.counter
     ?? counters.find(c => JSON.parse(c.id)[0] === adapter.defaultCounter)?.id ?? relevantMeasurements[0]?.counter ?? null;
   if (options.counter && !counters.some(c => c.id === options.counter)) throw new SelectedCounterUnavailable("Selected counter is unavailable in this period");
-  let probes = allProbes.filter(p => p.counter === selectedCounter);
+  let probes = loadProbes(ctx.sqlite, adapter, account, scanStart, scanEnd, ctx.cycles ?? {}, planIndex,
+    catalogue.find(p => p.counter === selectedCounter));
   const probeCopies = new Map<string, Probe[]>();
   for (const probe of probes) { const rows = probeCopies.get(probe.ts) ?? []; rows.push(probe); probeCopies.set(probe.ts, rows); }
   let conflictingReadings = 0;

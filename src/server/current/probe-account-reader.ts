@@ -337,20 +337,38 @@ const KEY_COLUMN: Record<KeyTime, ProbeKeyColumn> = { collection: "at", accounti
  * Readings keyed by collection, accounting or Claude observation time within `[since, until)`
  * (observation: `until`'s millisecond included), each through its own index.
  */
-function readByTime(db: Database, provider: string, account: string, since: string | null, until: string | null, time: KeyTime): ProbeAccountRow[] {
+/** A reading predicate (alias p for probe_windows) applied inside the indexed read. */
+export type ProbeRowFilter = Pick<OwnedProbeSelect, "where" | "params">;
+function timeSelect(since: string | null, until: string | null, time: KeyTime): OwnedProbeSelect {
   const lower = since === null ? -Infinity : Date.parse(since);
   const upper = until === null ? Infinity : Date.parse(until) + (time === "claude-observation" ? 1 : 0);
   const key = KEY_COLUMN[time];
-  return selectOwnedProbes(db, probeReadContext(db), provider, account,
-    key === "at" ? { from: lower, until: upper } : { key, keyFrom: lower, keyUntil: upper }).map(item => item.row);
+  return key === "at" ? { from: lower, until: upper } : { key, keyFrom: lower, keyUntil: upper };
+}
+function readByTime(db: Database, provider: string, account: string, since: string | null, until: string | null, time: KeyTime,
+  filter: ProbeRowFilter = {}): ProbeAccountRow[] {
+  return selectOwnedProbes(db, probeReadContext(db), provider, account, { ...filter, ...timeSelect(since, until, time) }).map(item => item.row);
 }
 
-/** Bounded account/time range. Overflow is unavailable, never a truncated accounting history. */
+/**
+ * A few columns of every reading of an account range, for a catalogue such as a report's counters.
+ * Unbounded like the cadence and coverage readers: the caller keeps only a small distinct result.
+ */
+export function readPreparedProbeAccountCatalogue(db: Database, provider: string, account: string,
+  since: string | null, until: string | null, time: KeyTime, select: ProbeRowFilter & { columns: string }): ProbeAccountRow[] | null {
+  if (!preparedProbeAccountIndexReady(db)) return null;
+  return selectOwnedProbes(db, probeReadContext(db), provider, account, { ...select, ...timeSelect(since, until, time) }).map(item => item.row);
+}
+
+/**
+ * Bounded account/time range. Overflow is unavailable, never a truncated accounting history.
+ * `filter` keeps readings the caller would discard out of the bound.
+ */
 export function readPreparedProbeAccountRange(db: Database, provider: string, account: string,
-  since: string | null, until: string | null, limit = 20_000, time: KeyTime = "collection"): ProbeAccountRead | null {
+  since: string | null, until: string | null, limit = 20_000, time: KeyTime = "collection", filter?: ProbeRowFilter): ProbeAccountRead | null {
   if (!preparedProbeAccountIndexReady(db)) return null;
   const cap = Number.isFinite(limit) ? Math.max(1, Math.min(20_000, Math.floor(limit))) : 20_000;
-  const rows = readByTime(db, provider, account, since, until, time);
+  const rows = readByTime(db, provider, account, since, until, time, filter);
   if (rows.length > cap) throw new ProbeAccountReadLimitExceeded();
   return { rows, visitedKeys: rows.length };
 }

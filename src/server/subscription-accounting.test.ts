@@ -573,6 +573,29 @@ test("a narrow Claude report seeks effective observation time across more than 2
   expect(results[1]).toEqual({ ...results[0]!, size: 20_050 });
 }, 30_000);
 
+test("more than 20000 readings of another counter or failed samples leave the selected counter's report available", () => {
+  const db = fixture(), ctx = context(db), size = 20_050;
+  const insert = db.query(`INSERT INTO probe_windows(id,provider,subject,ts,kind,used_percent,ok,machine,profile,extra,window_minutes)
+    VALUES(?,'claude','claude1',?,?,?,?,'FIXTURE-claude1',?,?,300)`);
+  const extra = JSON.stringify({ home: `C:/Users/${LOGIN}/.claude-claude1` });
+  db.transaction(() => {
+    for (let i = 0; i < size; i++) {
+      const ts = new Date(Date.parse("2026-08-09T00:00:00.000Z") + i * 1000).toISOString();
+      insert.run(2 * i + 1, ts, "session", 10, 1, LOGIN, extra);
+      insert.run(2 * i + 2, ts, "error", null, 0, LOGIN, extra);
+    }
+  }).immediate();
+  probe(db, { id: 2 * size + 1, provider: "claude", subject: "claude1", ts: "2026-08-10T10:00:00.000Z",
+    kind: "weekly_all", used: 20, reset: "2026-08-17T00:00:00.000Z" });
+  const report = buildSubscriptionAccountingReport(ctx, "claude", options("claude1", "2026-08-10", "2026-08-10"));
+  expect(report.provider?.counter).toBe('["weekly_all","",10080]');
+  expect(report.provider?.counters?.map(counter => counter.id)).toEqual(['["session","",300]', '["weekly_all","",10080]']);
+  expect(report.meter_history?.periodic_first).toBe("2026-08-10T10:00:00.000Z");
+  // The selected counter itself still overflows into unavailable, never a truncated history.
+  expect(() => buildSubscriptionAccountingReport(ctx, "claude",
+    { ...options("claude1", "2026-08-10", "2026-08-10"), counter: '["session","",300]' })).toThrow(ProbeAccountReadLimitExceeded);
+}, 30_000);
+
 test("an A/C period correction moves A's accounting to C while B's report stays byte-identical", () => {
   const db = fixture(), ctx = context(db);
   probe(db, { id: 1, provider: "claude", subject: "a", ts: "2026-09-01T10:00:00.000Z",
