@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { CodexAccountingReport } from "../../shared/codex-accounting";
 import type { SubscriptionModelDetail } from "../../shared/subscription-accounting";
-import { modelUnitCosts } from "./model-unit-cost";
+import { costPresets, ladderRows, modelUnitCosts, type ModelUnitCost } from "./model-unit-cost";
 import { modelColorsByTokens, vendorShade } from "./model-colors";
 
 type Row = CodexAccountingReport["breakdown"][number];
@@ -51,5 +51,21 @@ describe("cost per 1M tokens", () => {
     expect(colors.get("claude-a")).toBe(vendorShade("var(--claude)", 1));
     expect(colors.get("gpt-6")).toBe("var(--codex)");
     expect(modelColorsByTokens([{ model: "auto", tokens: 1 }], "gemini").get("auto")).toBe("var(--gemini)");
+  });
+});
+
+describe("costPresets", () => {
+  const row = (model: string | null, perMillion: number | null, tokens: number): ModelUnitCost =>
+    ({ model, tokens, pricedTokens: tokens, apiUsd: perMillion === null ? null : perMillion * tokens / 1e6, perMillion, partial: false, rates: null });
+  const rows = [row("a", 9, 10), row("b", 5, 900), row("c", 1, 50), row("d", 0.5, 20), row("e", 0.2, 30), row("f", 0.1, 40),
+    row("g", 0.05, 70), row("h", 0.01, 60), row("i", 0.001, 80), row("free", 0, 1000), row(null, 2, 500)];
+  test("the ladder keeps named models with a positive cost", () => {
+    expect(ladderRows(rows).map(item => item.model)).toEqual(["a", "b", "c", "d", "e", "f", "g", "h", "i"]);
+  });
+  test("busiest by tokens, dearest and cheapest per 1M, never a $0 or unnamed model", () => {
+    const presets = costPresets(rows);
+    expect([...presets.busiest]).toEqual(["b", "i", "g", "h", "c", "f", "e", "d"]);
+    expect([...presets.dearest]).toEqual(["a", "b", "c", "d", "e"]);
+    expect([...presets.cheapest]).toEqual(["e", "f", "g", "h", "i"]);
   });
 });

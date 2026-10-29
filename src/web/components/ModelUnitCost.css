@@ -18,3 +18,11 @@
 .muc-legend-glyph { width: 14px; height: 14px; flex-shrink: 0; overflow: visible; }
 .archive-legend i.muc-legend-dot { width: 10px; height: 10px; border-radius: var(--r-dot); background: var(--muted); }
 .muc-swatch { display: inline-block; width: 8px; height: 8px; margin-right: var(--s-3); border-radius: var(--r-dot); vertical-align: middle; }
+
+/* The model choice above the ladder: the Speed chart's chips, its drawer opens from the button on the right. */
+.muc-picker-bar { display: flex; align-items: flex-start; gap: var(--s-4) var(--s-6); margin-bottom: var(--s-3); }
+.muc-picker-bar .speed-chips { flex: 1; min-width: 0; margin: 0; }
+.muc-picker-bar > :last-child { flex-shrink: 0; }
+.speed-chip .muc-swatch { margin-right: 0; }
+.muc-row { transition: opacity 120ms ease; }
+.muc-row.is-dim { opacity: 0.28; }

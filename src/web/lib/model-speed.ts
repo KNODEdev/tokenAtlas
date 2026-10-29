@@ -248,12 +248,19 @@ function readAll(storage: Storage | null, key: string): Record<string, string[]>
  */
 export const PICKED_SERIES_KEY = "tokenatlas.speed.picked.v1";
 export function storedPickedSeries(account: string, storage: Storage | null = browserStorage()): Set<string> | null {
-  const record = readAll(storage, PICKED_SERIES_KEY);
-  return Object.prototype.hasOwnProperty.call(record, account) ? new Set(record[account]) : null;
+  return storedPicks(PICKED_SERIES_KEY, account, storage);
 }
 export function writePickedSeries(account: string, picked: ReadonlySet<string>, storage: Storage | null = browserStorage()): void {
+  writePicks(PICKED_SERIES_KEY, account, picked, storage);
+}
+/** A chart's picked list under its own storage key, one list per scope; null while a scope has no stored choice. */
+export function storedPicks(key: string, scope: string, storage: Storage | null = browserStorage()): Set<string> | null {
+  const record = readAll(storage, key);
+  return Object.prototype.hasOwnProperty.call(record, scope) ? new Set(record[scope]) : null;
+}
+export function writePicks(key: string, scope: string, picked: ReadonlySet<string>, storage: Storage | null = browserStorage()): void {
   try {
-    storage?.setItem(PICKED_SERIES_KEY, JSON.stringify(withList(readAll(storage, PICKED_SERIES_KEY), account, [...picked].sort())));
+    storage?.setItem(key, JSON.stringify(withList(readAll(storage, key), scope, [...picked].sort())));
   } catch { /* The choice still applies for this visit. */ }
 }
 

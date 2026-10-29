@@ -111,3 +111,17 @@ export function modelUnitCosts(data: CodexAccountingReport, useBreakdown: boolea
   const pricedTokens = rows.reduce((sum, row) => sum + row.pricedTokens, 0);
   return { rows, tokens: rows.reduce((sum, row) => sum + row.tokens, 0), pricedTokens, apiUsd, perMillion: perMillion(apiUsd, pricedTokens) };
 }
+
+/* ---- Models on the price ladder (the Speed chart's chips and drawer, approved 2026-10-29) ---- */
+
+export const COST_PICKED_KEY = "tokenatlas.cost.picked.v1";
+export const COST_PRESET_SIZE = 5, COST_BUSIEST = 8;
+/** Named models with a positive cost: a $0 model has no place on a log scale and says nothing about price. */
+export const ladderRows = (rows: readonly ModelUnitCost[]) => rows.filter(row => row.model !== null && row.perMillion !== null && row.perMillion > 0);
+/** The drawer's presets over ladder rows: the busiest by tokens, and the dearest and cheapest per 1M. */
+export function costPresets(rows: readonly ModelUnitCost[]): { busiest: Set<string>; dearest: Set<string>; cheapest: Set<string> } {
+  const ladder = ladderRows(rows), keys = (list: readonly ModelUnitCost[]) => new Set(list.map(row => row.model!));
+  const byCost = [...ladder].sort((a, b) => b.perMillion! - a.perMillion!);
+  return { busiest: keys([...ladder].sort((a, b) => b.tokens - a.tokens).slice(0, COST_BUSIEST)),
+    dearest: keys(byCost.slice(0, COST_PRESET_SIZE)), cheapest: keys(byCost.slice(-COST_PRESET_SIZE)) };
+}
