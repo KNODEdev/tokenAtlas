@@ -163,6 +163,10 @@ export function CreditNotices({ notices, now, onOpenAccount, onRead }: { notices
   // Opening a subscription closes the panel so it does not cover the selected account.
   const ref = useRef<HTMLDivElement>(null);
   const unread = notices.filter(notice => notice.acknowledged_at == null).map(notice => notice.id);
+  const rows = notices.map(notice => {
+    const line = creditNoticeLine(notice, now);
+    return { notice, line, action: !!onOpenAccount && isOpenCreditNotice(notice) && line.tone === "warn" };
+  });
   return (
     <div ref={ref} data-credit-notices className="status-event">
       <div className="status-event-head">
@@ -171,24 +175,33 @@ export function CreditNotices({ notices, now, onOpenAccount, onRead }: { notices
           <GhostButton disabled={!unread.length} onClick={() => onRead(unread)}>{t("Mark as read", "Oznacz jako przeczytane")}</GhostButton>
         </div>
       </div>
-      {notices.map(notice => {
-        const line = creditNoticeLine(notice, now);
-        const tooltip = [notice.occurred_at,
-          notice.acknowledged_at && `${t("Read", "Przeczytane")}: ${dayTime(notice.acknowledged_at)}`,
-          notice.resolved_at && `${t("Resolved", "Nieaktualne")}: ${dayTime(notice.resolved_at)}`].filter(Boolean).join(" · ");
-        return <div key={notice.id} className="status-event-item" title={tooltip}>
-          <div className="status-event-item-head">
-            <strong className={line.tone === "warn" ? "is-warn" : line.tone === "ok" ? "is-ok" : undefined}>{line.title}</strong>
-            {line.when && <span className="status-event-meta mono">{line.when}</span>}
-          </div>
-          <span className="status-event-meta mono">
-            <span aria-hidden="true" className="status-event-dot" style={{ background: `var(--${notice.provider}, var(--faint))` }} />
-            {notice.label} · {line.facts}</span>
-          {line.tone === "warn" && isOpenCreditNotice(notice) && onOpenAccount && <div className="status-event-actions">
-            <GhostButton onClick={() => { ref.current?.closest("details")?.removeAttribute("open"); onOpenAccount(notice.account); }}>
-              {t("Open subscription", "Otwórz subskrypcję")}</GhostButton></div>}
-        </div>;
-      })}
+      {/* One row per notice: the panel is wide enough for columns, so nothing wraps into a second line. */}
+      <table className="ui-table status-event-table">
+        <thead><tr>
+          <th className="ui-th">{t("Event", "Zdarzenie")}</th>
+          <th className="ui-th">{t("Subscription", "Subskrypcja")}</th>
+          <th className="ui-th">{t("Details", "Szczegóły")}</th>
+          <th className="ui-th status-event-when">{t("When", "Kiedy")}</th>
+        </tr></thead>
+        <tbody>
+          {rows.map(({ notice, line, action }) => {
+            const tooltip = [notice.occurred_at,
+              notice.acknowledged_at && `${t("Read", "Przeczytane")}: ${dayTime(notice.acknowledged_at)}`,
+              notice.resolved_at && `${t("Resolved", "Nieaktualne")}: ${dayTime(notice.resolved_at)}`].filter(Boolean).join(" · ");
+            return <tr key={notice.id} title={tooltip} className={isOpenCreditNotice(notice) ? undefined : "is-closed"}>
+              <td className="ui-td"><strong className={line.tone === "warn" ? "is-warn" : line.tone === "ok" ? "is-ok" : undefined}>{line.title}</strong></td>
+              <td className="ui-td status-event-who" title={notice.label}>
+                <span aria-hidden="true" className="status-event-dot" style={{ background: `var(--${notice.provider}, var(--faint))` }} />
+                {/* An open warning links its subscription instead of a button column that would narrow the details. */}
+                {action ? <button type="button" className="status-event-link" title={t("Open subscription", "Otwórz subskrypcję")}
+                  onClick={() => { ref.current?.closest("details")?.removeAttribute("open"); onOpenAccount!(notice.account); }}>
+                  {notice.label}</button> : <span>{notice.label}</span>}</td>
+              <td className="ui-td status-event-facts">{line.facts}</td>
+              <td className="ui-td is-num status-event-when">{line.when}</td>
+            </tr>;
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

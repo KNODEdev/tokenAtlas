@@ -20,12 +20,22 @@
 .status-event-item { display: grid; gap: var(--s-1); }
 /* Items of one group are separated by a rule so wrapped lines never read as the next item. */
 .status-event-item + .status-event-item { padding-top: var(--s-4); border-top: 1px solid var(--line); }
-.status-event-item-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-4); }
-.status-event-item-head > strong { font-weight: var(--fw-semibold); }
-.status-event-item-head > strong.is-warn { color: var(--warn); }
-.status-event-item-head > strong.is-ok { color: var(--ok); }
-.status-event-item-head > .status-event-meta { white-space: nowrap; }
-.status-event-item > .status-event-actions { margin-top: var(--s-2); }
+/* Package history as a compact table: event, subscription, details, time and an optional action on one row. */
+.status-event-table .ui-th, .status-event-table .ui-td { padding: var(--s-2) var(--s-4); vertical-align: baseline; }
+.status-event-table .ui-th:first-child, .status-event-table .ui-td:first-child { padding-left: 0; }
+.status-event-table .ui-th:last-child, .status-event-table .ui-td:last-child { padding-right: 0; }
+.status-event-table strong { font-weight: var(--fw-semibold); }
+.status-event-table strong.is-warn { color: var(--warn); }
+.status-event-table strong.is-ok { color: var(--ok); }
+/* Long account ids are cut (full name in the tooltip); details and time may wrap only when the panel is narrow. */
+.status-event-who { color: var(--muted); font-size: var(--fs-3); }
+.status-event-who > :last-child { display: inline-block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.status-event-link { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline;
+  text-underline-offset: 2px; cursor: pointer; }
+.status-event-facts { white-space: normal !important; color: var(--muted); font-size: var(--fs-3); }
+.status-event-when { white-space: normal !important; text-align: right; color: var(--muted); font-size: var(--fs-3); }
+/* Read or resolved notices stay as history, quieter than the open ones. */
+.status-event-table tr.is-closed strong { font-weight: var(--fw-medium); }
 .status-event-dot { display: inline-block; width: 6px; height: 6px; margin-right: var(--s-2); border-radius: var(--r-dot); }
 .status-event-rows { display: grid; gap: var(--s-2); margin: 0; padding: 0; list-style: none; }
 .status-event-rows > li { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-4); }
