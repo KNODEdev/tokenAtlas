@@ -19,13 +19,33 @@ const CAPTURE_STYLE_PROPS = [
   "fill", "fill-opacity", "stroke", "stroke-width", "stroke-opacity",
   "stroke-dasharray", "stroke-linecap", "stroke-linejoin",
 ];
-function copyComputedStyles(src: Element, dst: Element): void {
-  const computed = window.getComputedStyle(src);
+function resolvedCss(computed: CSSStyleDeclaration): string {
   let css = "";
   for (const prop of CAPTURE_STYLE_PROPS) {
     const value = computed.getPropertyValue(prop);
     if (value) css += `${prop}:${value};`;
   }
+  return css;
+}
+function pseudoText(content: string): string {
+  if (!content.startsWith("\"")) return "";
+  try { return JSON.parse(content) as string; } catch { return content.slice(1, -1); }
+}
+// The clone carries no stylesheet, so ::before/::after (reference lines, bracket ticks) become real boxes.
+function materializePseudoElements(src: Element, dst: Element): void {
+  if (!(src instanceof HTMLElement)) return;
+  for (const pseudo of ["::before", "::after"] as const) {
+    const computed = window.getComputedStyle(src, pseudo);
+    if (!computed.content || computed.content === "none" || computed.content === "normal" || computed.display === "none") continue;
+    const box = document.createElement("span");
+    box.setAttribute("style", resolvedCss(computed));
+    box.textContent = pseudoText(computed.content);
+    if (pseudo === "::before") dst.prepend(box);
+    else dst.append(box);
+  }
+}
+function copyComputedStyles(src: Element, dst: Element): void {
+  const css = resolvedCss(window.getComputedStyle(src));
   const inline = (src as HTMLElement).style?.cssText;
   // Resolved styles must win over inline var()/currentColor references in the detached SVG.
   dst.setAttribute("style", inline ? `${inline};${css}` : css);
@@ -34,6 +54,8 @@ function copyComputedStyles(src: Element, dst: Element): void {
   for (let i = 0; i < from.length && i < to.length; i++) {
     copyComputedStyles(from[i]!, to[i]!);
   }
+  // After the children: the extra boxes would shift the index pairing above.
+  materializePseudoElements(src, dst);
 }
 function inlineThemeVariables(src: Element, dst: HTMLElement): void {
   const computed = window.getComputedStyle(src);
