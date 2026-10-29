@@ -20,7 +20,7 @@ const DAY_LABEL_GAP = 46;
 /**
  * `span` is the chosen period (first and last UTC day): the axis covers all of it, so quiet days at its ends stay visible.
  * Without a period a few stray points before a long silent gap stay off the axis and are named instead. `yScale` applies
- * to first-token metrics; `highlight` picks one line out and dims the rest.
+ * to every metric; `highlight` picks one line out and dims the rest.
  */
 export function SpeedChart({ rows, kind, grain, span, reference, announcement, challenge, metric = "speed", yScale = "full", highlight = null }: { rows: SpeedChartRow[]; kind: SpeedKind; grain: SpeedGrain; span: [string, string] | null; reference?: { value: number; label: string }; announcement?: { at: string; label: string }; challenge?: { from: string; days: number }; metric?: SpeedChartMetric; yScale?: SpeedYScale; highlight?: string | null }) {
   const { t, locale } = useI18n();
@@ -39,25 +39,28 @@ export function SpeedChart({ rows, kind, grain, span, reference, announcement, c
         : t("No visible model has a bucket with at least {0} calls of this kind.", `Żaden widoczny model nie ma przedziału z co najmniej ${MIN_POINT_CALLS} wywołaniami tego rodzaju.`, [MIN_POINT_CALLS])}
     </div></div>;
   }
-  // A model far faster than the rest (codex-spark) would flatten every other line: it is drawn clipped at the top.
-  const outlier = latency ? null : outlierSeries(series.map(item => ({ key: item.row.key, values: item.points.map(point => point.value) })));
+  // On the capped tok/s scale a model far faster than the rest (codex-spark) would flatten every other line: it is drawn clipped at the top.
+  const outlier = latency || yScale !== "capped" ? null : outlierSeries(series.map(item => ({ key: item.row.key, values: item.points.map(point => point.value) })));
   const values = series.filter(item => item.row.key !== outlier?.key).flatMap(item => item.points.map(point => point.value));
-  const latencyScale = latency ? latencyAxis(values, yScale) : null;
-  const max = latencyScale ? latencyScale.max : speedScaleMax(reference && Number.isFinite(reference.value) && reference.value > 0 ? [...values, reference.value] : values);
+  const withReference = reference && Number.isFinite(reference.value) && reference.value > 0 ? [...values, reference.value] : values;
+  const axisScale = latency ? latencyAxis(values, yScale) : yScale === "log" ? latencyAxis(withReference, "log") : null;
+  const max = axisScale ? axisScale.max : speedScaleMax(yScale === "full" ? [Math.max(...withReference)] : withReference);
   const step = speedScaleStep(max);
-  // Points beyond a capped first-token scale: a marker with the value at the top edge, never a flattened chart.
-  const above = latencyScale && !latencyScale.log ? series.flatMap(({ row, points }) => points.filter(point => point.value > max).map(point => ({ row, point }))) : [];
+  // Points beyond a capped scale: a marker with the value at the top edge, never a flattened chart. The clipped outlier
+  // model is named once instead of counted point by point.
+  const above = yScale === "capped" ? series.filter(item => item.row.key !== outlier?.key)
+    .flatMap(({ row, points }) => points.filter(point => point.value > max).map(point => ({ row, point }))) : [];
   const top = above.length ? CAPPED_TOP : TOP;
   const times = [...all.map(point => point.at), ...(span ?? [])].map(at => Date.parse(`${at}T00:00:00Z`));
   const x0 = Math.min(...times), x1 = Math.max(...times);
   const x = (at: string) => LEFT + (x1 === x0 ? 0.5 : (Date.parse(`${at}T00:00:00Z`) - x0) / (x1 - x0)) * (width - LEFT - RIGHT);
   const bottom = challenge ? BOTTOM + 18 : BOTTOM;
   const y = (value: number) => {
-    const share = latencyScale?.log ? (Math.log10(Math.max(value, latencyScale.min)) - Math.log10(latencyScale.min)) / (Math.log10(max) - Math.log10(latencyScale.min))
+    const share = axisScale?.log ? (Math.log10(Math.max(value, axisScale.min)) - Math.log10(axisScale.min)) / (Math.log10(max) - Math.log10(axisScale.min))
       : Math.min(value, max) / max;
     return top + (1 - Math.min(share, 1)) * (HEIGHT - top - bottom);
   };
-  const gridValues = latencyScale ? latencyScale.ticks : Array.from({ length: Math.floor(max / step) + 1 }, (_, i) => i * step);
+  const gridValues = axisScale ? axisScale.ticks : Array.from({ length: Math.floor(max / step) + 1 }, (_, i) => i * step);
   let lastLabel = -Infinity;
   const labelled = new Set(above.slice().sort((a, b) => x(a.point.at) - x(b.point.at)).filter(({ point }) => {
     if (x(point.at) - lastLabel < CAP_LABEL_GAP) return false;
@@ -104,9 +107,9 @@ export function SpeedChart({ rows, kind, grain, span, reference, announcement, c
                   : kind === "long" ? t("{0} long calls", `${whole.format(point.n)} długich wywołań`, [whole.format(point.n)]) : t("{0} calls", `${whole.format(point.n)} wywołań`, [whole.format(point.n)])
               } · ${t("measured", "zmierzone")} ${point.total ? whole.format(point.measured / point.total * 100) : "—"}%`}</title>
               <circle cx={x(point.at)} cy={y(point.value)} r={7} fill="transparent" />
-              {point.value > max && !latencyScale?.log ? <>
+              {point.value > max && !axisScale?.log ? <>
                 <path d={`M${x(point.at) - 5},${top + 1}L${x(point.at) + 5},${top + 1}L${x(point.at)},${top - 7}Z`} fill="var(--warn)" stroke={row.color} strokeWidth={1.2} />
-                {labelled.has(point) && <text x={x(point.at)} y={top - 11} textAnchor="middle" {...TICK} fill="var(--text)">{whole.format(point.value)} s</text>}
+                {labelled.has(point) && <text x={x(point.at)} y={top - 11} textAnchor="middle" {...TICK} fill="var(--text)">{whole.format(point.value)}{latency ? " s" : ""}</text>}
               </> : <circle cx={x(point.at)} cy={y(point.value)} r={points.length > 40 ? 1.6 : 2.6} fill={row.color} />}
             </g>)}
           </g>;
@@ -118,7 +121,7 @@ export function SpeedChart({ rows, kind, grain, span, reference, announcement, c
         <text x={LEFT} y={top + 2} dx={4} dy={6} {...TICK}>{chartUnit}</text>
       </svg>
       {(above.length > 0 || strays) && <div className="speed-chart-note">
-        {above.length > 0 && t("▲ above {1} s: {0}", `▲ powyżej ${seconds.format(max)} s: ${above.length}`, [above.length, seconds.format(max)])}
+        {above.length > 0 && t("▲ above {1}: {0}", `▲ powyżej ${seconds.format(max)} ${chartUnit}: ${above.length}`, [above.length, `${seconds.format(max)} ${chartUnit}`])}
         {above.length > 0 && strays && " · "}
         {strays && t("◂ off the axis: {0} from {1}", `◂ poza osią: ${strays.count} od ${strays.earliest}`, [strays.count, strays.earliest])}
       </div>}

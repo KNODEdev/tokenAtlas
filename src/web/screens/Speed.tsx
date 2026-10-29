@@ -11,18 +11,21 @@ import { browserSafeDiagnostic } from "../lib/browserDiagnostic";
 import { ALL_ACCOUNT, type RosterCard } from "../lib/roster";
 import {
   MIN_POINT_CALLS, MIN_RANKED_CALLS, accountSelected, accountState, entriesSince, latestWeek, mergeSpeedParts, modelSelected, modelTotals,
-  rangeStart, rankedModels, readSpeedSelection, storedHiddenModels, selectedParts, setAccounts, speedModels, speedProviderOf,
-  speedSubscriptions, speedSeriesKey, executionSuffix, toggleAccount, toggleModel, totalSpeed, writeHiddenModels, writeSpeedSelection,
+  rangeStart, rankedModels, readSpeedSelection, storedPickedSeries, selectedParts, setAccounts, speedModels, speedProviderOf,
+  speedSubscriptions, speedSeriesKey, executionSuffix, toggleAccount, toggleModel, totalSpeed, writePickedSeries, writeSpeedSelection,
   type ModelSpeedResponse, type ModelTotals, type SpeedEntry, type SpeedGrain, type SpeedKind, type SpeedPart, type SpeedRange, type SpeedSelection,
   type SpeedSubscription,
   type SpeedProvider,
   type SpeedChartMetric,
   type SpeedYScale,
 } from "../lib/model-speed";
-import { TableRow, Card, EmptyState, ErrorState, GhostButton, LegendAllToggle, LoadingCard, Table, Tabs, Td, Th, HelpDot } from "../components/ui";
+import { TableRow, Card, Dropdown, EmptyState, ErrorState, GhostButton, LoadingCard, Table, Tabs, Td, Th, HelpDot } from "../components/ui";
 import { Kpi, KpiRow, unit } from "../components/WindowStatusCard";
-import { DEFAULT_VISIBLE, defaultHidden, executionStroke, fastHidden, modelInks } from "../lib/speed-matrix";
-import { SpeedMatrix } from "../components/SpeedMatrix";
+import {
+  NO_EXECUTION, PRESET_SIZE, UNKNOWN_EFFORT, compareChoices, compareSeries, effortColumn, executionStroke, fastPairPicks, fastestPicks, modelInks,
+  speedSection, topPicks, type SpeedCompare,
+} from "../lib/speed-matrix";
+import { SpeedChips, SpeedSeriesPicker } from "../components/SpeedSeries";
 import { AccountPeriodDrawer } from "../components/AccountPeriodDrawer";
 import { TriStateCheck as Check } from "../components/TriStateCheck";
 import { compareTableValues, modelVersionSortValue } from "../lib/table-sort";
@@ -276,16 +279,46 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
     const inks = modelInks(sorted.map(row => row.model));
     return sorted.map(row => { const ink = inks.get(row.model)!; return { ...row, ink, ...executionStroke(ink, row.series) }; });
   }, [ranged, language, split, subscriptions, t]);
-  // Nothing stored: many series start as the busiest standard ones plus every fast one; a stored choice is kept as is.
-  const [stored, setStored] = useState<Set<string> | null>(() => storedHiddenModels(hiddenScope));
-  const preset = useMemo(() => defaultHidden(rows.map(row => ({ key: row.key, series: row.series, calls: activity(row.totals) }))), [rows]);
-  const hidden = stored ?? preset;
-  const setAll = (next: Set<string>) => { setStored(next); writeHiddenModels(hiddenScope, next, undefined, preset.size > 0); };
-  // A group turns on unless all of it is on already.
+  // The period's value of the chart's metric (the server's combined first-token percentiles, or a ratio of sums).
+  const cellValue = (totals: ModelTotals) => {
+    if (chartMetric === "speed") return totalSpeed(totals, kind);
+    const ms = chartMetric === "first-token-median" ? totals.firstToken?.median_ms : totals.firstToken?.p90_ms;
+    return ms == null ? null : ms / 1000;
+  };
+  /*
+   * The chart shows a few series (docs/design/mockups/speed-series-picker.html, approved 2026-10-29): the picked ones,
+   * every measured execution of one model, or one effort across models. Nothing stored starts from the top preset.
+   */
+  const pickItems = useMemo(() => rows.map(row => ({ key: row.key, name: row.name, series: row.series, calls: activity(row.totals) })), [rows]);
+  const [stored, setStored] = useState<Set<string> | null>(() => storedPickedSeries(hiddenScope));
+  const picked = useMemo(() => stored ?? topPicks(pickItems), [stored, pickItems]);
+  const [compare, setCompare] = useState<SpeedCompare>("custom");
+  const [compareModel, setCompareModel] = useState<string | null>(null);
+  const [compareEffort, setCompareEffort] = useState("high");
+  const [withFast, setWithFast] = useState(true);
+  const [kpiScope, setKpiScope] = useState<"chart" | "all">("chart");
+  const [drawer, setDrawer] = useState(false);
+  const [search, setSearch] = useState("");
+  const [onlyMeasured, setOnlyMeasured] = useState(true);
+  const opener = useRef<HTMLElement | null>(null);
+  const measured = pickItems.filter(item => cellValue(rows.find(row => row.key === item.key)!.totals) !== null
+    && ["standard", "fast"].includes(speedSection(item.series)));
+  const choices = compareChoices(measured);
+  const model = compareModel !== null && choices.models.includes(compareModel) ? compareModel : choices.models[0] ?? "";
+  const effort = choices.efforts.includes(compareEffort) ? compareEffort : choices.efforts.includes("high") ? "high" : choices.efforts[0] ?? "";
+  const shownKeys = compare === "custom" ? picked
+    : new Set(compareSeries(measured, compare, compare === "model" ? model : effort, withFast).map(item => item.key));
+  const setPicked = (next: Set<string>) => { setStored(next); writePickedSeries(hiddenScope, next); setCompare("custom"); };
+  // Editing a comparison keeps what it shows as the starting point; a group turns on unless all of it is on already.
   const toggle = (keys: string[]) => {
-    const next = new Set(hidden), on = keys.every(key => !hidden.has(key));
-    for (const key of keys) if (on) next.add(key); else next.delete(key);
-    setAll(next);
+    const next = new Set(shownKeys), on = keys.every(key => shownKeys.has(key));
+    for (const key of keys) if (on) next.delete(key); else next.add(key);
+    setPicked(next);
+  };
+  const openDrawer = () => {
+    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (compare !== "custom") setPicked(new Set(shownKeys));
+    setDrawer(true);
   };
   const kinds = [{ value: "long" as const, label: t("long calls ≥{0}", `długie wywołania ≥${longOutMin}`, [longOutMin]) },
     { value: "all" as const, label: t("all calls", "wszystkie wywołania") }];
@@ -310,43 +343,58 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
   }
   const whole = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
   const oneDecimal = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  const ranked = rankedModels(rows, kind);
-  const calls = rows.reduce((sum, row) => sum + row.totals.calls, 0), timed = rows.reduce((sum, row) => sum + row.totals.timed, 0);
-  const latest = latestWeek(rows.map(row => row.series), kind);
+  // The tiles follow the series on the chart unless switched to all of them.
+  const shownRows = rows.filter(row => shownKeys.has(row.key));
+  const kpiRows = kpiScope === "chart" ? shownRows : rows;
+  const ranked = rankedModels(kpiRows, kind);
+  const calls = kpiRows.reduce((sum, row) => sum + row.totals.calls, 0), timed = kpiRows.reduce((sum, row) => sum + row.totals.timed, 0);
+  const allCalls = rows.reduce((sum, row) => sum + row.totals.calls, 0);
+  const latest = latestWeek(kpiRows.map(row => row.series), kind);
   const speedValue = (value: number | null) => value === null ? "—" : <>{whole.format(value)}{unit(" tok/s")}</>;
   const noRanked = t("no model with {0} calls of this kind", `brak modelu z ${MIN_RANKED_CALLS} wywołaniami tego rodzaju`, [MIN_RANKED_CALLS]);
   const all = subscriptions !== undefined;
-  // Matrix cells: the period's value of the chart's metric (the server's combined first-token percentiles, or a ratio of sums).
-  const cellValue = (totals: ModelTotals) => {
-    if (chartMetric === "speed") return totalSpeed(totals, kind);
-    const ms = chartMetric === "first-token-median" ? totals.firstToken?.median_ms : totals.firstToken?.p90_ms;
-    return ms == null ? null : ms / 1000;
-  };
+  // One model's efforts share its ink, so their shades spread wider.
+  const stroke = (row: Row) => compare === "model" ? executionStroke(row.ink, row.series, 1.8) : { color: row.color, dash: row.dash };
+  const formatValue = (value: number | null) => value === null ? "—" : chartLatency ? `${oneDecimal.format(value)} s` : `${whole.format(value)} tok/s`;
+  const effortText = (row: Row) => { const column = effortColumn(row.series); return column === NO_EXECUTION ? "" : column === UNKNOWN_EFFORT ? "?" : column; };
+  const valueOf = (key: string) => { const row = rows.find(item => item.key === key); return row ? cellValue(row.totals) : null; };
   const cellTitle = chartMetric === "speed" ? t("Cells: tok/s for the period", "Komórki: tok/s w okresie")
     : chartMetric === "first-token-median" ? t("Cells: first-token median for the period, seconds", "Komórki: mediana pierwszego tokena w okresie, sekundy")
     : t("Cells: first-token P90 for the period, seconds", "Komórki: P90 pierwszego tokena w okresie, sekundy");
   return (
     <div className="archive speed ui-tab-page">
       {controlRow}
+      <div className="speed-kpi-scope">{t("Tiles for", "Kafelki dla")} <Tabs value={kpiScope} onChange={setKpiScope} options={[
+        { value: "chart" as const, label: t("series on the chart", "serii na wykresie"), title: t("Counted only from the series on the chart", "Liczone tylko z serii na wykresie") },
+        { value: "all" as const, label: t("all", "wszystkich"), title: t("Counted from every series in the period", "Liczone ze wszystkich serii w okresie") },
+      ]} /></div>
       <KpiRow columns={4}>
         <Kpi label={t("Fastest model", "Najszybszy model")} value={speedValue(ranked[0] ? totalSpeed(ranked[0].totals, kind) : null)} visual={null}
           caption={ranked[0]?.label ?? noRanked} />
         <Kpi label={t("Slowest model", "Najwolniejszy model")} value={speedValue(ranked.length ? totalSpeed(ranked.at(-1)!.totals, kind) : null)} visual={null}
           caption={ranked.at(-1)?.label ?? noRanked} />
-        <Kpi label={t("Measured calls", "Zmierzone wywołania")}
-          value={calls ? <>{oneDecimal.format(timed / calls * 100)}{unit("%")}</> : "—"} visual={null}
-          caption={t("{0} of {1} calls", `${compact(timed)} z ${compact(calls)} wywołań`, [compact(timed), compact(calls)])} />
+        {kpiScope === "chart"
+          ? <Kpi label={t("Calls on the chart", "Wywołania na wykresie")} value={compact(calls)} visual={null}
+            caption={t("{0}% of {1} calls · {2}% measured",
+              `${allCalls ? oneDecimal.format(calls / allCalls * 100) : "—"}% z ${compact(allCalls)} wywołań · ${calls ? oneDecimal.format(timed / calls * 100) : "—"}% zmierzonych`,
+              [allCalls ? oneDecimal.format(calls / allCalls * 100) : "—", compact(allCalls), calls ? oneDecimal.format(timed / calls * 100) : "—"])} />
+          : <Kpi label={t("Measured calls", "Zmierzone wywołania")}
+            value={calls ? <>{oneDecimal.format(timed / calls * 100)}{unit("%")}</> : "—"} visual={null}
+            caption={t("{0} of {1} calls", `${compact(timed)} z ${compact(calls)} wywołań`, [compact(timed), compact(calls)])} />}
         <Kpi label={t("Latest week", "Ostatni tydzień")} value={speedValue(latest?.speed ?? null)} visual={null}
-          caption={latest ? t("all models · week of {0} · {1} calls",
-            `wszystkie modele · tydzień od ${latest.week} · ${compact(latest.calls)} wywołań`, [latest.week, compact(latest.calls)]) : "—"} />
+          caption={!latest ? "—" : kpiScope === "chart"
+            ? t("{0} series on the chart · week of {1} · {2} calls",
+              `${shownRows.length} serii na wykresie · tydzień od ${latest.week} · ${compact(latest.calls)} wywołań`, [shownRows.length, latest.week, compact(latest.calls)])
+            : t("all models · week of {0} · {1} calls",
+              `wszystkie modele · tydzień od ${latest.week} · ${compact(latest.calls)} wywołań`, [latest.week, compact(latest.calls)])} />
       </KpiRow>
       <Card><ChartExport title={chartTitle}>
         <div className="archive-head">
           <div><span className="ui-display" style={CARD_TITLE}>{chartTitle}</span> <HelpDot label={chartTitle}>{chartLatency
             ? t("Verified first-token times in seconds, grouped by model, speed mode and reasoning effort. Lower is faster. Unknown settings stay separate. Each day's or week's percentiles use only that execution variant's measurements.",
               "Pewne czasy pierwszego tokena w sekundach, według modelu, trybu szybkości i poziomu rozumowania. Mniej znaczy szybciej. Nieznane ustawienia pozostają osobno. Percentyle dnia lub tygodnia obejmują tylko pomiary danego wariantu.") : t(
-            "Points with ≥{0} calls; gaps without traffic are not bridged. Click a model to hide it.",
-            `Punkty z ≥${MIN_POINT_CALLS} wywołań; przerwy bez ruchu nie są łączone. Kliknij model, żeby go ukryć.`, [MIN_POINT_CALLS])}
+            "Points with ≥{0} calls; gaps without traffic are not bridged. Pick series under “Series”, or compare one model or one effort.",
+            `Punkty z ≥${MIN_POINT_CALLS} wywołań; przerwy bez ruchu nie są łączone. Wybierz serie w „Serie” albo porównaj jeden model lub jeden effort.`, [MIN_POINT_CALLS])}
             <br />{t("Separate series for each model, speed mode and reasoning effort. Missing settings remain unknown.", "Osobne serie dla modelu, trybu szybkości i poziomu rozumowania. Brakujące ustawienia pozostają nieznane.")}
             {speedPending && <><br />{t("Execution timing history is still being prepared.", "Historia pomiarów według trybów jest jeszcze przygotowywana.")}</>}
             </HelpDot> <span className="archive-sub">· {chartLatency
@@ -360,35 +408,59 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
             { value: "first-token-median" as const, label: t("First token · median", "Pierwszy token · mediana") },
             { value: "first-token-p90" as const, label: t("First token · P90", "Pierwszy token · P90") },
           ]} />
-          {chartLatency && <span className="speed-yscale">{t("Y axis", "oś Y")} <Tabs value={yScale} onChange={setYScale} options={[
-            { value: "capped" as const, label: t("capped", "przycięta"), title: t("Up to the 95th percentile of the drawn values; slower ones are marked ▲ at the top",
-              "Do 95. percentyla rysowanych wartości; wolniejsze oznaczone ▲ u góry") },
+          <span className="speed-yscale">{t("Y axis", "oś Y")} <Tabs value={yScale} onChange={setYScale} options={[
+            { value: "capped" as const, label: t("capped", "przycięta"), title: chartLatency
+              ? t("Up to the 95th percentile of the drawn values; slower ones are marked ▲ at the top", "Do 95. percentyla rysowanych wartości; wolniejsze oznaczone ▲ u góry")
+              : t("Without a model far faster than the rest; faster points are marked ▲ at the top", "Bez modelu dużo szybszego od reszty; szybsze punkty oznaczone ▲ u góry") },
             { value: "log" as const, label: "log", title: t("Logarithmic scale", "Skala logarytmiczna") },
             { value: "full" as const, label: t("full", "pełna"), title: t("Every value on the scale", "Wszystkie wartości na skali") },
-          ]} /></span>}
+          ]} /></span>
         </div>
-        <div className="speed-plot">
-          <SpeedChart rows={rows.filter(row => !hidden.has(row.key))} kind={kind} grain={grain} metric={chartMetric} yScale={yScale}
-            highlight={hover !== null && !hidden.has(hover) ? hover : null} span={since === null ? null : [since, today]} />
-          <SpeedMatrix items={rows.map(row => ({ key: row.key, name: row.name, model: row.model, series: row.series,
+        <div className="speed-compare">
+          <Tabs value={compare} onChange={setCompare} options={[
+            { value: "custom" as const, label: t("Picked", "Wybrane"), title: t("Your own choice of series", "Własny wybór serii") },
+            { value: "model" as const, label: t("One model", "Jeden model"), title: t("Every effort and speed mode of one model", "Wszystkie efforty i tryby szybkości jednego modelu") },
+            { value: "effort" as const, label: t("One effort", "Jeden effort"), title: t("One effort across every model", "Jeden effort we wszystkich modelach") },
+          ]} />
+          {compare === "model" && choices.models.length > 0 && <Dropdown value={model} onChange={setCompareModel} ariaLabel={t("Model", "Model")}
+            options={choices.models.map(name => ({ value: name, label: name }))} />}
+          {compare === "effort" && choices.efforts.length > 0 && <Tabs value={effort} onChange={setCompareEffort}
+            options={choices.efforts.map(column => ({ value: column, label: column === UNKNOWN_EFFORT ? "?" : column === NO_EXECUTION ? "—" : column,
+              title: column === UNKNOWN_EFFORT ? t("unknown effort", "effort nieznany") : column === NO_EXECUTION ? t("No reasoning setting recorded", "Brak zapisanego poziomu rozumowania") : undefined }))} />}
+          {compare !== "custom" && <label className="speed-split"><input type="checkbox" checked={withFast} onChange={event => setWithFast(event.target.checked)} />
+            {t("with fast", "z fast")}</label>}
+          <GhostButton onClick={openDrawer}>{t("Series · {0}", `Serie · ${shownRows.length}`, [shownRows.length])}</GhostButton>
+        </div>
+        <SpeedChips compare={compare} highlight={hover} onHover={setHover} onAdd={openDrawer} onRemove={key => toggle([key])}
+          chips={shownRows.map(row => ({ key: row.key, name: row.name, effort: effortText(row), fast: row.series.speed === "fast", label: row.label,
+            mode: row.series.speed === "mixed" ? t("mixed", "mieszany") : row.series.speed?.startsWith("unknown") ? t("unknown", "nieznany") : null,
+            ...stroke(row), value: formatValue(cellValue(row.totals)) }))} />
+        <SpeedChart rows={shownRows.map(row => ({ ...row, ...stroke(row) }))} kind={kind} grain={grain} metric={chartMetric} yScale={yScale}
+          highlight={hover !== null && shownKeys.has(hover) ? hover : null} span={since === null ? null : [since, today]} />
+      </ChartExport></Card>
+      {drawer && <AccountPeriodDrawer busy={false} onClose={() => { setDrawer(false); setHover(null); }} returnFocus={opener.current} className="speed-series-drawer"
+        closeLabel={t("Close the series choice", "Zamknij wybór serii")} title={t("Series on the chart", "Serie na wykresie")}
+        subtitle={t("{0} picked · a cell adds or removes a series, a row its model, a column its effort",
+          `wybrane: ${shownRows.length} · komórka dodaje lub usuwa serię, wiersz jej model, kolumna jej effort`, [shownRows.length])}>
+        <SpeedSeriesPicker picked={shownRows.length} search={search} onSearch={setSearch} onlyMeasured={onlyMeasured} onOnlyMeasured={setOnlyMeasured}
+          items={rows.map(row => ({ key: row.key, name: row.name, model: row.model, series: row.series,
             calls: chartLatency ? row.totals.firstToken?.turns ?? 0 : row.totals.calls,
             label: row.label, ink: row.ink, color: row.color, dash: row.dash, value: cellValue(row.totals) }))}
-            hidden={hidden} onToggle={toggle} onHover={setHover} firstDay={key => firstDays.get(key) ?? null} today={today}
-            format={value => chartLatency ? oneDecimal.format(value) : whole.format(value)} valueTitle={cellTitle}
-            countLabel={chartLatency ? t("turns", "tury") : t("calls", "wywołania")}
-            actions={<>
-              {rows.length > DEFAULT_VISIBLE && <button type="button" className="ui-legend-all"
-                onClick={() => setAll(defaultHidden(rows.map(row => ({ key: row.key, series: row.series, calls: activity(row.totals) })), 0))}>
-                {t("top {0} + fast", `top ${DEFAULT_VISIBLE} + fast`, [DEFAULT_VISIBLE])}</button>}
-              {rows.some(row => row.series.speed === "fast") && rows.some(row => row.series.speed !== "fast") && <button type="button" className="ui-legend-all"
-                onClick={() => setAll(fastHidden(rows))}>{t("fast only", "tylko fast")}</button>}
-              {rows.length > 1 && <LegendAllToggle allShown={rows.every(row => !hidden.has(row.key))} onShowAll={() => setAll(new Set())}
-                onHideAll={() => setAll(new Set([...hidden, ...rows.map(row => row.key)]))} />}
-              <span className="speed-matrix-count">{t("{0} of {1} series on the chart", `${rows.filter(row => !hidden.has(row.key)).length} z ${rows.length} serii na wykresie`,
-                [rows.filter(row => !hidden.has(row.key)).length, rows.length])}</span>
-            </>} />
-        </div>
-      </ChartExport></Card>
+          hidden={new Set(rows.filter(row => !shownKeys.has(row.key)).map(row => row.key))} onToggle={toggle} onHover={setHover}
+          firstDay={key => firstDays.get(key) ?? null} today={today}
+          format={value => chartLatency ? oneDecimal.format(value) : whole.format(value)} valueTitle={cellTitle}
+          countLabel={chartLatency ? t("turns", "tury") : t("calls", "wywołania")}
+          presets={[
+            { label: t("Top {0}", `Top ${PRESET_SIZE}`, [PRESET_SIZE]), title: t("The busiest series of the busiest models, and the busiest fast one",
+              "Najczęstsza seria najczęściej używanych modeli i najczęstsza fast"), apply: () => setPicked(topPicks(pickItems)) },
+            { label: t("Fastest {0}", `Najszybsze ${PRESET_SIZE}`, [PRESET_SIZE]), title: cellTitle,
+              apply: () => setPicked(fastestPicks(pickItems, valueOf, !chartLatency)) },
+            ...rows.some(row => row.series.speed === "fast") ? [{ label: t("Fast vs standard", "Fast vs standard"),
+              title: t("Each fast series beside the same model and effort without fast", "Każda seria fast obok tego samego modelu i effortu bez fast"),
+              apply: () => setPicked(fastPairPicks(pickItems)) }] : [],
+            { label: t("Clear", "Wyczyść"), title: t("Take every series off the chart", "Zdejmij wszystkie serie z wykresu"), apply: () => setPicked(new Set()) },
+          ]} />
+      </AccountPeriodDrawer>}
       <Card>
         <div className="archive-head">
           <div><span className="ui-display" style={CARD_TITLE}>{t("Per model", "Według modeli")}</span> <span className="archive-sub">· {periodName
@@ -421,10 +493,10 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
               : t("No verified first-token measurements", "Brak pewnych pomiarów pierwszego tokena");
             const firstTokenValue = (ms: number | null | undefined) => ms == null ? "—" : `${oneDecimal.format(ms / 1000)} s`;
             return <TableRow key={row.key}>
-              <Td><button type="button" className={`speed-toggle${hidden.has(row.key) ? " is-off" : ""}`} aria-pressed={!hidden.has(row.key)}
+              <Td><button type="button" className={`speed-toggle${shownKeys.has(row.key) ? "" : " is-off"}`} aria-pressed={shownKeys.has(row.key)}
                 onClick={() => toggle([row.key])}
-                title={hidden.has(row.key) ? t("Show on the chart", "Pokaż na wykresie") : t("Hide from the chart", "Ukryj na wykresie")}>
-                <span className="speed-swatch" style={{ background: row.color }} />{row.label}</button></Td>
+                title={shownKeys.has(row.key) ? t("Hide from the chart", "Ukryj na wykresie") : t("Show on the chart", "Pokaż na wykresie")}>
+                <span className="speed-swatch" style={{ background: stroke(row).color }} />{row.label}</button></Td>
               {all && <Td title={accounts.map(sub => sub.label).join("\n")} style={{ color: "var(--muted)" }}>
                 <span className="speed-subs">{accounts.slice(0, 2).map(sub => sub.name).join(", ")}{accounts.length > 2 ? ` +${accounts.length - 2}` : ""}</span></Td>}
               <Td sortValue={row.totals.calls} mono align="right">{compact(row.totals.calls)}</Td>

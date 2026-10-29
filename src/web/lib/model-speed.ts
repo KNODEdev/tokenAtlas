@@ -230,32 +230,30 @@ function withList(record: Readonly<Record<string, string[]>>, key: string, list:
   return Object.fromEntries([...Object.entries(record).filter(([id]) => id !== key), ...(list ? [[key, list] as const] : [])]);
 }
 
-export const HIDDEN_MODELS_KEY = "tokenatlas.speed.hidden.v1";
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
 const browserStorage = (): Storage | null => {
   try { return typeof localStorage === "undefined" ? null : localStorage; } catch { return null; }
 };
-function readAll(storage: Storage | null): Record<string, string[]> {
+function readAll(storage: Storage | null, key: string): Record<string, string[]> {
   try {
-    const value: unknown = JSON.parse(storage?.getItem(HIDDEN_MODELS_KEY) ?? "null");
+    const value: unknown = JSON.parse(storage?.getItem(key) ?? "null");
     if (!value || typeof value !== "object" || Array.isArray(value)) return {};
     return Object.fromEntries(Object.entries(value as Record<string, unknown>)
       .map(([account, models]) => [account, Array.isArray(models) ? models.filter((m): m is string => typeof m === "string") : []]));
   } catch { return {}; }
 }
-/** The models hidden on the chart of one subscription; nothing when storage is unavailable. */
-export function readHiddenModels(account: string, storage: Storage | null = browserStorage()): Set<string> {
-  return new Set(ownList(readAll(storage), account));
-}
-/** The stored choice of one subscription, or null when it has none (its chart then starts from the default selection). */
-export function storedHiddenModels(account: string, storage: Storage | null = browserStorage()): Set<string> | null {
-  const record = readAll(storage);
+/**
+ * The series picked for the Speed chart (docs/design/mockups/speed-series-picker.html, approved 2026-10-29): a list of
+ * what is shown, so series that appear later stay off until picked. Null when a scope has no stored choice yet.
+ */
+export const PICKED_SERIES_KEY = "tokenatlas.speed.picked.v1";
+export function storedPickedSeries(account: string, storage: Storage | null = browserStorage()): Set<string> | null {
+  const record = readAll(storage, PICKED_SERIES_KEY);
   return Object.prototype.hasOwnProperty.call(record, account) ? new Set(record[account]) : null;
 }
-/** `keepEmpty` stores "nothing hidden" explicitly, where forgetting the choice would bring a default selection back. */
-export function writeHiddenModels(account: string, hidden: ReadonlySet<string>, storage: Storage | null = browserStorage(), keepEmpty = false): void {
+export function writePickedSeries(account: string, picked: ReadonlySet<string>, storage: Storage | null = browserStorage()): void {
   try {
-    storage?.setItem(HIDDEN_MODELS_KEY, JSON.stringify(withList(readAll(storage), account, hidden.size ? [...hidden].sort() : keepEmpty ? [] : null)));
+    storage?.setItem(PICKED_SERIES_KEY, JSON.stringify(withList(readAll(storage, PICKED_SERIES_KEY), account, [...picked].sort())));
   } catch { /* The choice still applies for this visit. */ }
 }
 

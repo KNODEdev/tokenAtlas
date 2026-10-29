@@ -5,7 +5,7 @@ import { api, bustApiMemo, type ApiAccount } from "../lib/api";
 import { emptyModel } from "../lib/cycle";
 import { setLanguage } from "../lib/i18n";
 import { ALL_ACCOUNT, type RosterCard } from "../lib/roster";
-import { HIDDEN_MODELS_KEY, SPEED_SELECTION_KEY, type ModelSpeedPoint, type ModelSpeedResponse } from "../lib/model-speed";
+import { PICKED_SERIES_KEY, SPEED_SELECTION_KEY, type ModelSpeedPoint, type ModelSpeedResponse } from "../lib/model-speed";
 import type { ScreenProps } from "../lib/screens";
 import { flushUntil, installTestDom, invoke, type TestNode } from "../lib/test-dom-harness";
 import { Speed } from "./Speed";
@@ -43,9 +43,12 @@ test("the same model has independently visible speed and first-token lines for e
     await flushUntil(() => dom.host.textContent.includes("Per model"));
     for (const suffix of ["standard · high", "fast · high", "fast · ultra", "fast · unknown effort"])
       expect(dom.host.textContent).toContain(`gpt-6.1-sol · ${suffix}`);
-    await invoke(toggles(dom.host, "gpt-6.1-sol · fast · ultra")[0]!, "onClick");
+    // The top preset shows the standard series and the busiest fast one; each other variant is picked on its own.
     expect(toggles(dom.host, "gpt-6.1-sol · fast · ultra").every(n => n.attributes["aria-pressed"] === "false")).toBe(true);
+    await invoke(toggles(dom.host, "gpt-6.1-sol · fast · ultra")[0]!, "onClick");
+    expect(toggles(dom.host, "gpt-6.1-sol · fast · ultra").every(n => n.attributes["aria-pressed"] === "true")).toBe(true);
     expect(toggles(dom.host, "gpt-6.1-sol · fast · high").every(n => n.attributes["aria-pressed"] === "true")).toBe(true);
+    expect(toggles(dom.host, "gpt-6.1-sol · fast · unknown effort").every(n => n.attributes["aria-pressed"] === "false")).toBe(true);
     await invoke(nodes(dom.host).find(n => n.tagName === "BUTTON" && n.textContent === "First token · median")!, "onClick");
     expect(dom.host.textContent).toContain("9.0 s");
     expect(nodes(dom.host).some(n => n.tagName === "SVG" && n.attributes["aria-label"] === "Time to first token")).toBe(true);
@@ -91,9 +94,11 @@ test("first-token columns show seconds, turn coverage and a dash for unverified 
     expect(dom.host.textContent).toContain("5.6 s");
   } finally { await act(async () => root.unmount()); read.mockRestore(); dom.restore(); }
 });
-/** The matrix cell (named by its label) and the table name of one series, in that order. */
+/** The table name of one series, then its matrix cell (named by its label) while the series drawer is open. */
 const toggles = (host: TestNode, label: string) => nodes(host).filter(node => node.tagName === "BUTTON"
   && (node.className.includes("speed-toggle") && node.textContent === label || node.className.includes("speed-cell") && node.attributes["aria-label"] === label));
+const button = (host: TestNode, text: string) => nodes(host).find(node => node.tagName === "BUTTON" && node.textContent === text)!;
+const seriesButton = (host: TestNode) => nodes(host).find(node => node.tagName === "BUTTON" && node.textContent.startsWith("Series · "))!;
 function withStorage(storage: unknown): () => void {
   const previous = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
@@ -131,7 +136,7 @@ test("Speed opens with long calls, daily points and all history for a subscripti
   } finally { await act(async () => root.unmount()); read.mockRestore(); dom.restore(); }
 });
 
-test("a model hides from the legend or the table, on the chart only, and stays hidden after a reload", async () => {
+test("a series leaves the chart by its chip or the table, the tiles follow the chart, and the choice survives a reload", async () => {
   setLanguage("en"); bustApiMemo();
   const values = new Map<string, string>();
   const restoreStorage = withStorage({ getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } });
@@ -141,30 +146,38 @@ test("a model hides from the legend or the table, on the chart only, and stays h
   try {
     await act(async () => root.render(<Speed {...props("codex1", "codex")} />));
     await flushUntil(() => dom.host.textContent.includes("Per model"));
-    // The spark line sits above the others' scale.
+    // The spark line sits above the others' scale; the full scale keeps it on the axis.
     expect(dom.host.textContent).toContain("gpt-5.3-codex-spark ≈ 300 tok/s · above the scale ↑");
+    await invoke(button(dom.host, "full"), "onClick");
+    expect(dom.host.textContent).not.toContain("above the scale");
+    await invoke(button(dom.host, "capped"), "onClick");
     expect(dom.host.textContent).toContain("Fastest model300 tok/sgpt-5.3-codex-spark");
     expect(dom.host.textContent).not.toContain("<synthetic>");
-    expect(dom.host.textContent).toContain("Measured calls100.0%240 of 240 calls");
-    await invoke(toggles(dom.host, "gpt-5.3-codex-spark")[0]!, "onClick");
-    expect(toggles(dom.host, "gpt-5.3-codex-spark").map(node => node.attributes["aria-pressed"])).toEqual(["false", "false"]);
-    expect(toggles(dom.host, "gpt-5.3-codex-spark").every(node => node.className.includes("is-off"))).toBe(true);
+    expect(dom.host.textContent).toContain("Calls on the chart240100.0% of 240 calls · 100.0% measured");
+    const remove = nodes(dom.host).find(node => node.tagName === "BUTTON" && node.attributes["aria-label"] === "Remove gpt-5.3-codex-spark from the chart")!;
+    await invoke(remove, "onClick");
+    expect(toggles(dom.host, "gpt-5.3-codex-spark").map(node => node.attributes["aria-pressed"])).toEqual(["false"]);
+    expect(toggles(dom.host, "gpt-5.3-codex-spark")[0]!.className).toContain("is-off");
     expect(dom.host.textContent).not.toContain("above the scale");
-    // Tiles and table still cover the hidden model.
+    // The tiles count the chart's series, or every series when switched.
+    expect(dom.host.textContent).toContain("Fastest model40 tok/sgpt-5.6-sol");
+    expect(dom.host.textContent).toContain("Calls on the chart12050.0% of 240 calls");
+    await invoke(button(nodes(dom.host).find(node => node.className === "speed-kpi-scope")!, "all"), "onClick");
     expect(dom.host.textContent).toContain("Fastest model300 tok/sgpt-5.3-codex-spark");
-    expect(JSON.parse(values.get(HIDDEN_MODELS_KEY)!)).toEqual({ codex1: ["gpt-5.3-codex-spark"] });
+    expect(dom.host.textContent).toContain("Measured calls100.0%240 of 240 calls");
+    expect(JSON.parse(values.get(PICKED_SERIES_KEY)!)).toEqual({ codex1: ["gpt-5.6-sol"] });
     await act(async () => root.unmount());
     root = createRoot(dom.host as unknown as Element);
     await act(async () => root.render(<Speed {...props("codex1", "codex")} />));
     await flushUntil(() => dom.host.textContent.includes("Per model"));
-    expect(toggles(dom.host, "gpt-5.3-codex-spark")[1]!.attributes["aria-pressed"]).toBe("false");
-    await invoke(toggles(dom.host, "gpt-5.3-codex-spark")[1]!, "onClick");
+    expect(toggles(dom.host, "gpt-5.3-codex-spark")[0]!.attributes["aria-pressed"]).toBe("false");
+    await invoke(toggles(dom.host, "gpt-5.3-codex-spark")[0]!, "onClick");
     expect(toggles(dom.host, "gpt-5.3-codex-spark")[0]!.attributes["aria-pressed"]).toBe("true");
-    expect(JSON.parse(values.get(HIDDEN_MODELS_KEY)!)).toEqual({});
+    expect(JSON.parse(values.get(PICKED_SERIES_KEY)!)).toEqual({ codex1: ["gpt-5.3-codex-spark", "gpt-5.6-sol"] });
   } finally { await act(async () => root.unmount()); read.mockRestore(); restoreStorage(); dom.restore(); }
 });
 
-test("fast series are dashed and deeper effort is darker, on the chart and in the matrix alike", async () => {
+test("fast series are dashed and deeper effort is darker, on the chart and in the drawer's matrix alike", async () => {
   setLanguage("en"); bustApiMemo();
   const dom = installTestDom(), root = createRoot(dom.host as unknown as Element);
   const variant = (speed: string, effort: string, calls: number) => ({ ...model("gpt-6.1-sol", [point("2026-10-05", calls, 4000, 100_000)]), speed, effort });
@@ -172,19 +185,27 @@ test("fast series are dashed and deeper effort is darker, on the chart and in th
   try {
     await act(async () => root.render(<Speed {...props("codex1", "codex")} />));
     await flushUntil(() => dom.host.textContent.includes("Per model"));
-    const cellLine = (label: string) => nodes(toggles(dom.host, label)[0]!).find(node => node.tagName === "LINE")!;
+    const paths = () => nodes(dom.host).filter(node => node.tagName === "PATH");
+    // Top: the model's busiest series and the busiest fast one.
+    expect(paths().map(node => node.attributes["stroke-dasharray"] ?? "")).toEqual(["", "5 3"]);
+    await invoke(seriesButton(dom.host), "onClick");
+    const dialog = nodes(dom.host).find(node => node.tagName === "DIALOG")!;
+    const cellLine = (label: string) => nodes(toggles(dialog, label)[0]!).find(node => node.tagName === "LINE")!;
     expect(cellLine("gpt-6.1-sol · standard · high").attributes["stroke-dasharray"]).toBeUndefined();
     expect(cellLine("gpt-6.1-sol · fast · high").attributes["stroke-dasharray"]).toBe("5 3");
-    const paths = nodes(dom.host).filter(node => node.tagName === "PATH");
-    expect(paths.map(node => node.attributes["stroke-dasharray"] ?? "")).toEqual(["", "", "5 3"]);
-    expect(paths[0]!.attributes.stroke).toBe("var(--codex)");
-    expect(paths[1]!.attributes.stroke).toContain("calc(l - 0.16)");
     // The fast mode has its own section of the matrix.
-    expect(dom.host.textContent).toContain("⚡ fast 1 models · 1 series");
+    expect(dialog.textContent).toContain("⚡ fast 1 models · 1 series");
+    await invoke(toggles(dialog, "gpt-6.1-sol · standard · max")[0]!, "onClick");
+    expect(paths().map(node => node.attributes["stroke-dasharray"] ?? "")).toEqual(["", "", "5 3"]);
+    expect(paths()[0]!.attributes.stroke).toBe("var(--codex)");
+    expect(paths()[1]!.attributes.stroke).toContain("calc(l - 0.16)");
+    // One model alone: its efforts spread wider.
+    await invoke(button(dom.host, "One model"), "onClick");
+    expect(paths()[1]!.attributes.stroke).toContain("calc(l - 0.288)");
   } finally { await act(async () => root.unmount()); read.mockRestore(); dom.restore(); }
 });
 
-test("many series start as the busiest standard ones plus every fast one, and show all is remembered", async () => {
+test("the chart starts from the top preset, a drawer column adds an effort everywhere, and comparisons pick their own series", async () => {
   setLanguage("en"); bustApiMemo();
   const values = new Map<string, string>();
   const restoreStorage = withStorage({ getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } });
@@ -198,23 +219,40 @@ test("many series start as the busiest standard ones plus every fast one, and sh
   try {
     await act(async () => root.render(<Speed {...props("codex1", "codex")} />));
     await flushUntil(() => dom.host.textContent.includes("Per model"));
-    expect(dom.host.textContent).toContain("9 of 16 series on the chart");
+    // Each model's busiest series and the fast one.
+    expect(seriesButton(dom.host).textContent).toBe("Series · 4");
     expect(toggles(dom.host, "gpt-6.1-terra · fast · high")[0]!.attributes["aria-pressed"]).toBe("true");
     expect(toggles(dom.host, "gpt-6-luna · standard · max")[0]!.attributes["aria-pressed"]).toBe("false");
-    await invoke(nodes(dom.host).find(node => node.tagName === "BUTTON" && node.textContent === "show all")!, "onClick");
-    expect(JSON.parse(values.get(HIDDEN_MODELS_KEY)!)).toEqual({ codex1: [] });
+    await invoke(seriesButton(dom.host), "onClick");
+    const head = (text: string) => nodes(dom.host).find(node => node.tagName === "BUTTON" && node.className.includes("speed-matrix-head") && node.textContent === text)!;
+    await invoke(head("max"), "onClick");
+    expect(seriesButton(dom.host).textContent).toBe("Series · 7");
+    expect(JSON.parse(values.get(PICKED_SERIES_KEY)!).codex1).toHaveLength(7);
+    await invoke(head("high"), "onClick");
+    expect(dom.host.textContent).toContain("10 series: the chart gets hard to read");
     await act(async () => root.unmount());
     root = createRoot(dom.host as unknown as Element);
     await act(async () => root.render(<Speed {...props("codex1", "codex")} />));
     await flushUntil(() => dom.host.textContent.includes("Per model"));
-    expect(dom.host.textContent).toContain("16 of 16 series on the chart");
-    // A column head toggles that effort in every model.
-    await invoke(nodes(dom.host).find(node => node.tagName === "BUTTON" && node.className.includes("speed-matrix-head") && node.textContent === "max")!, "onClick");
-    expect(dom.host.textContent).toContain("13 of 16 series on the chart");
+    expect(seriesButton(dom.host).textContent).toBe("Series · 10");
+    // One effort: that effort in every model, with or without fast.
+    await invoke(button(dom.host, "One effort"), "onClick");
+    await invoke(button(dom.host, "xhigh"), "onClick");
+    expect(seriesButton(dom.host).textContent).toBe("Series · 3");
+    await invoke(button(dom.host, "high"), "onClick");
+    expect(seriesButton(dom.host).textContent).toBe("Series · 4");
+    const withFast = nodes(dom.host).find(node => node.tagName === "INPUT" && node.parentNode?.textContent === "with fast")!;
+    await invoke(withFast, "onChange", { target: { checked: false } });
+    expect(seriesButton(dom.host).textContent).toBe("Series · 3");
+    // Removing a chip keeps the rest as an own selection.
+    await invoke(nodes(dom.host).find(node => node.tagName === "BUTTON" && node.attributes["aria-label"] === "Remove gpt-6-luna · standard · high from the chart")!, "onClick");
+    expect(seriesButton(dom.host).textContent).toBe("Series · 2");
+    expect(button(dom.host, "Picked").attributes["aria-pressed"]).toBe("true");
+    expect(JSON.parse(values.get(PICKED_SERIES_KEY)!).codex1).toHaveLength(2);
   } finally { await act(async () => root.unmount()); read.mockRestore(); restoreStorage(); dom.restore(); }
 });
 
-test("hiding works for the visit when storage throws, and show all brings every model back", async () => {
+test("picking works for the visit when storage throws", async () => {
   setLanguage("en"); bustApiMemo();
   const denied = () => { throw new Error("storage denied"); };
   const restoreStorage = withStorage({ getItem: denied, setItem: denied });
@@ -223,13 +261,13 @@ test("hiding works for the visit when storage throws, and show all brings every 
   try {
     await act(async () => root.render(<Speed {...props("codex1", "codex")} />));
     await flushUntil(() => dom.host.textContent.includes("Per model"));
-    expect(dom.host.textContent).not.toContain("show all");
-    await invoke(toggles(dom.host, "gpt-5.6-sol")[1]!, "onClick");
+    await invoke(toggles(dom.host, "gpt-5.6-sol")[0]!, "onClick");
     expect(toggles(dom.host, "gpt-5.6-sol")[0]!.attributes["aria-pressed"]).toBe("false");
-    const showAll = nodes(dom.host).find(node => node.tagName === "BUTTON" && node.textContent === "show all")!;
-    await invoke(showAll, "onClick");
+    await invoke(seriesButton(dom.host), "onClick");
+    await invoke(button(dom.host, "Clear"), "onClick");
+    expect(seriesButton(dom.host).textContent).toBe("Series · 0");
+    await invoke(button(dom.host, "Top 5"), "onClick");
     expect(toggles(dom.host, "gpt-5.6-sol").map(node => node.attributes["aria-pressed"])).toEqual(["true", "true"]);
-    expect(dom.host.textContent).not.toContain("show all");
   } finally { await act(async () => root.unmount()); read.mockRestore(); restoreStorage(); dom.restore(); }
 });
 
@@ -241,10 +279,10 @@ test("model labels follow a language switch on a mounted screen without reading 
   try {
     await act(async () => root.render(<Speed {...props("codex1", "codex")} />));
     await flushUntil(() => dom.host.textContent.includes("Per model"));
-    expect(toggles(dom.host, "Codex internal review")).toHaveLength(2);
+    expect(toggles(dom.host, "Codex internal review")).toHaveLength(1);
     await act(async () => setLanguage("pl"));
     expect(dom.host.textContent).toContain("Według modeli");
-    expect(toggles(dom.host, "Wewnętrzne review Codexa")).toHaveLength(2);
+    expect(toggles(dom.host, "Wewnętrzne review Codexa")).toHaveLength(1);
     expect(dom.host.textContent).not.toContain("Codex internal review");
     expect(read).toHaveBeenCalledTimes(1);
   } finally { await act(async () => root.unmount()); setLanguage("en"); read.mockRestore(); dom.restore(); }
@@ -325,7 +363,7 @@ test("the drawer narrows every part of All, persists without storage errors, and
     await invoke(check("codex / codex2@example.test"), "onChange");
     expect(rowNames(dom.host)).toEqual(["claude-opus-5 | claude-a@example.test | 60"]);
     expect(dom.host.textContent).toContain("Subscriptions and models · 1 of 4");
-    expect(dom.host.textContent).toContain("Measured calls100.0%60 of 60 calls");
+    expect(dom.host.textContent).toContain("Calls on the chart60100.0% of 60 calls · 100.0% measured");
     const clearAll = nodes(dialog).find(node => node.tagName === "BUTTON" && node.attributes["aria-label"] === "Clear · all subscriptions")!;
     await invoke(clearAll, "onClick");
     expect(dom.host.textContent).toContain("No subscription or model is chosen");
@@ -518,7 +556,7 @@ test("a period narrows the tiles, the chart and the table, and an empty period s
     await act(async () => root.render(<Speed {...props("codex1", "codex")} />));
     await flushUntil(() => dom.host.textContent.includes("Per model"));
     expect(tab("all").attributes["aria-pressed"]).toBe("true");
-    expect(dom.host.textContent).toContain("Measured calls100.0%240 of 240 calls");
+    expect(dom.host.textContent).toContain("Calls on the chart240100.0% of 240 calls · 100.0% measured");
     expect(dom.host.textContent).toContain("whole history of the subscription");
     for (const days of [7, 14, 30, 60, 90, 180, 360]) {
       const label = days === 360 ? "360 days (year)" : `${days} days`;
@@ -528,7 +566,7 @@ test("a period narrows the tiles, the chart and the table, and an empty period s
     expect(read).toHaveBeenCalledTimes(1);
     // The last 30 days start on 1 October: only the week of 5 October is left.
     await invoke(tab("30 days"), "onClick");
-    expect(dom.host.textContent).toContain("Measured calls100.0%120 of 120 calls");
+    expect(dom.host.textContent).toContain("Calls on the chart120100.0% of 120 calls · 100.0% measured");
     expect(dom.host.textContent).toContain("last 30 days of the subscription");
     expect(dom.host.textContent).toContain("2026-10-05 … 2026-10-05");
     setSystemTime(new Date("2026-12-31T12:00:00Z"));

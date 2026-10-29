@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
-import { defaultHidden, effortColumn, executionStroke, fastHidden, isNewRow, matrixLayout, modelInks, orderEfforts } from "./speed-matrix";
+import {
+  compareChoices, compareSeries, effortColumn, executionStroke, fastPairPicks, fastestPicks, isNewRow, matrixLayout, modelInks, orderEfforts, topPicks,
+} from "./speed-matrix";
 import type { ModelSpeedSeries } from "./model-speed";
 
 const series = (speed: string | undefined, effort: string | null = null) =>
@@ -21,13 +23,28 @@ test("the matrix groups series into model rows per speed mode, standard first, b
     ["standard", ["luna:low", "sol:high,max", "claude:-"]], ["fast", ["sol:high"]]]);
 });
 
-test("many series start as the busiest standard ones and every fast one", () => {
-  const items = Array.from({ length: 12 }, (_, i) => item(`s${i}`, `m${i}`, "standard", "high", 100 - i));
-  expect(defaultHidden(items).size).toBe(0);
-  items.push(item("f", "fast", "fast", "high", 1));
-  expect([...defaultHidden(items)].sort()).toEqual(["s10", "s11", "s8", "s9"]);
-  expect(defaultHidden(items.slice(0, 9), 0)).toEqual(new Set(["s8"]));
-  expect(fastHidden(items).has("f")).toBe(false);
+test("the top preset takes the busiest series of the four busiest models and the busiest fast one", () => {
+  const items = [item("a1", "sol", "standard", "high", 50), item("a2", "sol", "standard", "low", 60), item("b", "luna", "standard", "high", 100),
+    item("c", "astra", "standard", "high", 30), item("d", "terra", "standard", "high", 20), item("e", "reserve", "standard", "high", 5),
+    item("f1", "sol", "fast", "high", 9), item("f2", "luna", "fast", "high", 3)];
+  expect([...topPicks(items)]).toEqual(["a2", "b", "c", "d", "f1"]);
+  expect([...topPicks(items.slice(0, 2))]).toEqual(["a2"]);
+});
+
+test("the fastest preset follows the metric's direction and fast pairs keep their standard twin", () => {
+  const items = [item("a", "sol", "standard", "high", 1), item("b", "sol", "fast", "high", 1), item("c", "luna", "standard", "low", 1), item("d", "luna", "fast", "high", 1)];
+  const values: Record<string, number | null> = { a: 30, b: 70, c: 50, d: null };
+  expect([...fastestPicks(items, key => values[key]!, true)]).toEqual(["b", "c", "a"]);
+  expect([...fastestPicks(items, key => values[key]!, false)]).toEqual(["a", "c", "b"]);
+  expect([...fastPairPicks(items)]).toEqual(["b", "a", "d"]);
+});
+
+test("a comparison shows one model's executions or one effort across models", () => {
+  const items = [item("a", "sol", "standard", "high", 9), item("b", "sol", "fast", "high", 1), item("c", "sol", "standard", "low", 1), item("d", "luna", "standard", "high", 20),
+    item("u", "sol", "unknown:old", "high", 4)];
+  expect(compareSeries(items, "model", "sol", true).map(entry => entry.key)).toEqual(["a", "b", "c"]);
+  expect(compareSeries(items, "effort", "high", false).map(entry => entry.key)).toEqual(["a", "d"]);
+  expect(compareChoices(items.slice(0, 4))).toEqual({ models: ["luna", "sol"], efforts: ["low", "high"] });
 });
 
 test("a row is new within a week of its first call", () => {
@@ -46,4 +63,6 @@ test("models of one vendor take turned hues; effort sets lightness and the speed
   expect(executionStroke("var(--codex)", series("fast", "max"))).toEqual({ color: "oklch(from var(--codex) clamp(0.32, calc(l - 0.16), 0.92) c h)", dash: "5 3" });
   expect(executionStroke("var(--codex)", series("mixed", null)).color).toContain("calc(c * 0.35)");
   expect(executionStroke("var(--codex)", series("mixed", null)).dash).toBe("1.5 3");
+  // One model alone on the chart: wider steps.
+  expect(executionStroke("var(--codex)", series("standard", "max"), 1.8).color).toContain("calc(l - 0.288)");
 });

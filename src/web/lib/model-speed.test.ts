@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
 import { firstTokenSummary } from "../../shared/first-token";
 import {
-  chartBuckets, modelChartBuckets, firstTokenChartScale, joined, latencyAxis, leadingStrays, latestWeek, modelTotals, outlierSeries, rankedModels, readHiddenModels, speedBuckets, speedScaleMax, weekStart,
-  accountSelected, accountState, modelSelected, setAccounts, readHiddenModels as readHidden, mergeSpeedParts, readSpeedSelection, selectedParts, seriesStroke, speedModels, speedSubscriptions, toggleAccount, toggleModel,
-  writeHiddenModels, writeSpeedSelection, entriesSince, rangeStart, HIDDEN_MODELS_KEY, SPEED_SELECTION_KEY, EMPTY_SELECTION, type ModelSpeedPoint, type ModelSpeedSeries,
+  chartBuckets, modelChartBuckets, firstTokenChartScale, joined, latencyAxis, leadingStrays, latestWeek, modelTotals, outlierSeries, rankedModels, storedPickedSeries, speedBuckets, speedScaleMax, weekStart,
+  accountSelected, accountState, modelSelected, setAccounts, mergeSpeedParts, readSpeedSelection, selectedParts, seriesStroke, speedModels, speedSubscriptions, toggleAccount, toggleModel,
+  writePickedSeries, writeSpeedSelection, entriesSince, rangeStart, PICKED_SERIES_KEY, SPEED_SELECTION_KEY, EMPTY_SELECTION, type ModelSpeedPoint, type ModelSpeedSeries,
 } from "./model-speed";
 
 const day = (at: string, sums: Partial<ModelSpeedPoint>): ModelSpeedPoint => ({ at, calls: 0, timed_calls: 0, timed_out: 0, timed_ms: 0, speed: null,
@@ -108,20 +108,21 @@ test("only models with 50 calls of the kind are ranked; the latest week sums eve
   expect(latestWeek([fast, slow], "all")).toEqual({ week: "2026-10-05", calls: 70, speed: 6100 * 1000 / 70_000 });
 });
 
-test("hidden models are kept per subscription and the page works when storage fails", () => {
+test("picked series are kept per subscription, an empty pick is remembered, and the page works when storage fails", () => {
   const values = new Map<string, string>();
   const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
-  writeHiddenModels("codex1", new Set(["gpt-5.3-codex-spark"]), storage);
-  writeHiddenModels("codex2", new Set(["gpt-5.5"]), storage);
-  expect([...readHiddenModels("codex1", storage)]).toEqual(["gpt-5.3-codex-spark"]);
-  writeHiddenModels("codex1", new Set(), storage);
-  expect(JSON.parse(values.get(HIDDEN_MODELS_KEY)!)).toEqual({ codex2: ["gpt-5.5"] });
-  values.set(HIDDEN_MODELS_KEY, "{not json");
-  expect(readHiddenModels("codex2", storage).size).toBe(0);
+  expect(storedPickedSeries("codex1", storage)).toBeNull();
+  writePickedSeries("codex1", new Set(["gpt-5.6-sol", "gpt-5.3-codex-spark"]), storage);
+  writePickedSeries("codex2", new Set(["gpt-5.5"]), storage);
+  expect([...storedPickedSeries("codex1", storage)!]).toEqual(["gpt-5.3-codex-spark", "gpt-5.6-sol"]);
+  writePickedSeries("codex1", new Set(), storage);
+  expect(JSON.parse(values.get(PICKED_SERIES_KEY)!)).toEqual({ codex2: ["gpt-5.5"], codex1: [] });
+  values.set(PICKED_SERIES_KEY, "{not json");
+  expect(storedPickedSeries("codex2", storage)).toBeNull();
   const failing = { getItem: () => { throw new Error("denied"); }, setItem: () => { throw new Error("denied"); } };
-  expect(readHiddenModels("codex1", failing).size).toBe(0);
-  expect(() => writeHiddenModels("codex1", new Set(["x"]), failing)).not.toThrow();
-  expect(readHiddenModels("codex1", null).size).toBe(0);
+  expect(storedPickedSeries("codex1", failing)).toBeNull();
+  expect(() => writePickedSeries("codex1", new Set(["x"]), failing)).not.toThrow();
+  expect(storedPickedSeries("codex1", null)).toBeNull();
 });
 
 test("Claude Code's <synthetic> placeholder and calls without a model are not models on the screen", () => {
@@ -243,11 +244,11 @@ test("subscription IDs that name inherited properties are ordinary keys in the c
     const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
     writeSpeedSelection(partly, storage);
     expect(accountState(readSpeedSelection(storage), id, models)).toBe("some");
-    expect(readHidden(id, storage).size).toBe(0);
-    writeHiddenModels(id, new Set(["gpt"]), storage);
-    writeHiddenModels("codex1", new Set(["luna"]), storage);
-    expect([...readHidden(id, storage)]).toEqual(["gpt"]);
-    expect([...readHidden("codex1", storage)]).toEqual(["luna"]);
+    expect(storedPickedSeries(id, storage)).toBeNull();
+    writePickedSeries(id, new Set(["gpt"]), storage);
+    writePickedSeries("codex1", new Set(["luna"]), storage);
+    expect([...storedPickedSeries(id, storage)!]).toEqual(["gpt"]);
+    expect([...storedPickedSeries("codex1", storage)!]).toEqual(["luna"]);
   }
 });
 

@@ -51,17 +51,52 @@ export function matrixLayout<T extends MatrixSeries>(items: readonly T[]): Matri
   };
 }
 
-/** Shown by default when a scope has nothing stored and more series than this: the busiest standard ones and every fast one. */
-export const DEFAULT_VISIBLE = 8, DEFAULT_PRESET_FROM = 12;
-export function defaultHidden(items: readonly Pick<MatrixSeries, "key" | "series" | "calls">[], from = DEFAULT_PRESET_FROM): Set<string> {
-  if (items.length <= from) return new Set();
-  const shown = new Set([...items].filter(item => speedSection(item.series) === "standard").sort((a, b) => b.calls - a.calls)
-    .slice(0, DEFAULT_VISIBLE).map(item => item.key));
-  for (const item of items) if (item.series.speed === "fast") shown.add(item.key);
-  return new Set(items.filter(item => !shown.has(item.key)).map(item => item.key));
+/*
+ * The chart shows a few picked series (docs/design/mockups/speed-series-picker.html, approved 2026-10-29). More than
+ * PICK_LIMIT is allowed but warned about; the presets pick PRESET_SIZE.
+ */
+export const PICK_LIMIT = 8, PRESET_SIZE = 5, TOP_MODELS = 4;
+type Pickable = Pick<MatrixSeries, "key" | "name" | "series" | "calls">;
+const busiest = <T extends Pickable>(items: readonly T[]) => [...items].sort((a, b) => b.calls - a.calls);
+/** Top: the busiest series of each of the busiest standard models, plus the busiest fast series. */
+export function topPicks(items: readonly Pickable[]): Set<string> {
+  const standard = items.filter(item => speedSection(item.series) === "standard"), byName = new Map<string, number>();
+  for (const item of standard) byName.set(item.name, (byName.get(item.name) ?? 0) + item.calls);
+  const names = [...byName].sort((a, b) => b[1] - a[1]).slice(0, TOP_MODELS).map(([name]) => name);
+  const picks = names.map(name => busiest(standard.filter(item => item.name === name))[0]!.key);
+  const fast = busiest(items.filter(item => item.series.speed === "fast"))[0];
+  return new Set(fast ? [...picks, fast.key] : picks);
 }
-export function fastHidden(items: readonly Pick<MatrixSeries, "key" | "series">[]): Set<string> {
-  return new Set(items.filter(item => item.series.speed !== "fast").map(item => item.key));
+/** The fastest series by the shown metric; `higherIsFaster` is true for tok/s, false for first-token seconds. */
+export function fastestPicks(items: readonly Pickable[], value: (key: string) => number | null, higherIsFaster: boolean): Set<string> {
+  const valued = items.flatMap(item => { const v = value(item.key); return v === null ? [] : [{ key: item.key, v }]; });
+  return new Set(valued.sort((a, b) => higherIsFaster ? b.v - a.v : a.v - b.v).slice(0, PRESET_SIZE).map(item => item.key));
+}
+/** Each fast series beside its standard counterpart (same model and effort), when there is one. */
+export function fastPairPicks(items: readonly Pickable[]): Set<string> {
+  const picks = new Set<string>();
+  for (const fast of items.filter(item => item.series.speed === "fast")) {
+    picks.add(fast.key);
+    const twin = items.find(item => item.name === fast.name && speedSection(item.series) === "standard" && effortColumn(item.series) === effortColumn(fast.series));
+    if (twin) picks.add(twin.key);
+  }
+  return picks;
+}
+
+/**
+ * What the chart compares: the picked series, every execution of one model, or one effort across models. Comparisons
+ * keep standard and (optionally) fast; older calls of an unknown or mixed mode are picked in the drawer instead.
+ */
+export type SpeedCompare = "custom" | "model" | "effort";
+export function compareSeries<T extends Pickable>(items: readonly T[], compare: Exclude<SpeedCompare, "custom">, choice: string, withFast: boolean): T[] {
+  return items.filter(item => (compare === "model" ? item.name === choice : effortColumn(item.series) === choice)
+    && (speedSection(item.series) === "standard" || withFast && speedSection(item.series) === "fast"));
+}
+/** Models in order of calls, and the effort columns present, for the two comparison choices. */
+export function compareChoices(items: readonly Pickable[]): { models: string[]; efforts: string[] } {
+  const byName = new Map<string, number>();
+  for (const item of items) byName.set(item.name, (byName.get(item.name) ?? 0) + item.calls);
+  return { models: [...byName].sort((a, b) => b[1] - a[1]).map(([name]) => name), efforts: orderEfforts(items.map(item => effortColumn(item.series))) };
 }
 
 /** A row whose first call (in the whole history) is this recent is marked new. */
@@ -92,10 +127,13 @@ export function modelInks(models: readonly string[]): Map<string, string> {
   }
   return inks;
 }
-/** Colour and dash per series: the model's ink, lighter for shallow and darker for deep effort; fast dashed, other modes dotted. */
-export function executionStroke(ink: string, series: Pick<ModelSpeedSeries, "speed" | "effort">): { color: string; dash: string | undefined } {
+/**
+ * Colour and dash per series: the model's ink, lighter for shallow and darker for deep effort; fast dashed, other modes
+ * dotted. `spread` widens the lightness steps when one model's efforts fill the chart alone.
+ */
+export function executionStroke(ink: string, series: Pick<ModelSpeedSeries, "speed" | "effort">, spread = 1): { color: string; dash: string | undefined } {
   const column = effortColumn(series);
-  const step = EFFORT_LIGHTNESS[column] ?? 0, muted = column === UNKNOWN_EFFORT;
+  const step = +((EFFORT_LIGHTNESS[column] ?? 0) * spread).toFixed(3), muted = column === UNKNOWN_EFFORT;
   const color = step === 0 && !muted ? ink : `oklch(from ${ink} clamp(0.32, calc(l ${signed(step)}), 0.92) ${muted ? "calc(c * 0.35)" : "c"} h)`;
   const section = speedSection(series);
   return { color, dash: section === "standard" ? undefined : section === "fast" ? FAST_DASH : OTHER_MODE_DASH };

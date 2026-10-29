@@ -5,11 +5,36 @@
 .speed-point { cursor: default; }
 .speed-chart-note { margin-top: var(--s-2); font-family: var(--font-sans); font-size: var(--fs-2); color: var(--faint); }
 
-/* Metric tabs with the first-token axis switch on the right; the chart beside its matrix legend, stacked when narrow. */
+/* Metric tabs with the axis switch on the right; below, what the chart compares and the series button. */
 .speed-chart-switches { display: flex; justify-content: space-between; align-items: center; gap: var(--s-4) var(--s-8); flex-wrap: wrap; }
 .speed-yscale { display: inline-flex; align-items: center; gap: var(--s-4); font-size: var(--fs-3); color: var(--faint); }
-.speed-plot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(420px, 560px); gap: var(--s-8); align-items: start; margin-top: var(--s-3); }
-@media (max-width: 1400px) { .speed-plot { grid-template-columns: minmax(0, 1fr); } }
+.speed-compare { display: flex; align-items: center; gap: var(--s-4) var(--s-6); flex-wrap: wrap; margin-top: var(--s-4); }
+.speed-compare > :last-child { margin-left: auto; }
+.speed-kpi-scope { display: flex; justify-content: flex-end; align-items: center; gap: var(--s-4); font-size: var(--fs-3); color: var(--faint); }
+
+/* Chips are the chart's legend (docs/design/mockups/speed-series-picker.html). */
+.speed-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); min-height: 30px; margin: var(--s-4) 0 var(--s-2); }
+.speed-chip { display: inline-flex; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-1) var(--s-1) var(--s-4);
+  border: 1px solid var(--line2); border-radius: var(--r-chip); background: var(--surface); font-size: var(--fs-3); }
+.speed-chip.is-hot { border-color: var(--text); background: var(--raised); }
+.speed-chip-effort { color: var(--muted); }
+.speed-chip-value { color: var(--muted); font-family: var(--font-figure); font-size: var(--fs-2); }
+.speed-chip-remove { padding: 0 var(--s-2); border: 0; background: none; color: var(--faint); font: inherit; font-size: var(--fs-5); line-height: 1; cursor: pointer; }
+.speed-chip-remove:hover { color: var(--text); }
+.speed-chip-remove:focus-visible, .speed-chip-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.speed-chip-add { padding: var(--s-1) var(--s-5); border: 1px dashed var(--pencil); border-radius: var(--r-chip); background: none;
+  color: var(--accent); font: inherit; font-size: var(--fs-3); cursor: pointer; }
+.speed-chip-add:hover { background: var(--accent-soft); }
+.speed-chips-hint { font-size: var(--fs-2); color: var(--faint); }
+
+/* The series drawer stays see-through, so the chart behind it follows each pick. */
+.speed-series-drawer { width: min(780px, 100vw); }
+.speed-series-drawer::backdrop { background: transparent; }
+.speed-picker-tools, .speed-picker-presets { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3) var(--s-6); margin-bottom: var(--s-5); }
+.speed-picker-tools input[type="search"] { width: 220px; }
+.speed-picker-warn { padding: 0 var(--s-4); border-radius: var(--r-chip); background: var(--warn-soft); color: var(--warn); font-size: var(--fs-3); }
+.speed-picker-hidden { margin: var(--s-5) 0 0; font-size: var(--fs-2); color: var(--faint); }
+.speed-picker .speed-cell[aria-pressed="true"] { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
 
 /* Matrix legend (docs/design/mockups/speed-legend-matrix.html): model rows, effort columns, one toggle per series. */
 .speed-matrix table { width: 100%; border-collapse: collapse; font-family: var(--font-sans); font-size: var(--fs-3); }

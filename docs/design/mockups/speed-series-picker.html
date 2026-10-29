@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="pl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speed · wybór serii (makieta)</title>
+<!-- Mockup only: light paper-atlas tokens copied from src/web/tokens.css (inline, so it opens anywhere); synthetic data
+     shaped like the 2026-10-29 screenshot (Codex, all time, ~28 models, 5 fast). -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #f6f8f8; --surface: #ffffff; --raised: #eef2f2; --sunk: #f1f4f4; --band: #eaf0f0;
+    --line: #d9e1e1; --line2: #b4c2c3; --pencil: #66808a;
+    --text: #22333b; --muted: #4c5f65; --faint: #6c7e7f;
+    --accent: #136d88; --accent-soft: #d6e9ef;
+    --warn: #9a6a12; --warn-soft: rgba(154, 106, 18, 0.11);
+    --shadow: 0 18px 44px rgba(41, 58, 67, 0.16);
+    color-scheme: light;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-size: 13px; background: var(--bg); color: var(--text); font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 1720px; margin: 0 auto; padding: 24px 28px 48px; }
+  .note { color: var(--muted); font-size: 12px; margin: 0 0 18px; line-height: 1.5; max-width: 1100px; }
+  .note b { color: var(--text); font-weight: 600; }
+  .title { font-size: 15px; font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .help { display: inline-grid; place-items: center; width: 14px; height: 14px; border: 1px solid var(--pencil); border-radius: 50%;
+    font-size: 9px; color: var(--muted); vertical-align: 1px; }
+  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .head-right { display: flex; gap: 22px; align-items: baseline; }
+  .tabs { display: flex; gap: 14px; border-bottom: 1px solid var(--line2); margin: 10px 0 12px; }
+  .tabs button, .switch button { border: 0; background: none; font: inherit; color: var(--muted); padding: 4px 0 6px; cursor: pointer; }
+  .tabs button.on { color: var(--text); font-weight: 500; box-shadow: inset 0 -2px 0 var(--accent); }
+  .switch { display: inline-flex; gap: 10px; align-items: baseline; font-size: 12px; color: var(--faint); }
+  .switch button { padding: 2px 0 3px; }
+  .switch button.on { color: var(--text); font-weight: 500; box-shadow: inset 0 -2px 0 var(--accent); }
+
+  /* Mode bar: what the chart compares */
+  .bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  .seg { display: inline-flex; border: 1px solid var(--line2); border-radius: 4px 6px 3px 5px; overflow: hidden; background: var(--surface); }
+  .seg button { border: 0; background: none; font: inherit; font-size: 12px; color: var(--muted); padding: 4px 11px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--accent-soft); color: var(--text); font-weight: 500; }
+  .seg button:hover:not(.on) { background: var(--raised); }
+  .mode-ctl { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+  select { font: inherit; font-size: 12px; color: var(--text); background: var(--surface); border: 1px solid var(--pencil);
+    border-radius: 4px 6px 3px 5px; padding: 3px 6px; }
+  label.check { display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
+  .btn { border: 1px solid var(--pencil); background: var(--surface); color: var(--text); font: inherit; font-size: 12px;
+    padding: 3px 10px; border-radius: 4px 6px 3px 5px; cursor: pointer; }
+  .btn:hover { background: var(--raised); }
+  .btn.on { border-color: var(--accent); background: var(--accent-soft); }
+  .btn.primary { border-color: var(--accent); color: var(--accent); font-weight: 500; }
+  .grow { flex: 1; }
+
+  /* Chips = the legend */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 30px; margin-bottom: 4px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line2); background: var(--surface); border-radius: 4px 6px 3px 5px;
+    padding: 2px 4px 2px 8px; font-size: 12px; cursor: default; }
+  .chip.hot { border-color: var(--text); background: var(--raised); }
+  .chip.empty { opacity: .55; }
+  .chip .eff { color: var(--muted); }
+  .chip .val { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--muted); }
+  .chip .x { border: 0; background: none; color: var(--faint); font: inherit; cursor: pointer; padding: 0 4px; font-size: 14px; line-height: 1; }
+  .chip .x:hover { color: var(--text); }
+  .chip-add { border: 1px dashed var(--pencil); background: none; color: var(--accent); font: inherit; font-size: 12px; padding: 3px 10px;
+    border-radius: 4px 6px 3px 5px; cursor: pointer; }
+  .chip-add:hover { background: var(--accent-soft); }
+  .hint { color: var(--faint); font-size: 11.5px; }
+
+  /* KPI tiles follow the series on the chart */
+  .kpi-head { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); margin-bottom: 22px; }
+  .kpi { padding: 10px 12px 12px; }
+  .kpi + .kpi { border-left: 1px dashed var(--line); }
+  .kpi .k { font-size: 12px; font-weight: 500; }
+  .kpi .n { font-family: "IBM Plex Mono", monospace; font-size: 30px; font-weight: 500; margin: 6px 0 4px; }
+  .kpi .n small { font-size: 14px; font-weight: 400; margin-left: 6px; }
+  .kpi .d { color: var(--muted); font-size: 11.5px; }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+  .axis { font-size: 10.5px; fill: var(--muted); }
+  .grid { stroke: var(--line); stroke-dasharray: 3 3; }
+  .capline { stroke: var(--warn); stroke-dasharray: 2 3; }
+  .caplabel { font-size: 10px; fill: var(--warn); }
+  .outlier { fill: var(--warn); }
+  .outlier-label { font-size: 10.5px; fill: var(--text); font-weight: 500; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line2); border-radius: 4px 6px 3px 5px;
+    box-shadow: var(--shadow); padding: 6px 9px; font-size: 12px; white-space: nowrap; display: none; }
+  .tip .v { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+  .chart-foot { color: var(--faint); font-size: 11.5px; margin-top: 6px; }
+
+  /* Drawer: non-modal, so the chart behind updates live while picking */
+  .drawer { position: fixed; top: 0; right: 0; height: 100vh; width: 760px; max-width: 100vw; background: var(--surface);
+    border-left: 1px solid var(--line2); box-shadow: var(--shadow); transform: translateX(100%); transition: transform .18s ease;
+    display: flex; flex-direction: column; z-index: 10; }
+  .drawer.open { transform: none; }
+  .drawer header { padding: 16px 20px 10px; border-bottom: 1px solid var(--line); }
+  .drawer h2 { margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: baseline; gap: 10px; }
+  .drawer h2 .count { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .drawer .close { margin-left: auto; border: 0; background: none; font: inherit; font-size: 18px; color: var(--muted); cursor: pointer; }
+  .drawer .tools { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .drawer input[type=search] { font: inherit; font-size: 12px; border: 1px solid var(--pencil); border-radius: 4px 6px 3px 5px; padding: 4px 8px; width: 200px; }
+  .drawer .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+  .drawer .presets .lbl { color: var(--faint); font-size: 11.5px; margin-right: 2px; }
+  .drawer .body { overflow: auto; padding: 4px 20px 16px; flex: 1; }
+  .drawer footer { padding: 10px 20px; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
+  .warn { color: var(--warn); background: var(--warn-soft); border-radius: 3px 5px 2px 4px; padding: 2px 8px; font-size: 12px; }
+  .hidden-note { color: var(--faint); font-size: 11.5px; margin: 8px 0 0; }
+  .hidden-note button { border: 0; background: none; font: inherit; color: var(--accent); cursor: pointer; padding: 0; }
+
+  .matrix { border-collapse: collapse; width: 100%; font-size: 12px; }
+  .matrix th, .matrix td { padding: 0; height: 26px; border-bottom: 1px dashed var(--line); }
+  .matrix thead th { border-bottom: 1px solid var(--line2); height: 28px; position: sticky; top: 0; background: var(--surface); z-index: 1; }
+  .matrix .colh, .matrix .rowh { border: 0; background: none; font: inherit; color: var(--muted); cursor: pointer; padding: 0 6px; height: 100%; width: 100%; }
+  .matrix .colh { text-align: center; font-weight: 500; }
+  .matrix .colh:hover, .matrix .rowh:hover { color: var(--text); background: var(--raised); }
+  .matrix .rowh { display: flex; align-items: center; gap: 7px; text-align: left; color: var(--text); white-space: nowrap; }
+  .matrix .rowh .dot { width: 8px; height: 8px; border-radius: 3px 4px 3px 4px; flex-shrink: 0; }
+  .matrix td.calls { text-align: right; color: var(--faint); font-family: "IBM Plex Mono", monospace; font-size: 11px; padding-right: 4px; width: 64px; white-space: nowrap; }
+  .cell { display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%; height: 100%; border: 0; background: none; cursor: pointer;
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--muted); padding: 0 4px; }
+  .cell:hover { background: var(--raised); color: var(--text); }
+  .cell svg { flex-shrink: 0; opacity: .35; }
+  .cell.sel { background: var(--accent-soft); color: var(--text); font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent); }
+  .cell.sel svg { opacity: 1; }
+  .cell.nodata { color: var(--line2); }
+  .none { display: block; text-align: center; color: var(--line2); }
+  .sec td { border-bottom: 1px solid var(--line2); padding-top: 10px; height: 30px; font-weight: 600; font-size: 12px; }
+  .badge { font-size: 10.5px; font-weight: 500; padding: 0 6px; border-radius: 3px 5px 2px 4px; background: var(--warn-soft); color: var(--warn); }
+  .badge.count { background: var(--accent-soft); color: var(--accent); }
+  .key { color: var(--faint); font-size: 11.5px; line-height: 1.6; }
+  .key svg { vertical-align: middle; }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="note"><b>Makieta</b> · Speed → „Speed over time”. Wykres dostaje pełną szerokość i pokazuje <b>kilka wybranych serii</b>, a nie wszystkie.
+    Chipy nad wykresem są legendą (× usuwa, najechanie wyróżnia linię). Wybór robisz w szufladzie <b>⚙ Serie</b> albo jednym z trybów porównania:
+    <b>Jeden model</b> (wszystkie efforty i fast tego modelu) i <b>Jeden effort</b> (ten effort we wszystkich modelach).
+    <b>Kafelki</b> liczą się z serii na wykresie (przełącznik „wszystkich” wraca do całości). Dane syntetyczne w proporcjach jak na zrzucie z 29.10.</p>
+
+  <div class="kpi-head"><div class="switch" id="kpiScope">kafelki dla
+    <button data-s="shown" class="on" title="Liczone tylko z serii na wykresie">serii na wykresie</button>
+    <button data-s="all" title="Liczone ze wszystkich serii z pomiarami w okresie">wszystkich</button></div></div>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="head">
+    <div><span class="title">Speed over time</span> <span class="help">?</span> <span class="sub" id="sub"></span></div>
+    <div class="head-right">
+      <div class="switch" id="period">okres
+        <button data-p="30">30 dni</button><button data-p="90">90 dni</button><button data-p="all" class="on">całość</button>
+      </div>
+      <div class="switch" id="yswitch">oś Y
+        <button data-y="capped" class="on" title="Skala do P95 widocznych punktów; wyższe jako ▲ przy górnej krawędzi">przycięta</button>
+        <button data-y="log" title="Skala logarytmiczna">log</button>
+        <button data-y="full" title="Pełna skala">pełna</button>
+      </div>
+    </div>
+  </div>
+  <div class="tabs" id="metric">
+    <button data-m="speed" class="on">Token speed</button><button data-m="ttft">First token · median</button>
+  </div>
+
+  <div class="bar">
+    <div class="seg" id="mode">
+      <button data-mode="custom" class="on" title="Własny wybór serii">Wybrane</button>
+      <button data-mode="model" title="Wszystkie efforty i fast jednego modelu: który effort i czy fast">Jeden model</button>
+      <button data-mode="effort" title="Jeden effort we wszystkich modelach: który model najszybszy">Jeden effort</button>
+    </div>
+    <div class="mode-ctl" id="modeCtl"></div>
+    <span class="grow"></span>
+    <button class="btn primary" id="openDrawer">⚙ Serie <span id="openCount"></span></button>
+  </div>
+  <div class="chips" id="chips"></div>
+
+  <div class="chart" id="chart">
+    <svg id="svg" height="400"></svg>
+    <div class="tip" id="tip"></div>
+    <div class="chart-foot" id="foot"></div>
+  </div>
+</div>
+
+<aside class="drawer" id="drawer" aria-label="Serie na wykresie">
+  <header>
+    <h2>Serie na wykresie <span class="count" id="dCount"></span><button class="close" id="closeDrawer" title="Zamknij (Esc)">×</button></h2>
+    <div class="tools">
+      <input type="search" id="search" placeholder="Szukaj modelu…">
+      <label class="check"><input type="checkbox" id="onlyData" checked> tylko modele z pomiarami w okresie</label>
+    </div>
+    <div class="presets"><span class="lbl">szybko:</span>
+      <button class="btn" data-preset="top">Top 5</button>
+      <button class="btn" data-preset="fastest">Najszybsze 5</button>
+      <button class="btn" data-preset="fastpair">Fast vs standard</button>
+      <button class="btn" data-preset="clear">Wyczyść</button>
+    </div>
+  </header>
+  <div class="body">
+    <table class="matrix" id="matrix"></table>
+    <p class="hidden-note" id="hiddenNote"></p>
+  </div>
+  <footer>
+    <span class="key">
+      <svg width="22" height="6"><line x1="1" x2="21" y1="3" y2="3" stroke="var(--text)" stroke-width="1.75" stroke-linecap="round"/></svg> standard ·
+      <svg width="22" height="6"><line x1="1" x2="21" y1="3" y2="3" stroke="var(--text)" stroke-width="2.25" stroke-dasharray="5 3"/></svg> fast ·
+      w komórce mediana okresu · kliknij, żeby dodać
+    </span>
+    <span class="grow"></span>
+    <span id="limitWarn"></span>
+    <button class="btn primary" id="doneDrawer">Gotowe</button>
+  </footer>
+</aside>
+
+<script>
+const EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max", "?"];
+const EFFORT_L = { minimal: .8, low: .74, medium: .66, high: .58, xhigh: .5, max: .42, "?": .6 };
+// "Jeden model": one hue, so the ramp is wider to keep 5–6 efforts apart.
+const RAMP_L = { minimal: .88, low: .8, medium: .7, high: .58, xhigh: .47, max: .36, "?": .64 };
+const EFFORT_WEIGHT = { minimal: .5, low: 1, medium: 2, high: 3, xhigh: 2, max: 1, "?": .5 };
+const TTFT_EFFORT = { minimal: 1.1, low: 1.4, medium: 2.3, high: 3.8, xhigh: 6.5, max: 11, "?": 3 };
+const HUES = [220, 25, 150, 290, 75, 330, 185, 255, 110, 0, 50, 310, 200, 130, 270, 90, 345, 165, 240, 60, 15, 300, 120];
+
+// name, from, to, calls, standard {effort: tok/s}, fast {effort: tok/s}. Models without timings have empty ranges.
+const MODELS = [
+  ["gpt-6.1-sol", "2026-10-03", "2026-10-29", 133e3, { low: 51, medium: 30, high: 29, xhigh: 33, max: 31, "?": 32 }, { medium: 90, high: 67, xhigh: 50 }],
+  ["gpt-5.6-sol", "2026-08-20", "2026-10-29", 84.6e3, { minimal: 40, low: 51, medium: 42, high: 44, xhigh: 41, max: 42 }, { high: 45, xhigh: 57 }],
+  ["Codex internal review", "2026-07-02", "2026-10-29", 66.3e3, { low: 52 }, { low: 68 }],
+  ["gpt-6-astra", "2026-09-12", "2026-10-29", 47e3, { low: 24, medium: 28, high: 26, xhigh: 25, max: 22 }, { medium: 32, high: 41 }],
+  ["gpt-6-sol", "2026-09-12", "2026-10-26", 20.3e3, { medium: 46, high: 35, xhigh: 41 }, {}],
+  ["gpt-5.6-luna", "2026-08-20", "2026-10-10", 15.4e3, { medium: 49, high: 27, xhigh: 48, max: 47 }, {}],
+  ["gpt-6-luna", "2026-09-12", "2026-10-29", 5.8e3, { high: 45, xhigh: 82, max: 75 }, {}],
+  ["gpt-6.1-terra", "2026-10-08", "2026-10-29", 3.7e3, { high: 72, xhigh: 60, max: 66 }, { high: 100 }],
+  ["gpt-5.3-codex-spark", "2026-07-05", "2026-09-14", 2.4e3, { high: 210, xhigh: 209 }, {}],
+  ["gpt-5.6-terra", "2026-08-20", "2026-09-20", 166, { medium: 48, high: 45 }, {}],
+  ["gpt-reserve", "2026-10-12", "2026-10-29", 143, { high: 51, xhigh: 46, max: 47 }, {}],
+  ...["gpt-5", "gpt-5-codex", "gpt-5.1", "gpt-5.1-codex", "gpt-5.1-codex-mini", "gpt-5.3-codex", "gpt-5.4", "gpt-5.4-codex",
+    "gpt-5.5", "gpt-5.5-codex", "gpt-5.5-codex-high", "terra"].map(name => [name, null, null, 0, { high: null, xhigh: null }, {}]),
+];
+const START = new Date("2026-07-02T00:00:00Z"), END = new Date("2026-10-29T00:00:00Z");
+const DAY = 864e5, LAST = Math.round((END - START) / DAY);
+const dayIndex = iso => Math.round((new Date(iso + "T00:00:00Z") - START) / DAY);
+const dayLabel = i => { const d = new Date(+START + i * DAY); return String(d.getUTCDate()).padStart(2, "0") + "." + String(d.getUTCMonth() + 1).padStart(2, "0"); };
+const NEW_SINCE = dayIndex("2026-10-22");
+
+let seed = 11;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+const series = [];
+MODELS.forEach(([model, from, to, calls, std, fast], rank) => {
+  const hue = HUES[rank % HUES.length];
+  const total = Object.keys(std).reduce((a, e) => a + EFFORT_WEIGHT[e], 0) + Object.keys(fast).reduce((a, e) => a + EFFORT_WEIGHT[e] * .3, 0);
+  for (const [tier, efforts] of [["standard", std], ["fast", fast]]) for (const [effort, tokps] of Object.entries(efforts)) {
+    const speed = [], ttft = [];
+    if (from) {
+      const late = tier === "fast" && (model === "gpt-6.1-terra" || model === "gpt-6.1-sol");
+      const start = late ? dayIndex("2026-10-23") : dayIndex(from) + Math.floor(rnd() * 4);
+      const spread = model === "gpt-5.3-codex-spark" ? [.7, 1.2] : [.8, .4];
+      const ttftBase = TTFT_EFFORT[effort] * Math.sqrt(45 / tokps) * (tier === "fast" ? .5 : 1);
+      for (let d = start; d <= dayIndex(to); d++) {
+        if (rnd() < .15) continue; // days without enough calls stay gaps
+        speed.push([d, +(tokps * (spread[0] + rnd() * spread[1])).toFixed(1)]);
+        ttft.push([d, +(ttftBase * (.75 + rnd() * .5)).toFixed(2)]);
+      }
+    }
+    const weight = EFFORT_WEIGHT[effort] * (tier === "fast" ? .3 : 1);
+    series.push({ key: `${model}|${tier}|${effort}`, model, tier, effort, hue, rank, pts: { speed, ttft },
+      calls: Math.round(calls * weight / total), firstDay: speed[0]?.[0] ?? null });
+  }
+});
+const byKey = new Map(series.map(s => [s.key, s]));
+// A TTFT outlier like the 25 s+ ones on the real chart.
+{ const s = byKey.get("gpt-6.1-sol|standard|high"); const p = s.pts.ttft.at(-3); if (p) p[1] = 48.6; }
+
+// ---------- state ----------
+let metric = "speed", period = "all", yMode = "capped", mode = "custom", hot = null;
+let pickModel = "gpt-6.1-sol", pickEffort = "high", withFast = true, drawerOpen = false, search = "", onlyData = true;
+const periodStart = () => period === "all" ? 0 : LAST - Number(period) + 1;
+const pointsOf = s => s.pts[metric].filter(p => p[0] >= periodStart());
+const hasData = s => pointsOf(s).length > 0;
+const callsIn = s => s.pts.speed.length ? Math.round(s.calls * pointsOf(s).length / s.pts.speed.length) : 0;
+function valueOf(s) {
+  const v = pointsOf(s).map(p => p[1]).sort((a, b) => a - b);
+  return v.length ? v[Math.floor(v.length / 2)] : null;
+}
+const unit = () => metric === "speed" ? "tok/s" : "s";
+const fmtVal = v => v === null ? "–" : metric === "speed" ? v.toFixed(0) : v.toFixed(1);
+const compact = n => n >= 1e3 ? (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + "k" : String(n);
+
+function preset(name) {
+  const live = series.filter(hasData);
+  if (name === "clear") return new Set();
+  if (name === "fastest") return new Set([...live].sort((a, b) => metric === "speed" ? valueOf(b) - valueOf(a) : valueOf(a) - valueOf(b)).slice(0, 5).map(s => s.key));
+  if (name === "fastpair") {
+    const out = new Set();
+    for (const f of live.filter(s => s.tier === "fast")) { out.add(f.key); const std = byKey.get(`${f.model}|standard|${f.effort}`); if (std && hasData(std)) out.add(std.key); }
+    return out;
+  }
+  // Top 5: the busiest effort of the four busiest models, plus the busiest fast series.
+  const out = new Set(), models = [...new Set(live.filter(s => s.tier === "standard").sort((a, b) => callsIn(b) - callsIn(a)).map(s => s.model))];
+  for (const m of models.slice(0, 4)) out.add(live.filter(s => s.model === m && s.tier === "standard").sort((a, b) => callsIn(b) - callsIn(a))[0].key);
+  const fast = live.filter(s => s.tier === "fast").sort((a, b) => callsIn(b) - callsIn(a))[0];
+  if (fast) out.add(fast.key);
+  return out;
+}
+let picked = preset("top");
+
+function shownSeries() {
+  if (mode === "model") return series.filter(s => s.model === pickModel && (withFast || s.tier === "standard") && hasData(s));
+  if (mode === "effort") return series.filter(s => s.effort === pickEffort && (withFast || s.tier === "standard") && hasData(s));
+  return series.filter(s => picked.has(s.key));
+}
+function colorOf(s) {
+  const L = (mode === "model" ? RAMP_L : EFFORT_L)[s.effort];
+  const c = s.model === "Codex internal review" ? .045 : s.effort === "?" ? .035 : .13;
+  return `oklch(${L} ${c} ${s.hue})`;
+}
+const swatch = (s, w = 16) => `<svg width="${w}" height="6" aria-hidden="true"><line x1="1" x2="${w - 1}" y1="3" y2="3" stroke="${colorOf(s)}"
+  stroke-width="${s.tier === "fast" ? 2.25 : 2}" ${s.tier === "fast" ? 'stroke-dasharray="4 2.5"' : 'stroke-linecap="round"'}/></svg>`;
+
+// Leaving a comparison mode by editing keeps what was on the chart as the starting point.
+function toCustom() { if (mode !== "custom") { picked = new Set(shownSeries().map(s => s.key)); mode = "custom"; } }
+
+// ---------- top bar ----------
+function renderBar() {
+  document.querySelectorAll("#mode button").forEach(b => b.classList.toggle("on", b.dataset.mode === mode));
+  const ctl = document.getElementById("modeCtl");
+  const fastBox = `<label class="check"><input type="checkbox" id="withFast" ${withFast ? "checked" : ""}> z fast</label>`;
+  if (mode === "model") {
+    const models = [...new Set(series.filter(hasData).sort((a, b) => b.calls - a.calls).map(s => s.model))];
+    if (!models.includes(pickModel)) pickModel = models[0];
+    ctl.innerHTML = `model <select id="pickModel">${models.map(m => `<option ${m === pickModel ? "selected" : ""}>${m}</option>`).join("")}</select>${fastBox}`;
+  } else if (mode === "effort") {
+    const efforts = EFFORTS.filter(e => series.some(s => s.effort === e && hasData(s)));
+    if (!efforts.includes(pickEffort)) pickEffort = efforts.includes("high") ? "high" : efforts[0];
+    ctl.innerHTML = `<span class="switch" style="font-size:12px">${efforts.map(e => `<button data-effort="${e}" class="${e === pickEffort ? "on" : ""}">${e}</button>`).join("")}</span>${fastBox}`;
+  } else ctl.innerHTML = `<span class="hint">własny wybór · do 8 serii czytelnie</span>`;
+  document.getElementById("openCount").textContent = `(${shownSeries().length})`;
+  document.getElementById("sub").textContent = `· ${metric === "speed" ? "calls with ≥256 output tokens" : "median"} · per day`;
+}
+document.getElementById("modeCtl").addEventListener("change", e => {
+  if (e.target.id === "pickModel") pickModel = e.target.value;
+  if (e.target.id === "withFast") withFast = e.target.checked;
+  render();
+});
+document.getElementById("modeCtl").addEventListener("click", e => { const b = e.target.closest("[data-effort]"); if (b) { pickEffort = b.dataset.effort; render(); } });
+document.getElementById("mode").addEventListener("click", e => { const b = e.target.closest("[data-mode]"); if (b) { mode = b.dataset.mode; render(); } });
+
+// ---------- chips ----------
+function renderChips() {
+  const shown = shownSeries();
+  const chips = shown.map(s => {
+    const v = valueOf(s);
+    const label = mode === "model" ? `<span>${s.effort}</span>` : mode === "effort" ? `<span>${s.model}</span>` : `<span>${s.model}</span> <span class="eff">${s.effort}</span>`;
+    return `<span class="chip${hot === s.key ? " hot" : ""}${v === null ? " empty" : ""}" data-k="${s.key}" title="${s.model} · ${s.tier} · ${s.effort} · ${compact(callsIn(s))} wywołań w okresie">
+      ${swatch(s)}${label}${s.tier === "fast" ? " ⚡" : ""} <span class="val">${v === null ? "brak danych" : fmtVal(v) + " " + unit()}</span>
+      <button class="x" data-remove="${s.key}" title="${mode === "custom" ? "Usuń z wykresu" : "Usuń i przejdź do własnego wyboru"}">×</button></span>`;
+  }).join("");
+  document.getElementById("chips").innerHTML = chips +
+    (mode === "custom" ? `<button class="chip-add" data-open>+ dodaj serię</button>` : `<span class="hint">× albo „⚙ Serie” przenosi ten zestaw do własnego wyboru</span>`);
+}
+document.getElementById("chips").addEventListener("click", e => {
+  const rm = e.target.closest("[data-remove]");
+  if (rm) { toCustom(); picked.delete(rm.dataset.remove); hot = null; render(); return; }
+  if (e.target.closest("[data-open]")) openDrawer();
+});
+document.getElementById("chips").addEventListener("mouseover", e => { const c = e.target.closest(".chip"); const k = c ? c.dataset.k : null; if (k !== hot) { hot = k; renderChart(); renderChips(); } });
+document.getElementById("chips").addEventListener("mouseleave", () => { hot = null; renderChart(); renderChips(); });
+
+// ---------- drawer ----------
+function openDrawer() { toCustom(); drawerOpen = true; document.getElementById("drawer").classList.add("open"); render(); }
+function closeDrawer() { drawerOpen = false; document.getElementById("drawer").classList.remove("open"); }
+document.getElementById("openDrawer").addEventListener("click", openDrawer);
+document.getElementById("closeDrawer").addEventListener("click", closeDrawer);
+document.getElementById("doneDrawer").addEventListener("click", closeDrawer);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
+document.getElementById("search").addEventListener("input", e => { search = e.target.value.trim().toLowerCase(); renderMatrix(); });
+document.getElementById("onlyData").addEventListener("change", e => { onlyData = e.target.checked; renderMatrix(); });
+document.querySelectorAll("[data-preset]").forEach(b => b.addEventListener("click", () => { mode = "custom"; picked = preset(b.dataset.preset); render(); }));
+
+function renderMatrix() {
+  if (!drawerOpen) return;
+  const rowsOf = tier => [...new Set(series.filter(s => s.tier === tier).map(s => s.model))]
+    .map(model => ({ model, cells: series.filter(s => s.model === model && s.tier === tier) }))
+    .filter(r => !search || r.model.toLowerCase().includes(search));
+  const live = r => r.cells.some(hasData);
+  const std = rowsOf("standard"), fast = rowsOf("fast");
+  const hiddenRows = onlyData ? [...std, ...fast].filter(r => !live(r)) : [];
+  const keep = r => !onlyData || live(r);
+  const visibleRows = [...std, ...fast].filter(keep);
+  const columns = EFFORTS.filter(e => visibleRows.some(r => r.cells.some(s => s.effort === e)));
+  const head = `<thead><tr><th style="text-align:left;width:180px"></th>${columns.map(e =>
+    `<th><button class="colh" data-col="${e}" title="Dodaj albo usuń effort ${e} we wszystkich widocznych modelach">${e}</button></th>`).join("")}
+    <th style="text-align:right;color:var(--faint);font-weight:400;font-size:11px;padding-right:4px">wywołania</th></tr></thead>`;
+  const row = (r, tier) => {
+    const cells = columns.map(e => {
+      const s = r.cells.find(x => x.effort === e);
+      if (!s) return `<td><span class="none">·</span></td>`;
+      const v = valueOf(s), sel = picked.has(s.key);
+      return `<td><button class="cell${sel ? " sel" : ""}${v === null ? " nodata" : ""}" data-key="${s.key}"
+        title="${s.model} · ${tier} · ${e} · ${compact(callsIn(s))} wywołań w okresie">${swatch(s)}<span>${fmtVal(v)}</span></button></td>`;
+    }).join("");
+    const calls = r.cells.reduce((a, s) => a + callsIn(s), 0);
+    const first = Math.min(...r.cells.map(s => s.firstDay ?? Infinity));
+    const isNew = first >= NEW_SINCE && first !== Infinity;
+    return `<tr><th><button class="rowh" data-row="${r.model}|${tier}" title="Dodaj albo usuń cały wiersz">
+      <span class="dot" style="background:oklch(.58 ${r.model === "Codex internal review" ? .045 : .13} ${r.cells[0].hue})"></span>${r.model}${isNew ? ` <span class="badge" title="Pierwsze wywołania ${dayLabel(first)}">nowy</span>` : ""}</button></th>
+      ${cells}<td class="calls">${compact(calls)}</td></tr>`;
+  };
+  const fastRows = fast.filter(keep);
+  document.getElementById("matrix").innerHTML = head + "<tbody>" + std.filter(keep).map(r => row(r, "standard")).join("") +
+    (fastRows.length ? `<tr class="sec"><td colspan="${columns.length + 2}">⚡ fast <span class="badge count">${fastRows.length} modele · ${fastRows.reduce((a, r) => a + r.cells.length, 0)} serii</span></td></tr>` +
+      fastRows.map(r => row(r, "fast")).join("") : "") + "</tbody>";
+  document.getElementById("hiddenNote").innerHTML = hiddenRows.length
+    ? `Ukryto ${hiddenRows.length} ${hiddenRows.length < 5 ? "modele" : "modeli"} bez pomiarów w tym okresie (${hiddenRows.slice(0, 4).map(r => r.model).join(", ")}${hiddenRows.length > 4 ? "…" : ""}) · <button id="showHidden">pokaż</button>` : "";
+  document.getElementById("dCount").textContent = `${picked.size} wybranych`;
+  document.getElementById("limitWarn").innerHTML = picked.size > 8 ? `<span class="warn">${picked.size} serii: wykres robi się nieczytelny</span>` : "";
+}
+document.getElementById("hiddenNote").addEventListener("click", e => { if (e.target.id === "showHidden") { onlyData = false; document.getElementById("onlyData").checked = false; renderMatrix(); } });
+function toggleKeys(keys) {
+  const allOn = keys.every(k => picked.has(k));
+  for (const k of keys) allOn ? picked.delete(k) : picked.add(k);
+  mode = "custom"; render();
+}
+document.getElementById("matrix").addEventListener("click", e => {
+  const cell = e.target.closest("[data-key]"), row = e.target.closest("[data-row]"), col = e.target.closest("[data-col]");
+  if (cell) toggleKeys([cell.dataset.key]);
+  else if (row) { const [m, tier] = row.dataset.row.split("|"); toggleKeys(series.filter(s => s.model === m && s.tier === tier && hasData(s)).map(s => s.key)); }
+  else if (col) toggleKeys(series.filter(s => s.effort === col.dataset.col && hasData(s) && (!search || s.model.toLowerCase().includes(search))).map(s => s.key));
+});
+document.getElementById("matrix").addEventListener("mouseover", e => {
+  const cell = e.target.closest("[data-key]"); const k = cell && picked.has(cell.dataset.key) ? cell.dataset.key : null;
+  if (k !== hot) { hot = k; renderChart(); renderChips(); }
+});
+
+// ---------- switches ----------
+const bindSwitch = (id, attr, set) => document.getElementById(id).addEventListener("click", e => {
+  const b = e.target.closest(`[${attr}]`); if (!b) return;
+  document.querySelectorAll(`#${id} [${attr}]`).forEach(x => x.classList.toggle("on", x === b)); set(b.getAttribute(attr)); render();
+});
+bindSwitch("period", "data-p", v => period = v);
+bindSwitch("yswitch", "data-y", v => yMode = v);
+bindSwitch("metric", "data-m", v => metric = v);
+
+// ---------- chart ----------
+function niceStep(span, count) {
+  const raw = span / count, mag = 10 ** Math.floor(Math.log10(raw)), f = raw / mag;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag;
+}
+function renderChart() {
+  const svg = document.getElementById("svg"), W = svg.clientWidth || 1200, H = 400;
+  const M = { l: 50, r: 18, t: 34, b: 30 };
+  const shown = shownSeries().filter(hasData), foot = document.getElementById("foot");
+  if (!shown.length) {
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" class="axis">Brak serii · dodaj je w „⚙ Serie” albo wybierz tryb porównania</text>`; foot.textContent = ""; return;
+  }
+  const all = shown.flatMap(pointsOf);
+  const x0 = Math.min(...all.map(p => p[0])), x1 = Math.max(...all.map(p => p[0]));
+  const values = all.map(p => p[1]).sort((a, b) => a - b), vmax = values.at(-1), vmin = values[0];
+  const p95 = values[Math.min(values.length - 1, Math.floor(values.length * .95))];
+  const plotH = H - M.t - M.b;
+  let y, ticks, cap = null;
+  if (yMode === "log") {
+    const lo = 10 ** Math.floor(Math.log10(Math.max(vmin, .1))), hi = 10 ** Math.ceil(Math.log10(vmax));
+    y = v => M.t + plotH * (1 - (Math.log10(v) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo)));
+    ticks = []; for (let d = lo; d <= hi; d *= 10) for (const m of [1, 2, 5]) if (d * m <= hi) ticks.push(d * m);
+  } else {
+    const limit = yMode === "capped" ? Math.min(vmax, p95 * 1.25) : vmax;
+    const step = niceStep(limit, 5), top = Math.ceil(limit / step) * step;
+    if (yMode === "capped" && vmax > top) cap = top;
+    y = v => M.t + plotH * (1 - Math.min(v, top) / top);
+    ticks = []; for (let v = 0; v <= top + 1e-9; v += step) ticks.push(+v.toFixed(6));
+  }
+  const span = Math.max(1, x1 - x0), plotW = W - M.l - M.r, x = d => M.l + plotW * (d - x0) / span;
+  const fmt = v => v === 0 || v >= 10 ? v.toFixed(0) : v.toFixed(v < 1 ? 1 : 0);
+  let out = `<defs><clipPath id="plot"><rect x="${M.l - 3}" y="${M.t - 1}" width="${plotW + 6}" height="${plotH + 4}"/></clipPath></defs>`;
+  for (const v of ticks) out += `<line class="grid" x1="${M.l}" x2="${W - M.r}" y1="${y(v)}" y2="${y(v)}"/>
+    <text class="axis" x="${M.l - 8}" y="${y(v) + 3.5}" text-anchor="end">${fmt(v)}</text>`;
+  out += `<text class="axis" x="${M.l - 8}" y="${M.t - 14}" text-anchor="end">${unit()}</text>`;
+  const every = Math.max(1, Math.ceil(span / Math.max(4, Math.floor(plotW / 64))));
+  for (let d = x0; d <= x1; d += every) out += `<text class="axis" x="${x(d)}" y="${H - 10}" text-anchor="middle">${dayLabel(d)}</text>`;
+  if (cap !== null) out += `<line class="capline" x1="${M.l}" x2="${W - M.r}" y1="${M.t}" y2="${M.t}"/>`;
+  const order = [...shown].sort((a, b) => (a.key === hot) - (b.key === hot));
+  out += `<g clip-path="url(#plot)">`;
+  for (const s of order) {
+    const dim = hot && s.key !== hot ? .13 : 1, width = (s.tier === "fast" ? 2.25 : 1.75) + (s.key === hot ? .75 : 0), col = colorOf(s);
+    // A line only joins neighbouring days; a gap breaks it instead of drawing a long bridge.
+    let d = "", prev = null;
+    for (const [day, v] of pointsOf(s)) { d += `${prev !== null && day - prev <= 2 ? "L" : "M"}${x(day).toFixed(1)},${y(v).toFixed(1)}`; prev = day; }
+    out += `<path d="${d}" fill="none" stroke="${col}" stroke-width="${width}" opacity="${dim}" stroke-linejoin="round"
+      ${s.tier === "fast" ? 'stroke-dasharray="5 3"' : 'stroke-linecap="round"'} data-k="${s.key}"/>`;
+    for (const [day, v] of pointsOf(s)) if (cap === null || v <= cap)
+      out += `<circle cx="${x(day).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${s.key === hot ? 2.6 : 1.7}" fill="${col}" opacity="${dim}" data-k="${s.key}" data-d="${day}" data-v="${v}"/>`;
+  }
+  out += `</g>`;
+  let clipped = 0, lastLabel = -1e9;
+  if (cap !== null) for (const s of shown) for (const [day, v] of pointsOf(s)) if (v > cap) {
+    clipped++;
+    const cx = x(day), dim = hot && s.key !== hot ? .25 : 1;
+    out += `<g opacity="${dim}"><path class="outlier" d="M${cx - 5},${M.t + 1} L${cx + 5},${M.t + 1} L${cx},${M.t - 7} Z" stroke="${colorOf(s)}" stroke-width="1.2"
+      data-k="${s.key}" data-d="${day}" data-v="${v}"/>`;
+    if (cx - lastLabel > 34) { out += `<text class="outlier-label" x="${cx}" y="${M.t - 11}" text-anchor="middle">${fmt(v)}</text>`; lastLabel = cx; }
+    out += `</g>`;
+  }
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.innerHTML = out;
+  foot.textContent = `${dayLabel(x0)} – ${dayLabel(x1)} · ${shown.length} ${shown.length === 1 ? "seria" : shown.length < 5 ? "serie" : "serii"}` +
+    (cap !== null ? ` · ▲ powyżej ${fmt(cap)} ${unit()}: ${clipped}` : "");
+}
+
+const tip = document.getElementById("tip");
+document.getElementById("svg").addEventListener("mousemove", e => {
+  const el = e.target.closest("[data-k]");
+  if (!el) { tip.style.display = "none"; return; }
+  const s = byKey.get(el.dataset.k), box = document.getElementById("chart").getBoundingClientRect();
+  tip.innerHTML = `${s.model} · ${s.tier} · ${s.effort}` + (el.dataset.d ? `<br>${dayLabel(+el.dataset.d)} · <span class="v">${fmtVal(+el.dataset.v)} ${unit()}</span>` : "");
+  tip.style.display = "block"; tip.style.left = (e.clientX - box.left + 12) + "px"; tip.style.top = (e.clientY - box.top + 12) + "px";
+  if (hot !== s.key) { hot = s.key; renderChart(); renderChips(); }
+});
+document.getElementById("svg").addEventListener("mouseleave", () => { tip.style.display = "none"; hot = null; renderChart(); renderChips(); });
+
+// ---------- KPI tiles ----------
+let kpiScope = "shown";
+bindSwitch("kpiScope", "data-s", v => kpiScope = v);
+function renderKpis() {
+  const pool = (kpiScope === "shown" ? shownSeries() : series).filter(hasData);
+  const scope = kpiScope === "shown" ? `of ${pool.length} on the chart` : "all models";
+  const tile = (k, n, u, d) => `<div class="kpi"><div class="k">${k}</div><div class="n">${n}<small>${u}</small></div><div class="d">${d}</div></div>`;
+  const name = s => `${s.model} · ${s.tier} · ${s.effort}`;
+  if (!pool.length) { document.getElementById("kpis").innerHTML = tile("Fastest model", "–", "", scope) +tile("Slowest model", "–", "", "") + tile("Measured calls", "–", "", "") + tile("Latest week", "–", "", ""); return; }
+  const ranked = [...pool].sort((a, b) => valueOf(b) - valueOf(a));
+  const best = metric === "speed" ? ranked[0] : ranked.at(-1), worst = metric === "speed" ? ranked.at(-1) : ranked[0];
+  const calls = pool.reduce((a, s) => a + callsIn(s), 0), total = series.reduce((a, s) => a + callsIn(s), 0);
+  const week = pool.flatMap(s => s.pts[metric].filter(p => p[0] > LAST - 7).map(p => p[1])).sort((a, b) => a - b);
+  document.getElementById("kpis").innerHTML =
+    tile("Fastest model", fmtVal(valueOf(best)), unit(), `${name(best)} · ${scope}`) +
+    tile("Slowest model", fmtVal(valueOf(worst)), unit(), name(worst)) +
+    tile(kpiScope === "shown" ? "Calls on the chart" : "Measured calls", compact(calls), "", kpiScope === "shown" ? `${(100 * calls / total).toFixed(1)}% of ${compact(total)} measured calls` : "in the period") +
+    tile("Latest week", week.length ? fmtVal(week[Math.floor(week.length / 2)]) : "–", week.length ? unit() : "", week.length ? `${scope} · week of 2026-10-26` : "no calls in the last 7 days");
+}
+
+function render() { renderKpis(); renderBar(); renderChips(); renderChart(); renderMatrix(); }
+window.addEventListener("resize", renderChart);
+render();
+</script>
+</body>
+</html>
