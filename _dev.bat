@@ -112,7 +112,7 @@ echo [4] Opening the application - database preparation appears there...
 start "" /B cmd /c "scripts\dev\wait-and-open.bat %PORT_APP%"
 echo.
 echo [5] Preparing the database and checking configuration...
-call bun scripts\dev\prepare-app.ts
+call bun "%CD%\scripts\dev\prepare-app.ts"
 if errorlevel 1 (
   echo [X] Preparation stopped - see the specific error above and the application.
   pause

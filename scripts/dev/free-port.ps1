@@ -18,14 +18,22 @@ function Get-Tree([int]$Root, $All) {
 try {
     $listeners = @(Get-Listeners)
     if ($listeners.Count -eq 0) { Write-Host "[OK] Port $Port free."; exit 0 }
-    $entry = [IO.Path]::GetFullPath((Join-Path $ProjectRoot 'src\server\api.ts'))
     # Require the complete entrypoint argument, not a matching directory substring.
-    $entryPattern = '(?:^|\s)(?:"' + [regex]::Escape($entry) + '"|' + [regex]::Escape($entry) + ')(?=\s|$)'
+    $entryPatterns = @('src\server\api.ts', 'scripts\dev\prepare-app.ts') | ForEach-Object {
+        $entry = [IO.Path]::GetFullPath((Join-Path $ProjectRoot $_))
+        # Windows accepts either separator in an absolute entrypoint.
+        $escaped = [regex]::Escape($entry).Replace('\\', '[/\\]')
+        '(?:^|\s)(?:"' + $escaped + '"|' + $escaped + ')(?=\s|$)'
+    }
+    $entryPattern = $entryPatterns -join '|'
     $all = @(Get-CimInstance Win32_Process)
     $targets = @()
     foreach ($id in $listeners) {
         $server = $all | Where-Object { $_.ProcessId -eq $id }
         if (!$server -or $server.Name -ne 'bun.exe' -or $server.CommandLine -notmatch $entryPattern) {
+            if ($server -and $server.Name -eq 'bun.exe' -and $server.CommandLine -match '\s(?:run\s+)?"?scripts[/\\]dev[/\\]prepare-app\.ts"?\s*$') {
+                throw "Port $Port is held by a preparation process (PID $id) launched with a relative path. Check its startup error and close that preparation window before retrying. Its repository could not be verified; no process was stopped."
+            }
             throw "Port $Port belongs to an unrecognized process (PID $id). No process was stopped."
         }
         # The child has an absolute entrypoint; its supervisor uses a relative one.

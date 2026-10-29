@@ -39,7 +39,7 @@ test("Bun update runs before server retirement and data operations, and batch ke
   expect(launcher).not.toMatch(/(?<!\r)\n/);
   const prepare = launcher.indexOf("call :install_bun");
   expect(prepare).toBeGreaterThan(0);
-  for (const later of ["free-port.ps1", "call bun install", "call bun scripts\\dev\\prepare-app.ts", "call bun run serve"])
+  for (const later of ["free-port.ps1", "call bun install", 'call bun "%CD%\\scripts\\dev\\prepare-app.ts"', "call bun run serve"])
     expect(launcher.indexOf(later)).toBeGreaterThan(prepare);
   expect(launcher).toContain("call :install_bun || (pause & exit /b 1)");
 });
@@ -47,7 +47,7 @@ test("Bun update runs before server retirement and data operations, and batch ke
 test("the application bundle and browser are ready before database preparation starts", () => {
   const build = launcher.indexOf("call bun run build:web");
   const browser = launcher.indexOf('start "" /B cmd /c "scripts\\dev\\wait-and-open.bat');
-  const preparation = launcher.indexOf("call bun scripts\\dev\\prepare-app.ts");
+  const preparation = launcher.indexOf('call bun "%CD%\\scripts\\dev\\prepare-app.ts"');
   const serving = launcher.indexOf("call bun run serve");
   expect(build).toBeGreaterThan(0);
   expect(browser).toBeGreaterThan(build);
