@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { firstTokenSummary } from "../../shared/first-token";
 import {
-  chartBuckets, modelChartBuckets, firstTokenChartScale, joined, latestWeek, modelTotals, outlierSeries, rankedModels, readHiddenModels, speedBuckets, speedScaleMax, weekStart,
+  chartBuckets, modelChartBuckets, firstTokenChartScale, joined, latencyAxis, leadingStrays, latestWeek, modelTotals, outlierSeries, rankedModels, readHiddenModels, speedBuckets, speedScaleMax, weekStart,
   accountSelected, accountState, modelSelected, setAccounts, readHiddenModels as readHidden, mergeSpeedParts, readSpeedSelection, selectedParts, seriesStroke, speedModels, speedSubscriptions, toggleAccount, toggleModel,
   writeHiddenModels, writeSpeedSelection, entriesSince, rangeStart, HIDDEN_MODELS_KEY, SPEED_SELECTION_KEY, EMPTY_SELECTION, type ModelSpeedPoint, type ModelSpeedSeries,
 } from "./model-speed";
@@ -287,4 +287,27 @@ test("a period sums each model's totals again from its kept days and drops a mod
   expect(modelTotals(kept!.series)).toMatchObject({ calls: 20, first: "2026-10-01", last: "2026-10-01" });
   // The whole history keeps the entries untouched.
   expect(entriesSince(entries, null)).toEqual(entries);
+});
+
+test("the first-token axis caps at the 95th percentile, spans decades in log, or keeps every value", () => {
+  const values = [...Array.from({ length: 40 }, (_, i) => 2 + i * 0.2), 921];
+  const capped = latencyAxis(values, "capped");
+  expect(capped.max).toBeLessThan(20);
+  expect(capped.ticks[0]).toBe(0);
+  expect(latencyAxis(values, "full").max).toBeGreaterThanOrEqual(921);
+  const log = latencyAxis(values, "log");
+  expect([log.min, log.max, log.log]).toEqual([1, 1000, true]);
+  expect(log.ticks).toEqual([1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]);
+  // Without outliers the capped scale is the full one.
+  expect(latencyAxis([1, 2, 3], "capped")).toEqual(latencyAxis([1, 2, 3], "full"));
+});
+
+test("the whole history leaves a few stray points before a long silent gap off the axis", () => {
+  const days = (from: string, count: number) => Array.from({ length: count }, (_, i) =>
+    new Date(Date.parse(`${from}T00:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10));
+  const body = days("2026-08-25", 60).flatMap(day => [day, day]);
+  expect(leadingStrays(["2026-05-30", ...body])).toEqual({ from: "2026-08-25", earliest: "2026-05-30", count: 1 });
+  expect(leadingStrays(body)).toBeNull();
+  // Too many points before the gap: they are history, not strays.
+  expect(leadingStrays([...days("2026-05-01", 20), ...body])).toBeNull();
 });

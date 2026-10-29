@@ -11,16 +11,18 @@ import { browserSafeDiagnostic } from "../lib/browserDiagnostic";
 import { ALL_ACCOUNT, type RosterCard } from "../lib/roster";
 import {
   MIN_POINT_CALLS, MIN_RANKED_CALLS, accountSelected, accountState, entriesSince, latestWeek, mergeSpeedParts, modelSelected, modelTotals,
-  rangeStart, rankedModels, readHiddenModels, readSpeedSelection, selectedParts, setAccounts, speedModels, speedProviderOf,
+  rangeStart, rankedModels, readSpeedSelection, storedHiddenModels, selectedParts, setAccounts, speedModels, speedProviderOf,
   speedSubscriptions, speedSeriesKey, executionSuffix, toggleAccount, toggleModel, totalSpeed, writeHiddenModels, writeSpeedSelection,
   type ModelSpeedResponse, type ModelTotals, type SpeedEntry, type SpeedGrain, type SpeedKind, type SpeedPart, type SpeedRange, type SpeedSelection,
   type SpeedSubscription,
   type SpeedProvider,
   type SpeedChartMetric,
+  type SpeedYScale,
 } from "../lib/model-speed";
 import { TableRow, Card, EmptyState, ErrorState, GhostButton, LegendAllToggle, LoadingCard, Table, Tabs, Td, Th, HelpDot } from "../components/ui";
 import { Kpi, KpiRow, unit } from "../components/WindowStatusCard";
-import { modelStrokes } from "../lib/model-colors";
+import { DEFAULT_VISIBLE, defaultHidden, executionStroke, fastHidden, modelInks } from "../lib/speed-matrix";
+import { SpeedMatrix } from "../components/SpeedMatrix";
 import { AccountPeriodDrawer } from "../components/AccountPeriodDrawer";
 import { TriStateCheck as Check } from "../components/TriStateCheck";
 import { compareTableValues, modelVersionSortValue } from "../lib/table-sort";
@@ -233,8 +235,11 @@ function SpeedSelectionList({ subs, loaded, slow, selection, inactive, onChange 
   </div>;
 }
 
-type Row = { key: string; label: string; color: string; dash: string | undefined; totals: ModelTotals; series: ModelSpeedResponse["models"][number];
-  accounts: SpeedSubscription[] | null };
+/** How busy a series is, for ordering and the default selection: calls, or first-token turns while call timings are still prepared. */
+const activity = (totals: ModelTotals) => Math.max(totals.calls, totals.firstToken?.turns ?? 0);
+
+type Row = { key: string; label: string; name: string; model: string; ink: string; color: string; dash: string | undefined; totals: ModelTotals;
+  series: ModelSpeedResponse["models"][number]; accounts: SpeedSubscription[] | null };
 
 function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false, subscriptions, waiting = false, firstTokenPending = false, speedPending = false }: {
   entries: SpeedEntry[]; hiddenScope: string; longOutMin: number; controls?: ReactNode; split?: boolean;
@@ -249,31 +254,39 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
   const [kind, setKind] = useState<SpeedKind>("long");
   const [grain, setGrain] = useState<SpeedGrain>("day");
   const [chartMetric, setChartMetric] = useState<SpeedChartMetric>("speed");
+  const [yScale, setYScale] = useState<SpeedYScale>("capped");
+  const [hover, setHover] = useState<string | null>(null);
   const chartLatency = chartMetric !== "speed";
   const chartTitle = chartLatency ? t("Time to first token", "Czas do pierwszego tokena") : t("Speed over time", "Prędkość w czasie");
   // The period narrows the tiles, the chart and the table alike; UTC days, as the server's day rows.
   const [range, setRange] = useState<SpeedRange>("all");
   const today = new Date().toISOString().slice(0, 10), since = rangeStart(range, today);
   const ranged = useMemo(() => entriesSince(entries, since), [entries, since]);
-  const [hidden, setHidden] = useState<Set<string>>(() => readHiddenModels(hiddenScope));
+  // First day of each series in the whole history: a recent one is marked new whatever the period.
+  const firstDays = useMemo(() => new Map(entries.map(entry => [entry.key, entry.series.points[0]?.at ?? null])), [entries]);
   const rows = useMemo<Row[]>(() => {
     const sorted = ranged.map(entry => {
       const accounts = subscriptions ? subscriptions(entry.accounts) : null;
+      const name = usageModelLabel(entry.model) + (split && accounts?.[0] ? ` · ${accounts[0].name}` : "");
       const model = usageModelLabel(entry.model) + executionSuffix(entry.series, t("unknown", "nieznany"), t("mixed", "mieszany"), t("unknown effort", "effort nieznany"));
-      return { key: entry.key, model: entry.model, series: entry.series, totals: modelTotals(entry.series), accounts,
+      return { key: entry.key, model: entry.model, series: entry.series, totals: modelTotals(entry.series), accounts, name,
         label: split && accounts?.[0] ? `${model} · ${accounts[0].name}` : model };
-    }).sort((a, b) => b.totals.calls - a.totals.calls);
-    // Each line takes its vendor's hue; models of one vendor get its shades in order of calls.
-    const strokes = modelStrokes(sorted.map(row => row.model));
-    return sorted.map((row, index) => ({ ...row, ...strokes[index]! }));
+    }).sort((a, b) => activity(b.totals) - activity(a.totals));
+    // A model's ink (its vendor's hue, turned per model in order of calls); effort sets the shade, speed mode the pattern.
+    const inks = modelInks(sorted.map(row => row.model));
+    return sorted.map(row => { const ink = inks.get(row.model)!; return { ...row, ink, ...executionStroke(ink, row.series) }; });
   }, [ranged, language, split, subscriptions, t]);
-  const toggle = (key: string) => setHidden(previous => {
-    const next = new Set(previous);
-    if (!next.delete(key)) next.add(key);
-    writeHiddenModels(hiddenScope, next);
-    return next;
-  });
-  const setAll = (next: Set<string>) => { setHidden(next); writeHiddenModels(hiddenScope, next); };
+  // Nothing stored: many series start as the busiest standard ones plus every fast one; a stored choice is kept as is.
+  const [stored, setStored] = useState<Set<string> | null>(() => storedHiddenModels(hiddenScope));
+  const preset = useMemo(() => defaultHidden(rows.map(row => ({ key: row.key, series: row.series, calls: activity(row.totals) }))), [rows]);
+  const hidden = stored ?? preset;
+  const setAll = (next: Set<string>) => { setStored(next); writeHiddenModels(hiddenScope, next, undefined, preset.size > 0); };
+  // A group turns on unless all of it is on already.
+  const toggle = (keys: string[]) => {
+    const next = new Set(hidden), on = keys.every(key => !hidden.has(key));
+    for (const key of keys) if (on) next.add(key); else next.delete(key);
+    setAll(next);
+  };
   const kinds = [{ value: "long" as const, label: t("long calls ≥{0}", `długie wywołania ≥${longOutMin}`, [longOutMin]) },
     { value: "all" as const, label: t("all calls", "wszystkie wywołania") }];
   const grains = [{ value: "day" as const, label: t("day", "dzień") }, { value: "week" as const, label: t("week", "tydzień") }];
@@ -303,6 +316,15 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
   const speedValue = (value: number | null) => value === null ? "—" : <>{whole.format(value)}{unit(" tok/s")}</>;
   const noRanked = t("no model with {0} calls of this kind", `brak modelu z ${MIN_RANKED_CALLS} wywołaniami tego rodzaju`, [MIN_RANKED_CALLS]);
   const all = subscriptions !== undefined;
+  // Matrix cells: the period's value of the chart's metric (the server's combined first-token percentiles, or a ratio of sums).
+  const cellValue = (totals: ModelTotals) => {
+    if (chartMetric === "speed") return totalSpeed(totals, kind);
+    const ms = chartMetric === "first-token-median" ? totals.firstToken?.median_ms : totals.firstToken?.p90_ms;
+    return ms == null ? null : ms / 1000;
+  };
+  const cellTitle = chartMetric === "speed" ? t("Cells: tok/s for the period", "Komórki: tok/s w okresie")
+    : chartMetric === "first-token-median" ? t("Cells: first-token median for the period, seconds", "Komórki: mediana pierwszego tokena w okresie, sekundy")
+    : t("Cells: first-token P90 for the period, seconds", "Komórki: P90 pierwszego tokena w okresie, sekundy");
   return (
     <div className="archive speed ui-tab-page">
       {controlRow}
@@ -332,21 +354,39 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
             ? t("calls with ≥{0} output tokens", `wywołania z ≥${longOutMin} tokenami wyjścia`, [longOutMin])
             : t("all measured calls", "wszystkie zmierzone wywołania")} · {grain === "week" ? t("per week", "na tydzień") : t("per day", "na dzień")}</span></div>
         </div>
-        <Tabs value={chartMetric} onChange={setChartMetric} options={[
-          { value: "speed" as const, label: t("Token speed", "Prędkość tokenów") },
-          { value: "first-token-median" as const, label: t("First token · median", "Pierwszy token · mediana") },
-          { value: "first-token-p90" as const, label: t("First token · P90", "Pierwszy token · P90") },
-        ]} />
-        <SpeedChart rows={rows.filter(row => !hidden.has(row.key))} kind={kind} grain={grain} metric={chartMetric} span={since === null ? null : [since, today]} />
-        <div className="speed-legend">
-          {rows.map(row => <button key={row.key} type="button" className={`speed-toggle${hidden.has(row.key) ? " is-off" : ""}`}
-            aria-pressed={!hidden.has(row.key)} onClick={() => toggle(row.key)}
-            title={hidden.has(row.key) ? t("Show on the chart", "Pokaż na wykresie") : t("Hide from the chart", "Ukryj na wykresie")}>
-            <svg className="speed-legend-line" width={18} height={6} aria-hidden="true">
-              <line x1={1} x2={17} y1={3} y2={3} stroke={row.color} strokeWidth={2} strokeDasharray={row.dash} strokeLinecap={row.dash ? "butt" : "round"} />
-            </svg>{row.label}</button>)}
-          {rows.length > 1 && <LegendAllToggle allShown={rows.every(row => !hidden.has(row.key))} onShowAll={() => setAll(new Set())}
-            onHideAll={() => setAll(new Set([...hidden, ...rows.map(row => row.key)]))} />}
+        <div className="speed-chart-switches">
+          <Tabs value={chartMetric} onChange={setChartMetric} options={[
+            { value: "speed" as const, label: t("Token speed", "Prędkość tokenów") },
+            { value: "first-token-median" as const, label: t("First token · median", "Pierwszy token · mediana") },
+            { value: "first-token-p90" as const, label: t("First token · P90", "Pierwszy token · P90") },
+          ]} />
+          {chartLatency && <span className="speed-yscale">{t("Y axis", "oś Y")} <Tabs value={yScale} onChange={setYScale} options={[
+            { value: "capped" as const, label: t("capped", "przycięta"), title: t("Up to the 95th percentile of the drawn values; slower ones are marked ▲ at the top",
+              "Do 95. percentyla rysowanych wartości; wolniejsze oznaczone ▲ u góry") },
+            { value: "log" as const, label: "log", title: t("Logarithmic scale", "Skala logarytmiczna") },
+            { value: "full" as const, label: t("full", "pełna"), title: t("Every value on the scale", "Wszystkie wartości na skali") },
+          ]} /></span>}
+        </div>
+        <div className="speed-plot">
+          <SpeedChart rows={rows.filter(row => !hidden.has(row.key))} kind={kind} grain={grain} metric={chartMetric} yScale={yScale}
+            highlight={hover !== null && !hidden.has(hover) ? hover : null} span={since === null ? null : [since, today]} />
+          <SpeedMatrix items={rows.map(row => ({ key: row.key, name: row.name, model: row.model, series: row.series,
+            calls: chartLatency ? row.totals.firstToken?.turns ?? 0 : row.totals.calls,
+            label: row.label, ink: row.ink, color: row.color, dash: row.dash, value: cellValue(row.totals) }))}
+            hidden={hidden} onToggle={toggle} onHover={setHover} firstDay={key => firstDays.get(key) ?? null} today={today}
+            format={value => chartLatency ? oneDecimal.format(value) : whole.format(value)} valueTitle={cellTitle}
+            countLabel={chartLatency ? t("turns", "tury") : t("calls", "wywołania")}
+            actions={<>
+              {rows.length > DEFAULT_VISIBLE && <button type="button" className="ui-legend-all"
+                onClick={() => setAll(defaultHidden(rows.map(row => ({ key: row.key, series: row.series, calls: activity(row.totals) })), 0))}>
+                {t("top {0} + fast", `top ${DEFAULT_VISIBLE} + fast`, [DEFAULT_VISIBLE])}</button>}
+              {rows.some(row => row.series.speed === "fast") && rows.some(row => row.series.speed !== "fast") && <button type="button" className="ui-legend-all"
+                onClick={() => setAll(fastHidden(rows))}>{t("fast only", "tylko fast")}</button>}
+              {rows.length > 1 && <LegendAllToggle allShown={rows.every(row => !hidden.has(row.key))} onShowAll={() => setAll(new Set())}
+                onHideAll={() => setAll(new Set([...hidden, ...rows.map(row => row.key)]))} />}
+              <span className="speed-matrix-count">{t("{0} of {1} series on the chart", `${rows.filter(row => !hidden.has(row.key)).length} z ${rows.length} serii na wykresie`,
+                [rows.filter(row => !hidden.has(row.key)).length, rows.length])}</span>
+            </>} />
         </div>
       </ChartExport></Card>
       <Card>
@@ -382,7 +422,7 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
             const firstTokenValue = (ms: number | null | undefined) => ms == null ? "—" : `${oneDecimal.format(ms / 1000)} s`;
             return <TableRow key={row.key}>
               <Td><button type="button" className={`speed-toggle${hidden.has(row.key) ? " is-off" : ""}`} aria-pressed={!hidden.has(row.key)}
-                onClick={() => toggle(row.key)}
+                onClick={() => toggle([row.key])}
                 title={hidden.has(row.key) ? t("Show on the chart", "Pokaż na wykresie") : t("Hide from the chart", "Ukryj na wykresie")}>
                 <span className="speed-swatch" style={{ background: row.color }} />{row.label}</button></Td>
               {all && <Td title={accounts.map(sub => sub.label).join("\n")} style={{ color: "var(--muted)" }}>

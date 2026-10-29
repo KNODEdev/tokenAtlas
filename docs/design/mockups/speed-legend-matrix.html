@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="pl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speed · legenda-matryca (makieta)</title>
+<!-- Mockup only: light paper-atlas tokens copied from src/web/tokens.css (inline, so it opens anywhere); synthetic data. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #f6f8f8; --surface: #ffffff; --raised: #eef2f2; --sunk: #f1f4f4; --band: #eaf0f0;
+    --line: #d9e1e1; --line2: #b4c2c3; --pencil: #66808a;
+    --text: #22333b; --muted: #4c5f65; --faint: #6c7e7f;
+    --accent: #136d88; --accent-soft: #d6e9ef;
+    --warn: #9a6a12; --warn-soft: rgba(154, 106, 18, 0.11);
+    --shadow: 0 18px 44px rgba(41, 58, 67, 0.16);
+    color-scheme: light;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-size: 13px; background: var(--bg); color: var(--text); font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 1720px; margin: 0 auto; padding: 24px 28px 48px; }
+  .note { color: var(--muted); font-size: 12px; margin: 0 0 18px; line-height: 1.5; }
+  .note b { color: var(--text); font-weight: 600; }
+  .title { font-size: 15px; font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .help { display: inline-grid; place-items: center; width: 14px; height: 14px; border: 1px solid var(--pencil); border-radius: 50%;
+    font-size: 9px; color: var(--muted); vertical-align: 1px; }
+  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .tabs { display: flex; gap: 14px; border-bottom: 1px solid var(--line2); margin: 10px 0 12px; }
+  .tabs button, .switch button { border: 0; background: none; font: inherit; color: var(--muted); padding: 4px 0 6px; cursor: pointer; }
+  .tabs button.on { color: var(--text); font-weight: 500; box-shadow: inset 0 -2px 0 var(--accent); }
+  .switch { display: inline-flex; gap: 10px; align-items: baseline; font-size: 12px; color: var(--faint); }
+  .switch button { padding: 2px 0 3px; }
+  .switch button.on { color: var(--text); font-weight: 500; box-shadow: inset 0 -2px 0 var(--accent); }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 560px; gap: 28px; align-items: start; }
+  @media (max-width: 1320px) { .layout { grid-template-columns: 1fr; } }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+  .axis { font-size: 10.5px; fill: var(--muted); }
+  .grid { stroke: var(--line); stroke-dasharray: 3 3; }
+  .capline { stroke: var(--warn); stroke-dasharray: 2 3; }
+  .caplabel { font-size: 10px; fill: var(--warn); }
+  .outlier { fill: var(--warn); }
+  .outlier-label { font-size: 10.5px; fill: var(--text); font-weight: 500; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line2); border-radius: 4px 6px 3px 5px;
+    box-shadow: var(--shadow); padding: 6px 9px; font-size: 12px; white-space: nowrap; display: none; }
+  .tip .v { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+  .chart-foot { color: var(--faint); font-size: 11.5px; margin-top: 6px; }
+
+  /* Matrix legend */
+  .matrix { border-collapse: collapse; width: 100%; font-size: 12px; }
+  .matrix th, .matrix td { padding: 0; height: 26px; border-bottom: 1px dashed var(--line); }
+  .matrix thead th { border-bottom: 1px solid var(--line2); height: 28px; }
+  .matrix .colh, .matrix .rowh { border: 0; background: none; font: inherit; color: var(--muted); cursor: pointer; padding: 0 6px; height: 100%; width: 100%; }
+  .matrix .colh { text-align: center; font-weight: 500; }
+  .matrix .colh:hover, .matrix .rowh:hover { color: var(--text); background: var(--raised); }
+  .matrix .rowh { display: flex; align-items: center; gap: 7px; text-align: left; color: var(--text); white-space: nowrap; }
+  .matrix .rowh .dot { width: 8px; height: 8px; border-radius: 3px 4px 3px 4px; flex-shrink: 0; }
+  .matrix td.calls { text-align: right; color: var(--faint); font-family: "IBM Plex Mono", monospace; font-size: 11px; padding-right: 4px; width: 72px; white-space: nowrap; }
+  .cell { display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%; height: 100%; border: 0; background: none; cursor: pointer;
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--text); padding: 0 4px; }
+  .cell:hover { background: var(--raised); }
+  .cell svg { flex-shrink: 0; }
+  .cell.off { color: var(--faint); }
+  .cell.off svg { opacity: .25; }
+  .cell.off .val { opacity: .55; }
+  .cell.hot { background: var(--accent-soft); }
+  .none { display: block; text-align: center; color: var(--line2); }
+  .fast-head td { border-bottom: 1px solid var(--line2); padding-top: 10px; height: 30px; font-weight: 600; font-size: 12px; }
+  .fast-head .fh { display: flex; align-items: center; gap: 8px; }
+  .badge { font-size: 10.5px; font-weight: 500; padding: 0 6px; border-radius: 3px 5px 2px 4px; background: var(--warn-soft); color: var(--warn); }
+  .badge.count { background: var(--accent-soft); color: var(--accent); }
+  .new { margin-left: 4px; }
+  .actions { display: flex; gap: 8px; margin: 10px 0 6px; flex-wrap: wrap; align-items: center; }
+  .btn { border: 1px solid var(--pencil); background: var(--surface); color: var(--text); font: inherit; font-size: 12px;
+    padding: 3px 10px; border-radius: 4px 6px 3px 5px; cursor: pointer; }
+  .btn:hover { background: var(--raised); }
+  .btn.on { border-color: var(--accent); background: var(--accent-soft); }
+  .key { color: var(--faint); font-size: 11.5px; line-height: 1.6; margin-top: 6px; }
+  .key svg { vertical-align: middle; }
+  .shown { color: var(--muted); font-size: 12px; margin-left: auto; }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="note"><b>Makieta</b> · Speed → wykres „Czas do pierwszego tokena”. Dane syntetyczne, kształt jak na zrzucie z 28.10:
+    około 60 serii, w tym kilka „fast”, i jeden pomiar odstający około 920 s. Najedź na komórkę albo linię; kliknij komórkę, wiersz lub kolumnę.</p>
+
+  <div class="head">
+    <div><span class="title">Time to first token</span> <span class="help">?</span> <span class="sub">· median · seconds · per day</span></div>
+    <div class="switch" id="yswitch">oś Y
+      <button data-y="capped" class="on" title="Skala do P95 widocznych punktów; wyższe pokazane jako ▲ przy górnej krawędzi">przycięta</button>
+      <button data-y="log" title="Skala logarytmiczna">log</button>
+      <button data-y="full" title="Pełna skala, jak dziś">pełna</button>
+    </div>
+  </div>
+  <div class="tabs" id="metric">
+    <button>Token speed</button><button class="on">First token · median</button><button>First token · P90</button>
+  </div>
+
+  <div class="layout">
+    <div class="chart" id="chart">
+      <svg id="svg" height="420"></svg>
+      <div class="tip" id="tip"></div>
+      <div class="chart-foot" id="foot"></div>
+    </div>
+
+    <div>
+      <table class="matrix" id="matrix"></table>
+      <div class="actions">
+        <button class="btn" data-preset="default" title="8 serii z największą liczbą wywołań i wszystkie fast">top 8 + fast</button>
+        <button class="btn" data-preset="fast">tylko fast</button>
+        <button class="btn" data-preset="all">wszystkie</button>
+        <button class="btn" data-preset="none">żadne</button>
+        <span class="shown" id="shown"></span>
+      </div>
+      <div class="key">
+        <svg width="22" height="6"><line x1="1" x2="21" y1="3" y2="3" stroke="var(--text)" stroke-width="1.75" stroke-linecap="round"/></svg> standard ·
+        <svg width="22" height="6"><line x1="1" x2="21" y1="3" y2="3" stroke="var(--text)" stroke-width="2.25" stroke-dasharray="5 3"/></svg> fast ·
+        kolor = model, ciemniej = wyższy effort · w komórce mediana okresu w s · ? = effort nieznany
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const EFFORTS = ["low", "medium", "high", "xhigh", "max", "unknown"];
+const EFFORT_HEAD = { low: "low", medium: "medium", high: "high", xhigh: "xhigh", max: "max", unknown: "?" };
+const EFFORT_FACTOR = { low: 1.4, medium: 2.3, high: 3.8, xhigh: 6.5, max: 11, unknown: 3 };
+const EFFORT_L = { low: 0.80, medium: 0.70, high: 0.60, xhigh: 0.50, max: 0.40, unknown: 0.62 };
+
+// Model, hue, speed factor, active days (from/to as dates), standard efforts, fast efforts.
+const MODELS = [
+  ["gpt-6.1-sol", 215, 1.0, "2026-10-03", "2026-10-28", ["low", "medium", "high", "xhigh", "max", "unknown"], ["high", "xhigh"]],
+  ["gpt-6-astra", 30, 1.2, "2026-09-12", "2026-10-28", ["low", "medium", "high", "xhigh", "max", "unknown"], ["medium", "high"]],
+  ["gpt-6-luna", 150, 0.9, "2026-09-12", "2026-10-28", ["low", "medium", "high", "xhigh", "max"], []],
+  ["gpt-6-sol", 290, 1.1, "2026-09-12", "2026-10-26", ["low", "medium", "high", "xhigh"], []],
+  ["gpt-6.1-terra", 85, 1.6, "2026-10-08", "2026-10-28", ["high", "xhigh", "max"], ["high"]],
+  ["gpt-reserve", 0, 1.9, "2026-10-10", "2026-10-28", ["high", "xhigh", "max"], []],
+  ["gpt-5.6-luna", 175, 1.0, "2026-08-25", "2026-10-02", ["low", "medium", "high", "xhigh", "max", "unknown"], []],
+  ["gpt-5.6-sol", 330, 1.2, "2026-08-25", "2026-10-15", ["low", "medium", "high", "xhigh", "max"], []],
+  ["gpt-5.6-terra", 55, 1.7, "2026-08-25", "2026-09-20", ["low", "high"], []],
+  ["gpt-5.5", 250, 1.3, "2026-08-25", "2026-09-10", ["medium"], []],
+  ["gpt-5.3-codex-spark", 120, 0.5, "2026-08-28", "2026-09-30", ["high", "xhigh"], []],
+  ["Codex internal review", 220, 0.8, "2026-08-25", "2026-10-28", ["low"], ["low"]],
+];
+const NEW_SINCE = "2026-10-22"; // a fast row first seen after this is flagged "nowy"
+const START = new Date("2026-08-25T00:00:00Z"), END = new Date("2026-10-28T00:00:00Z");
+const DAY = 864e5, NDAYS = Math.round((END - START) / DAY) + 1;
+const dayIndex = iso => Math.round((new Date(iso + "T00:00:00Z") - START) / DAY);
+const dayLabel = i => { const d = new Date(+START + i * DAY); return String(d.getUTCDate()).padStart(2, "0") + "." + String(d.getUTCMonth() + 1).padStart(2, "0"); };
+
+let seed = 7;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+const series = [];
+for (const [model, hue, speed, from, to, std, fast] of MODELS) {
+  for (const [tier, efforts] of [["standard", std], ["fast", fast]]) {
+    for (const effort of efforts) {
+      // A late fast variant starts within the last week so the "nowy" flag shows.
+      const start = tier === "fast" && model === "gpt-6.1-terra" ? dayIndex("2026-10-24") : dayIndex(from) + Math.floor(rnd() * 4);
+      const end = dayIndex(to);
+      const base = EFFORT_FACTOR[effort] * speed * (tier === "fast" ? 0.45 : 1);
+      const points = [];
+      for (let d = start; d <= end; d++) {
+        if (rnd() < 0.12) continue; // days without enough calls stay gaps
+        points.push([d, +(base * (0.75 + rnd() * 0.5)).toFixed(2)]);
+      }
+      const chroma = model === "Codex internal review" ? 0.025 : effort === "unknown" ? 0.03 : 0.13;
+      series.push({ key: `${model}|${tier}|${effort}`, model, tier, effort, hue, points,
+        color: `oklch(${EFFORT_L[effort]} ${chroma} ${hue})`,
+        calls: Math.round((tier === "fast" ? 300 : 900) * (1 + rnd() * 6) * (effort === "high" || effort === "xhigh" ? 3 : 1) * points.length / 20),
+        firstDay: start });
+    }
+  }
+}
+// Outliers as on the screenshot.
+const spike = (key, iso, value) => { const s = series.find(x => x.key === key); if (!s) return; const d = dayIndex(iso);
+  const p = s.points.find(x => x[0] === d); if (p) p[1] = value; else { s.points.push([d, value]); s.points.sort((a, b) => a[0] - b[0]); } };
+// Spikes go on series the default selection shows, so the capped axis has something to cap.
+const busiest = [...series].filter(s => s.tier === "standard").sort((a, b) => b.calls - a.calls).slice(0, 8)
+  .filter(s => s.points.at(-1)[0] > dayIndex("2026-10-20")).map(s => s.key);
+spike(busiest[0], "2026-10-23", 921.4);
+spike(busiest[2], "2026-10-27", 304.0);
+spike(busiest[4], "2026-10-14", 61.7);
+spike("gpt-6-luna|standard|max", "2026-10-15", 48.2);
+
+for (const s of series) {
+  const v = s.points.map(p => p[1]).sort((a, b) => a - b);
+  s.median = v.length ? v[Math.floor(v.length / 2)] : null;
+}
+const byKey = new Map(series.map(s => [s.key, s]));
+
+function preset(name) {
+  if (name === "all") return new Set(series.map(s => s.key));
+  if (name === "none") return new Set();
+  if (name === "fast") return new Set(series.filter(s => s.tier === "fast").map(s => s.key));
+  const top = [...series].filter(s => s.tier === "standard").sort((a, b) => b.calls - a.calls).slice(0, 8).map(s => s.key);
+  return new Set([...top, ...series.filter(s => s.tier === "fast").map(s => s.key)]);
+}
+let visible = preset("default"), yMode = "capped", hot = null, activePreset = "default";
+
+// ---------- matrix ----------
+function rowsFor(tier) {
+  return MODELS.map(m => m[0]).filter(model => series.some(s => s.model === model && s.tier === tier));
+}
+function swatch(s) {
+  return `<svg width="16" height="6" aria-hidden="true"><line x1="1" x2="15" y1="3" y2="3" stroke="${s.color}" stroke-width="${s.tier === "fast" ? 2.25 : 2}"
+    ${s.tier === "fast" ? 'stroke-dasharray="4 2.5"' : 'stroke-linecap="round"'}/></svg>`;
+}
+function renderMatrix() {
+  const t = document.getElementById("matrix");
+  const head = `<thead><tr><th style="text-align:left;width:170px"></th>${EFFORTS.map(e =>
+    `<th><button class="colh" data-col="${e}" title="Pokaż albo ukryj effort ${e} we wszystkich modelach">${EFFORT_HEAD[e]}</button></th>`).join("")}
+    <th style="text-align:right;color:var(--faint);font-weight:400;font-size:11px;padding-right:4px">wywołania</th></tr></thead>`;
+  const row = (model, tier) => {
+    const cells = EFFORTS.map(e => {
+      const s = byKey.get(`${model}|${tier}|${e}`);
+      if (!s) return `<td><span class="none">·</span></td>`;
+      const on = visible.has(s.key);
+      return `<td><button class="cell${on ? "" : " off"}${hot === s.key ? " hot" : ""}" data-key="${s.key}"
+        title="${model} · ${tier} · ${e} · ${s.calls.toLocaleString("pl")} wywołań">${swatch(s)}<span class="val">${s.median.toFixed(1)}</span></button></td>`;
+    }).join("");
+    const mine = series.filter(s => s.model === model && s.tier === tier);
+    const calls = mine.reduce((a, s) => a + s.calls, 0);
+    const isNew = tier === "fast" && mine.every(s => s.firstDay >= dayIndex(NEW_SINCE));
+    const hue = mine[0].hue, chroma = model === "Codex internal review" ? 0.025 : 0.13;
+    return `<tr><th><button class="rowh" data-row="${model}|${tier}" title="Pokaż albo ukryj cały wiersz">
+      <span class="dot" style="background:oklch(0.58 ${chroma} ${hue})"></span>${model}${isNew ? `<span class="badge new" title="Pierwsze wywołania fast ${dayLabel(mine[0].firstDay)}">nowy</span>` : ""}</button></th>
+      ${cells}<td class="calls">${compact(calls)}</td></tr>`;
+  };
+  const fastRows = rowsFor("fast");
+  t.innerHTML = head + "<tbody>" + rowsFor("standard").map(m => row(m, "standard")).join("") +
+    `<tr class="fast-head"><td colspan="8"><span class="fh">⚡ fast <span class="badge count">${fastRows.length} modele · ${series.filter(s => s.tier === "fast").length} serii</span></span></td></tr>` +
+    fastRows.map(m => row(m, "fast")).join("") + "</tbody>";
+  document.getElementById("shown").textContent = `na wykresie ${visible.size} z ${series.length} serii`;
+  document.querySelectorAll("[data-preset]").forEach(b => b.classList.toggle("on", b.dataset.preset === activePreset));
+}
+const compact = n => n >= 1e6 ? (n / 1e6).toFixed(1) + " mln" : n >= 1e3 ? (n / 1e3).toFixed(1) + " tys." : String(n);
+
+function toggleKeys(keys) {
+  const allOn = keys.every(k => visible.has(k));
+  for (const k of keys) allOn ? visible.delete(k) : visible.add(k);
+  activePreset = null; render();
+}
+document.getElementById("matrix").addEventListener("click", e => {
+  const cell = e.target.closest("[data-key]"), row = e.target.closest("[data-row]"), col = e.target.closest("[data-col]");
+  if (cell) toggleKeys([cell.dataset.key]);
+  else if (row) { const [m, tier] = row.dataset.row.split("|"); toggleKeys(series.filter(s => s.model === m && s.tier === tier).map(s => s.key)); }
+  else if (col) toggleKeys(series.filter(s => s.effort === col.dataset.col).map(s => s.key));
+});
+document.getElementById("matrix").addEventListener("mouseover", e => {
+  const cell = e.target.closest("[data-key]"); const k = cell && visible.has(cell.dataset.key) ? cell.dataset.key : null;
+  if (k !== hot) { hot = k; renderChart(); }
+});
+document.getElementById("matrix").addEventListener("mouseleave", () => { hot = null; renderChart(); });
+document.querySelectorAll("[data-preset]").forEach(b => b.addEventListener("click", () => {
+  activePreset = b.dataset.preset; visible = preset(activePreset); render(); }));
+document.getElementById("yswitch").addEventListener("click", e => {
+  const b = e.target.closest("[data-y]"); if (!b) return; yMode = b.dataset.y;
+  document.querySelectorAll("[data-y]").forEach(x => x.classList.toggle("on", x === b)); renderChart(); });
+
+// ---------- chart ----------
+function niceStep(span, count) {
+  const raw = span / count, mag = 10 ** Math.floor(Math.log10(raw)), f = raw / mag;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag;
+}
+function renderChart() {
+  const svg = document.getElementById("svg"), W = svg.clientWidth || 1000, H = 420;
+  const M = { l: 50, r: 18, t: 34, b: 30 };
+  const shown = series.filter(s => visible.has(s.key) && s.points.length);
+  const foot = document.getElementById("foot");
+  if (!shown.length) { svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" class="axis">Brak serii na wykresie</text>`; foot.textContent = ""; return; }
+  const all = shown.flatMap(s => s.points);
+  // X starts at the first day with data among the shown series, not at the oldest stray point.
+  const x0 = Math.min(...all.map(p => p[0])), x1 = Math.max(...all.map(p => p[0]));
+  const values = all.map(p => p[1]).sort((a, b) => a - b);
+  const vmax = values.at(-1), vmin = values[0];
+  const p95 = values[Math.min(values.length - 1, Math.floor(values.length * 0.95))];
+  let yTop, ticks, y, cap = null;
+  const plotH = H - M.t - M.b;
+  if (yMode === "log") {
+    const lo = 10 ** Math.floor(Math.log10(Math.max(vmin, 0.1))), hi = 10 ** Math.ceil(Math.log10(vmax));
+    y = v => M.t + plotH * (1 - (Math.log10(v) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo)));
+    ticks = []; for (let d = lo; d <= hi; d *= 10) for (const m of [1, 2, 5]) if (d * m <= hi) ticks.push(d * m);
+    yTop = hi;
+  } else {
+    const limit = yMode === "capped" ? Math.min(vmax, p95 * 1.25) : vmax;
+    const step = niceStep(limit, 5); yTop = Math.ceil(limit / step) * step;
+    if (yMode === "capped" && vmax > yTop) cap = yTop;
+    y = v => M.t + plotH * (1 - Math.min(v, yTop) / yTop);
+    ticks = []; for (let v = 0; v <= yTop + 1e-9; v += step) ticks.push(+v.toFixed(6));
+  }
+  const span = Math.max(1, x1 - x0), plotW = W - M.l - M.r;
+  const x = d => M.l + plotW * (d - x0) / span;
+  const fmt = v => v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(0) : v.toFixed(v < 1 ? 1 : 0);
+  let out = `<defs><clipPath id="plot"><rect x="${M.l - 3}" y="${M.t - 1}" width="${plotW + 6}" height="${plotH + 4}"/></clipPath></defs>`;
+  for (const v of ticks) out += `<line class="grid" x1="${M.l}" x2="${W - M.r}" y1="${y(v)}" y2="${y(v)}"/>
+    <text class="axis" x="${M.l - 8}" y="${y(v) + 3.5}" text-anchor="end">${fmt(v)}${v === ticks.at(-1) ? " s" : ""}</text>`;
+  const every = Math.max(1, Math.ceil(span / Math.max(4, Math.floor(plotW / 64))));
+  for (let d = x0; d <= x1; d += every) out += `<text class="axis" x="${x(d)}" y="${H - 10}" text-anchor="middle">${dayLabel(d)}</text>`;
+  if (cap !== null) out += `<line class="capline" x1="${M.l}" x2="${W - M.r}" y1="${M.t}" y2="${M.t}"/>
+    <text class="caplabel" x="${M.l}" y="${M.t - 22}">powyżej ${fmt(cap)} s: ▲ z wartością</text>`;
+  const order = [...shown].sort((a, b) => (a.key === hot) - (b.key === hot));
+  out += `<g clip-path="url(#plot)">`;
+  for (const s of order) {
+    const dim = hot && s.key !== hot ? 0.13 : 1, width = (s.tier === "fast" ? 2.25 : 1.75) + (s.key === hot ? 0.75 : 0);
+    let d = "", prev = null;
+    for (const [day, v] of s.points) { d += `${prev !== null && day === prev + 1 ? "L" : "M"}${x(day).toFixed(1)},${y(v).toFixed(1)}`; prev = day; }
+    out += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${width}" opacity="${dim}" stroke-linejoin="round"
+      ${s.tier === "fast" ? 'stroke-dasharray="5 3"' : 'stroke-linecap="round"'} data-k="${s.key}"/>`;
+    for (const [day, v] of s.points) if (cap === null || v <= cap)
+      out += `<circle cx="${x(day).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${s.key === hot ? 2.6 : 1.8}" fill="${s.color}" opacity="${dim}" data-k="${s.key}" data-d="${day}" data-v="${v}"/>`;
+  }
+  out += `</g>`;
+  let clipped = 0;
+  if (cap !== null) for (const s of shown) for (const [day, v] of s.points) if (v > cap) {
+    clipped++;
+    const cx = x(day), dim = hot && s.key !== hot ? 0.25 : 1;
+    out += `<g opacity="${dim}"><path class="outlier" d="M${cx - 5},${M.t + 1} L${cx + 5},${M.t + 1} L${cx},${M.t - 7} Z" stroke="${s.color}" stroke-width="1.2"
+      data-k="${s.key}" data-d="${day}" data-v="${v}"/>
+      <text class="outlier-label" x="${cx}" y="${M.t - 11}" text-anchor="middle">${fmt(v)} s</text></g>`;
+  }
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.innerHTML = out;
+  foot.textContent = `${dayLabel(x0)} – ${dayLabel(x1)} · oś X od pierwszego dnia z danymi widocznych serii` +
+    (cap !== null ? ` · ${clipped} ${clipped === 1 ? "punkt powyżej skali" : "punkty powyżej skali"} (P95 = ${p95.toFixed(1)} s)` : "") +
+    (yMode === "full" ? " · pełna skala: jeden odstający punkt spłaszcza resztę" : "");
+}
+
+const tip = document.getElementById("tip");
+document.getElementById("svg").addEventListener("mousemove", e => {
+  const el = e.target.closest("[data-k]");
+  if (!el) { tip.style.display = "none"; if (hot && !e.buttons) { /* keep matrix hover */ } return; }
+  const s = byKey.get(el.dataset.k);
+  const box = document.getElementById("chart").getBoundingClientRect();
+  tip.innerHTML = `${s.model} · ${s.tier} · ${s.effort}` + (el.dataset.d ? `<br>${dayLabel(+el.dataset.d)} · <span class="v">${(+el.dataset.v).toFixed(1)} s</span>` : "");
+  tip.style.display = "block"; tip.style.left = (e.clientX - box.left + 12) + "px"; tip.style.top = (e.clientY - box.top + 12) + "px";
+  if (hot !== s.key) { hot = s.key; renderChart(); renderMatrix(); }
+});
+document.getElementById("svg").addEventListener("mouseleave", () => { tip.style.display = "none"; hot = null; renderChart(); renderMatrix(); });
+
+function render() { renderMatrix(); renderChart(); }
+window.addEventListener("resize", renderChart);
+render();
+</script>
+</body>
+</html>

@@ -110,6 +110,43 @@ export function firstTokenChartScale(values: readonly number[]): { max: number; 
   const step = [1, 2, 5, 10].map(n => n * power).find(n => n >= top / 5)!;
   return { max: Math.ceil(top / step) * step, step };
 }
+/** How the first-token axis treats slow turns: up to P95 with the rest marked above it, in decades, or every value. */
+export type SpeedYScale = "capped" | "log" | "full";
+export interface LatencyAxis { min: number; max: number; ticks: number[]; log: boolean }
+/** Values above the capped top are drawn as markers at the top edge instead of flattening every other line. */
+export const LATENCY_CAP_PERCENTILE = 0.95;
+export function latencyAxis(values: readonly number[], scale: SpeedYScale): LatencyAxis {
+  const sorted = values.filter(value => value > 0).sort((a, b) => a - b);
+  if (scale === "log" && sorted.length) {
+    const lo = 10 ** Math.floor(Math.log10(sorted[0]!)), top = 10 ** Math.ceil(Math.log10(sorted.at(-1)!));
+    const hi = top > lo ? top : lo * 10;
+    const ticks: number[] = [];
+    for (let decade = lo; decade < hi * 1.0001; decade *= 10) for (const n of [1, 2, 5]) if (decade * n <= hi * 1.0001) ticks.push(+(decade * n).toPrecision(3));
+    return { min: lo, max: hi, ticks, log: true };
+  }
+  const top = scale === "capped" && sorted.length
+    ? Math.min(sorted.at(-1)!, sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * LATENCY_CAP_PERCENTILE))]! * 1.25) : Math.max(0, ...values);
+  const { max, step } = firstTokenChartScale([top]);
+  return { min: 0, max, ticks: Array.from({ length: Math.floor(max / step + 1e-9) + 1 }, (_, i) => +(i * step).toPrecision(6)), log: false };
+}
+/**
+ * The whole history's axis starts after a long silent gap when only a few stray points come before it (a lone call
+ * months earlier would otherwise squeeze every line into the right edge). Returns the new first day and what it leaves out.
+ */
+export const STRAY_GAP_DAYS = 21, STRAY_GAP_SHARE = 0.3, STRAY_POINT_SHARE = 0.05;
+export function leadingStrays(days: readonly string[]): { from: string; earliest: string; count: number } | null {
+  const sorted = [...days].sort(), unique = [...new Set(sorted)];
+  if (unique.length < 3) return null;
+  const time = (day: string) => Date.parse(`${day}T00:00:00Z`);
+  const span = time(unique.at(-1)!) - time(unique[0]!);
+  for (let i = 0; i < unique.length - 1; i++) {
+    const before = sorted.filter(day => day <= unique[i]!).length;
+    if (before > sorted.length * STRAY_POINT_SHARE) return null;
+    const gap = time(unique[i + 1]!) - time(unique[i]!);
+    if (gap >= STRAY_GAP_DAYS * DAY_MS && gap >= span * STRAY_GAP_SHARE) return { from: unique[i + 1]!, earliest: unique[0]!, count: before };
+  }
+  return null;
+}
 /** Whether two consecutive drawn buckets are joined: gaps without traffic stay open. */
 export function joined(previousAt: string, at: string, grain: SpeedGrain): boolean {
   return Date.parse(`${at}T00:00:00Z`) - Date.parse(`${previousAt}T00:00:00Z`) <= bucketMs(grain) * GAP_BUCKETS;
@@ -210,9 +247,15 @@ function readAll(storage: Storage | null): Record<string, string[]> {
 export function readHiddenModels(account: string, storage: Storage | null = browserStorage()): Set<string> {
   return new Set(ownList(readAll(storage), account));
 }
-export function writeHiddenModels(account: string, hidden: ReadonlySet<string>, storage: Storage | null = browserStorage()): void {
+/** The stored choice of one subscription, or null when it has none (its chart then starts from the default selection). */
+export function storedHiddenModels(account: string, storage: Storage | null = browserStorage()): Set<string> | null {
+  const record = readAll(storage);
+  return Object.prototype.hasOwnProperty.call(record, account) ? new Set(record[account]) : null;
+}
+/** `keepEmpty` stores "nothing hidden" explicitly, where forgetting the choice would bring a default selection back. */
+export function writeHiddenModels(account: string, hidden: ReadonlySet<string>, storage: Storage | null = browserStorage(), keepEmpty = false): void {
   try {
-    storage?.setItem(HIDDEN_MODELS_KEY, JSON.stringify(withList(readAll(storage), account, hidden.size ? [...hidden].sort() : null)));
+    storage?.setItem(HIDDEN_MODELS_KEY, JSON.stringify(withList(readAll(storage), account, hidden.size ? [...hidden].sort() : keepEmpty ? [] : null)));
   } catch { /* The choice still applies for this visit. */ }
 }
 

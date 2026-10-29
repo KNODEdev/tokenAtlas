@@ -91,8 +91,9 @@ test("first-token columns show seconds, turn coverage and a dash for unverified 
     expect(dom.host.textContent).toContain("5.6 s");
   } finally { await act(async () => root.unmount()); read.mockRestore(); dom.restore(); }
 });
-const toggles = (host: TestNode, label: string) => nodes(host).filter(node => node.tagName === "BUTTON" && node.className.includes("speed-toggle")
-  && node.textContent === label);
+/** The matrix cell (named by its label) and the table name of one series, in that order. */
+const toggles = (host: TestNode, label: string) => nodes(host).filter(node => node.tagName === "BUTTON"
+  && (node.className.includes("speed-toggle") && node.textContent === label || node.className.includes("speed-cell") && node.attributes["aria-label"] === label));
 function withStorage(storage: unknown): () => void {
   const previous = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
@@ -163,26 +164,54 @@ test("a model hides from the legend or the table, on the chart only, and stays h
   } finally { await act(async () => root.unmount()); read.mockRestore(); restoreStorage(); dom.restore(); }
 });
 
-test("a vendor's models past its sixth shade are dashed on the chart and in the legend alike", async () => {
+test("fast series are dashed and deeper effort is darker, on the chart and in the matrix alike", async () => {
   setLanguage("en"); bustApiMemo();
   const dom = installTestDom(), root = createRoot(dom.host as unknown as Element);
-  // Eight OpenAI models with falling call counts: the seventh and eighth reuse the first two shades, dashed.
-  const many = { ...RESPONSE, models: Array.from({ length: 8 }, (_, i) => model(`gpt-m${i + 1}`, [point("2026-10-05", 100 - i, 4000, 100_000)])) };
-  const read = spyOn(api, "modelSpeed").mockResolvedValue(many);
+  const variant = (speed: string, effort: string, calls: number) => ({ ...model("gpt-6.1-sol", [point("2026-10-05", calls, 4000, 100_000)]), speed, effort });
+  const read = spyOn(api, "modelSpeed").mockResolvedValue({ ...RESPONSE, models: [variant("standard", "high", 90), variant("standard", "max", 80), variant("fast", "high", 70)] });
   try {
     await act(async () => root.render(<Speed {...props("codex1", "codex")} />));
     await flushUntil(() => dom.host.textContent.includes("Per model"));
-    const dashOf = (tag: string, label: string) => {
-      const toggle = toggles(dom.host, label)[0]!;
-      return nodes(toggle).find(node => node.tagName === tag.toUpperCase())?.attributes["stroke-dasharray"];
-    };
-    expect(dashOf("line", "gpt-m1")).toBeUndefined();
-    expect(dashOf("line", "gpt-m7")).toBe("6 4");
+    const cellLine = (label: string) => nodes(toggles(dom.host, label)[0]!).find(node => node.tagName === "LINE")!;
+    expect(cellLine("gpt-6.1-sol · standard · high").attributes["stroke-dasharray"]).toBeUndefined();
+    expect(cellLine("gpt-6.1-sol · fast · high").attributes["stroke-dasharray"]).toBe("5 3");
     const paths = nodes(dom.host).filter(node => node.tagName === "PATH");
-    expect(paths.map(node => node.attributes["stroke-dasharray"] ?? "")).toEqual([...Array(6).fill(""), "6 4", "6 4"]);
+    expect(paths.map(node => node.attributes["stroke-dasharray"] ?? "")).toEqual(["", "", "5 3"]);
     expect(paths[0]!.attributes.stroke).toBe("var(--codex)");
-    expect(paths[6]!.attributes.stroke).toBe(paths[0]!.attributes.stroke);
+    expect(paths[1]!.attributes.stroke).toContain("calc(l - 0.16)");
+    // The fast mode has its own section of the matrix.
+    expect(dom.host.textContent).toContain("⚡ fast 1 models · 1 series");
   } finally { await act(async () => root.unmount()); read.mockRestore(); dom.restore(); }
+});
+
+test("many series start as the busiest standard ones plus every fast one, and show all is remembered", async () => {
+  setLanguage("en"); bustApiMemo();
+  const values = new Map<string, string>();
+  const restoreStorage = withStorage({ getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } });
+  const dom = installTestDom();
+  const efforts = ["low", "medium", "high", "xhigh", "max"];
+  const models = ["gpt-6.1-sol", "gpt-6-astra", "gpt-6-luna"].flatMap((name, m) => efforts.map((effort, e) =>
+    ({ ...model(name, [point("2026-10-05", 100 - m * 10 - e, 4000, 100_000)]), speed: "standard", effort })));
+  models.push({ ...model("gpt-6.1-terra", [point("2026-10-05", 5, 4000, 100_000)]), speed: "fast", effort: "high" });
+  const read = spyOn(api, "modelSpeed").mockResolvedValue({ ...RESPONSE, models });
+  let root = createRoot(dom.host as unknown as Element);
+  try {
+    await act(async () => root.render(<Speed {...props("codex1", "codex")} />));
+    await flushUntil(() => dom.host.textContent.includes("Per model"));
+    expect(dom.host.textContent).toContain("9 of 16 series on the chart");
+    expect(toggles(dom.host, "gpt-6.1-terra · fast · high")[0]!.attributes["aria-pressed"]).toBe("true");
+    expect(toggles(dom.host, "gpt-6-luna · standard · max")[0]!.attributes["aria-pressed"]).toBe("false");
+    await invoke(nodes(dom.host).find(node => node.tagName === "BUTTON" && node.textContent === "show all")!, "onClick");
+    expect(JSON.parse(values.get(HIDDEN_MODELS_KEY)!)).toEqual({ codex1: [] });
+    await act(async () => root.unmount());
+    root = createRoot(dom.host as unknown as Element);
+    await act(async () => root.render(<Speed {...props("codex1", "codex")} />));
+    await flushUntil(() => dom.host.textContent.includes("Per model"));
+    expect(dom.host.textContent).toContain("16 of 16 series on the chart");
+    // A column head toggles that effort in every model.
+    await invoke(nodes(dom.host).find(node => node.tagName === "BUTTON" && node.className.includes("speed-matrix-head") && node.textContent === "max")!, "onClick");
+    expect(dom.host.textContent).toContain("13 of 16 series on the chart");
+  } finally { await act(async () => root.unmount()); read.mockRestore(); restoreStorage(); dom.restore(); }
 });
 
 test("hiding works for the visit when storage throws, and show all brings every model back", async () => {
@@ -231,7 +260,12 @@ const ANSWERS: Record<string, ModelSpeedResponse["models"]> = {
   "claude-a": [model("claude-opus-5", [point("2026-10-05", 60, 48_000, 600_000)]), model("<synthetic>", [point("2026-10-05", 9, 0, 9)])],
 };
 const allProps = () => ({ ...props(ALL_ACCOUNT, "all"), cards: CARDS });
-const rowNames = (host: TestNode) => nodes(host).filter(node => node.tagName === "TR").slice(1)
+/** Rows of the per-model table; the matrix legend's rows are left out. */
+const tableRows = (host: TestNode) => {
+  const legend = new Set(nodes(host).filter(node => node.className.includes("speed-matrix")).flatMap(nodes));
+  return nodes(host).filter(node => node.tagName === "TR" && !legend.has(node));
+};
+const rowNames = (host: TestNode) => tableRows(host).slice(1)
   .map(row => row.children.slice(0, 3).map(cell => cell.textContent).join(" | "));
 function mockAll(fail: string[] = []) {
   return spyOn(api, "modelSpeed").mockImplementation(async ({ account }) => {
@@ -253,7 +287,7 @@ test("All merges each model across the eligible subscriptions as a ratio of sums
     expect(rowNames(dom.host)).toEqual(["gpt-5.6-sol | codex1@example.test, codex2@example.test | 130",
       "claude-opus-5 | claude-a@example.test | 60", "gpt-6-luna | codex2@example.test | 50"]);
     // 76,000 tokens in 1,300 s: 58.5 tok/s, where the average of the two subscriptions' speeds would be 55.
-    const merged = nodes(dom.host).filter(node => node.tagName === "TR")[1]!;
+    const merged = tableRows(dom.host)[1]!;
     expect(merged.children.slice(4, 6).map(cell => cell.textContent)).toEqual(["58.5", "58.5"]);
     expect(dom.host.textContent).toContain("Subscriptions and models · 3 of 4");
     expect(dom.host.textContent).not.toContain("<synthetic>");
