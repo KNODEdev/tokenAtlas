@@ -186,6 +186,7 @@ export const DIRECT_DATA_ROUTES:Readonly<Record<string,string>>={
   "/api/codex-ledger-settings":"configuration of the shared Codex price ledger",
   "/api/setup":"configuration and local source discovery",
   "/api/setup/database":"explicit local database relocation and its status",
+  "/api/setup/archive-move":"explicit archive copy, verification and switch, and its progress",
   "/api/setup/directory":"user-invoked native directory picker",
   "/api/setup/confirm":"explicit first-run confirmation of the folders; releases a fresh database's first import",
   "/api/setup/temporary":"explicit local temporary directory configuration",
