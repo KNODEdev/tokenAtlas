@@ -142,22 +142,32 @@ test("a known zero payment needs no exchange rate", () => {
   expect(usdEquivalent(100, "EUR", "2026-09-01").usd).toBeNull();
 });
 
-test("after a declared end, readings of the same plan infer cycles until a cycle has no evidence (§3, §12.1)", () => {
+test("after a declared end, readings of the same plan add no cycles: the end is the owner's (29.10)", () => {
   const rows = [declared("max-20x", "2026-08-03", "2026-09-03", { amountMinor: 18000, currency: "EUR" }),
-    // Readings from before the end on: cut at the declared end (22.09 rule), still evidence afterwards.
+    // Readings from before the end on are cut at the declared end (22.09 rule).
     observed("max-20x", "2026-08-20T00:00:00Z", null, "2026-10-10T00:00:00Z")];
   const cycles = deriveBillingCycles(rows, [], { now: at("2026-12-01T00:00:00Z"), price });
   expect(brief(cycles)).toEqual([
     ["2026-08-03T00:00", "2026-09-03T00:00", "max-20x", "declared", 18000, "EUR", "declared", false, false],
-    // An inferred continuation repeats the last full-cycle payment (18.10).
-    ["2026-09-03T00:00", "2026-10-03T00:00", "max-20x", "inferred", 18000, "EUR", "repeated", false, false],
-    // Evidence up to 10.10 lies inside [04.10 00:00, 03.11): this cycle is inferred too.
-    ["2026-10-03T00:00", "2026-11-03T00:00", "max-20x", "inferred", 18000, "EUR", "repeated", false, false],
   ]);
-  // Without a payment to repeat, an inferred cycle takes the catalog price.
-  const unpaid = deriveBillingCycles([rows[0]!, ...rows.slice(1)].map((row) => row.origin === "declared" ? { ...row, amountMinor: null, currency: null } : row), [],
-    { now: at("2026-12-01T00:00:00Z"), price });
-  expect(brief(unpaid).slice(1).map((row) => row.slice(4, 7))).toEqual([[20000, "USD", "inferred"], [20000, "USD", "inferred"]]);
+});
+
+test("a stretch between two declarations stays a gap whatever readings show (29.10)", () => {
+  // codex1: the owner's 16.08-16.09, 16.09-16.10 and 21.10-21.11 with readings of Pro throughout.
+  const between = [declared("pro", "2026-08-16", "2026-09-16"), declared("pro", "2026-09-16", "2026-10-16"), declared("pro", "2026-10-21T17:30:00Z", "2026-11-21T17:30:00Z"),
+    observed("pro", "2026-09-09T15:11:32.698Z", null, "2026-10-29T16:00:00Z")];
+  expect(brief(deriveBillingCycles(between, [], { now: at("2026-10-29T16:00:00Z"), price })).map((row) => row.slice(0, 4))).toEqual([
+    ["2026-08-16T00:00", "2026-09-16T00:00", "pro", "declared"],
+    ["2026-09-16T00:00", "2026-10-16T00:00", "pro", "declared"],
+    ["2026-10-21T17:30", "2026-11-21T17:30", "pro", "declared"],
+  ]);
+  // Readings that start inside the gap do not fill it either.
+  const inside = [declared("plus", "2026-08-19T18:15:05Z", "2026-09-09T15:11:32.717Z"), declared("plus", "2026-10-06", null),
+    observed("plus", "2026-09-09T15:11:32.717Z", "2026-10-19T17:28:13.435Z")];
+  expect(brief(deriveBillingCycles(inside, [], { now: at("2026-10-29T16:00:00Z"), price })).map((row) => row.slice(0, 4))).toEqual([
+    ["2026-08-19T18:15", "2026-09-09T15:11", "plus", "declared"],
+    ["2026-10-06T00:00", "2026-11-06T00:00", "plus", "declared"],
+  ]);
 });
 
 test("evidence inside the first 24 h of a cycle does not infer it", () => {
@@ -166,7 +176,7 @@ test("evidence inside the first 24 h of a cycle does not infer it", () => {
   expect(deriveBillingCycles(rows, [], { now: at("2026-10-01T00:00:00Z"), price }).map((c) => c.basis)).toEqual(["declared", "observed"]);
 });
 
-test("a no-subscription row blocks the inference; readings inside declarations are not evidence", () => {
+test("a no-subscription row blocks readings; readings inside declarations add no cycles", () => {
   const blocked = [declared("max-20x", "2026-08-03", "2026-09-03"), declared("none", "2026-09-03", null),
     observed("max-20x", "2026-08-20T00:00:00Z", null, "2026-10-10T00:00:00Z")];
   expect(deriveBillingCycles(blocked, [], { now: at("2026-12-01T00:00:00Z"), price }).map((c) => c.basis)).toEqual(["declared"]);
@@ -209,20 +219,29 @@ test("an observed run is anchored at the first limit window carrying its plan, n
   expect(iso(deriveBillingCycles(rows, broken, { now: at("2026-10-08T14:30:00Z"), price })[0]!.start)).toBe("2026-09-08T21:06:19.000Z");
 });
 
-test("readings of another plan end an inferred chain where they start", () => {
+test("after a declared end, readings of another plan are a run of their own", () => {
   const rows = [declared("pro", "2026-08-01", "2026-09-01"), observed("pro", "2026-08-20T00:00:00Z", "2026-09-20T00:00:00Z"),
     observed("max-5x", "2026-09-20T00:00:00Z", null, "2026-10-15T00:00:00Z")];
   const cycles = deriveBillingCycles(rows, [], { now: at("2026-10-15T00:00:00Z"), price });
   expect(brief(cycles).map((row) => row.slice(0, 4))).toEqual([
     ["2026-08-01T00:00", "2026-09-01T00:00", "pro", "declared"],
-    ["2026-09-01T00:00", "2026-09-20T00:00", "pro", "inferred"],
     ["2026-09-20T00:00", "2026-10-20T00:00", "max-5x", "observed"],
   ]);
 });
 
-test("within its first day a continued cycle is kept on readings since its start; a day later the strict rule holds", () => {
-  const rows = [declared("pro", "2026-08-03", "2026-09-03"), observed("pro", "2026-08-20T00:00:00Z", null, "2026-09-03T10:00:00Z")];
-  expect(deriveBillingCycles(rows, [], { now: at("2026-09-03T12:00:00Z"), price }).map((c) => c.basis)).toEqual(["declared", "inferred"]);
-  // The readings stopped at 10:00 on the first day: once the day has passed the cycle has no evidence, so it is not inferred.
-  expect(deriveBillingCycles(rows, [], { now: at("2026-09-05T00:00:00Z"), price }).map((c) => c.basis)).toEqual(["declared"]);
+test("one plan at a time: a later reading of another plan ends an open declared plan (29.10)", () => {
+  // Claude B on 24.10: Max 20x until the morning, then "pro" declared without an end, then readings of 20x again.
+  const rows = [declared("max-20x", "2026-09-24T09:55:57.164Z", "2026-10-24T09:55:57.164Z", { amountMinor: 11378, currency: "EUR" }),
+    declared("pro", "2026-10-24T12:47:00Z", null),
+    observed("default_claude_ai", "2026-10-24T12:55:18Z", "2026-10-24T14:06:34.705Z"),
+    observed("max-20x", "2026-10-24T14:16:34.923Z", null, "2026-10-29T07:03:58Z")];
+  const cycles = brief(deriveBillingCycles(rows, [], { now: at("2026-10-29T08:00:00Z"), price })).map((row) => row.slice(0, 4));
+  expect(cycles).toEqual([
+    ["2026-09-24T09:55", "2026-10-24T09:55", "max-20x", "declared"],
+    ["2026-10-24T12:47", "2026-10-24T14:16", "pro", "declared"],
+    ["2026-10-24T14:16", "2026-11-24T14:16", "max-20x", "observed"],
+  ]);
+  // A reading of the same plan (in its provider spelling) does not end the declaration.
+  expect(brief(deriveBillingCycles(rows.slice(1, 3), [], { now: at("2026-10-29T08:00:00Z"), price })).map((row) => [row[2], row[3], row[1]]))
+    .toEqual([["pro", "declared", "2026-11-24T12:47"]]);
 });

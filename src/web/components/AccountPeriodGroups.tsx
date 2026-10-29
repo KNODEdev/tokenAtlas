@@ -9,7 +9,7 @@ import { useFillHeight } from "../lib/useFillHeight";
 import type { TimelineRow } from "./AccountPeriodsSettings";
 import { AccountHistoryTimeline, effectivePlanRows, planBreaks, planName, planSegments, PlanStrip, type DetailTab, type PeriodShift, type PlanPeriodSelection } from "./AccountHistoryTimeline";
 import { canonicalPeriodPlan, respectDeclaredEnds } from "../../shared/period-end";
-import type { BillingCycle, BillingCyclesAccount } from "../../shared/billing-cycles";
+import type { BillingCycle, BillingCyclesAccount, BillingCyclesPending } from "../../shared/billing-cycles";
 
 /** Provider spellings mapped to the catalog; unknown labels remain visible. */
 export const planDisplay = canonicalPeriodPlan;
@@ -159,7 +159,18 @@ export interface SectionRequest { key: string; seq: number }
 /** Accounts without a plan listed per provider before the rest of them fold. */
 const NO_PLAN_SHOWN = 2;
 
-export function AccountPeriodGroups({ accounts, timelines, plans, providers, providerLabel, renderSources, onPlanPeriod, onSourcePeriod, addPlan, editing, focus = null, priceCoverage, onPriceGap, selectAccount = null, accountSections, requestedSection = null, allAccountsSections, billingCycles, billingPending = null, onCycle }: {
+/**
+ * The server's reason the account's cycles are stale, over its aliases: one that moves dates over figures only, then
+ * the earliest start (a start-less change reaches every cycle).
+ */
+function serverPending(entries: readonly BillingCyclesAccount[]): BillingCyclesPending | null {
+  const moves = (pending: BillingCyclesPending) => pending.reason !== "figures";
+  const at = (pending: BillingCyclesPending) => pending.from === null ? -Infinity : Date.parse(pending.from);
+  return entries.filter((entry) => entry.stale).map((entry) => entry.pending).filter((pending): pending is BillingCyclesPending => !!pending)
+    .sort((a, b) => Number(moves(b)) - Number(moves(a)) || at(a) - at(b))[0] ?? null;
+}
+
+export function AccountPeriodGroups({ accounts, timelines, plans, providers, providerLabel, renderSources, onPlanPeriod, onSourcePeriod, addPlan, editing, focus = null, priceCoverage, onPriceGap, selectAccount = null, accountSections, requestedSection = null, allAccountsSections, billingCycles, billingPending = null, onCycle, onRemovePlan }: {
   accounts: AccountPeriodsView["accounts"]; timelines: SourceTimeline[]; plans: PlanPeriodRow[]; providers: string[];
   providerLabel: (provider: string) => string;
   renderSources: (timelines: SourceTimeline[], unknown?: boolean) => ReactNode;
@@ -184,7 +195,9 @@ export function AccountPeriodGroups({ accounts, timelines, plans, providers, pro
   billingCycles?: BillingCyclesAccount[] | null;
   /** The account and start a save has just sent to the billing producer; its later cycles show as being recalculated. */
   billingPending?: { provider: string; account: string; from: string } | null;
-  onCycle?: (account: { provider: string; account: string; aliases: string[] }, cycle: BillingCycle, confirm?: boolean) => void;
+  onCycle?: (account: { provider: string; account: string; aliases: string[] }, cycle: BillingCycle) => void;
+  /** Opens one declared plan period with its removal to confirm. */
+  onRemovePlan?: (selection: PlanPeriodSelection) => void;
 }) {
   const { t } = useI18n();
   const [now] = useState(Date.now);
@@ -325,16 +338,16 @@ export function AccountPeriodGroups({ accounts, timelines, plans, providers, pro
       </Facts>
       <AccountHistoryTimeline key={group.key} plans={group.plans} timelines={group.timelines}
         provider={group.provider} account={group.account} aliases={group.aliases}
-        onPlanPeriod={onPlanPeriod} onSourcePeriod={onSourcePeriod} editing={editing}
+        onPlanPeriod={onPlanPeriod} onSourcePeriod={onSourcePeriod} editing={editing} {...(onRemovePlan ? { onRemovePlan } : {})}
         sections={spec?.tabs} {...switcher}
         {...(priceCoverage ? { priceGaps: unpriced } : {})}
         {...(billingCycles && onCycle ? { cycles, cyclesStale: owned.some((entry) => entry.stale) || pendingHere,
-          cyclesPendingFrom: pendingHere ? billingPending!.from : null,
+          cyclesPendingFrom: pendingHere ? billingPending!.from : null, cyclesPending: serverPending(owned),
           // The cycle's own id among the account's aliases (stored lower-case).
-          onCycle: (cycle: BillingCycle, confirm?: boolean) => {
+          onCycle: (cycle: BillingCycle) => {
             const id = owned.find((entry) => entry.cycles.includes(cycle))?.account;
             const account = group.aliases.find((alias) => alias.toLowerCase() === id) ?? group.account;
-            onCycle({ provider: group.provider, account, aliases: group.aliases }, cycle, confirm);
+            onCycle({ provider: group.provider, account, aliases: group.aliases }, cycle);
           } } : {})} />
       {spec?.note}
     </section>;

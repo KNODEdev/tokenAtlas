@@ -15,7 +15,7 @@ import { subscriptionRate, type RateWindow, type SubscriptionRateResponse } from
 import { PROVIDER_RESETS } from "../shared/provider-resets";
 import { CODEX_PROMOTIONS } from "../shared/codex-promotions";
 import { currentVendor, type CurrentConfig } from "./current/registry";
-import { periodInstant, effectiveDatedPeriods } from "./account-periods";
+import { periodInstant, effectivePlanPeriods } from "./account-periods";
 import type { RateCard } from "./pricing";
 import type { WindowCycleSums, WindowRailSums } from "./window-usage-contracts";
 import { parseCounter } from "./main-counter";
@@ -49,7 +49,7 @@ export function rateRuleStart(db: Database, w: LimitWindowRow, catalog: PlansCat
   if (match?.kind === "ok") for (const v of match.plan.versions) {
     if (v.from && Date.parse(v.from) < Date.parse(w.end_ts) && Date.parse(v.from) >= Date.parse(candidates[0]!)) candidates.push(v.from);
   }
-  const periods=effectiveDatedPeriods(prepared?.periods ?? loadPeriods(db,PLAN_PERIODS)).filter(p=>p.provider===w.provider && p.subject===w.account)
+  const periods=effectivePlanPeriods(prepared?.periods ?? loadPeriods(db,PLAN_PERIODS)).filter(p=>p.provider===w.provider && p.subject===w.account)
     .sort((a,b)=>periodInstant(a.from,"from")-periodInstant(b.from,"from"));
   // A first observed plan dates the evidence, not an invented mid-window plan change.
   for (let i=1;i<periods.length;i++) {

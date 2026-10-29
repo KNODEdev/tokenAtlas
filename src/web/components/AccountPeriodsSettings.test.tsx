@@ -388,11 +388,11 @@ describe("AccountPeriodsSettings", () => {
     const save = spyOn(api, "savePeriodEdit").mockRejectedValue(new ApiError("Deklaracje zmieniły się. Odśwież dane.", 409));
     try {
       await selectHistoricalPlan(rendered.host);
-      await invoke(button(rendered.host, "Usuń korektę"), "onClick");
+      await invoke(button(formOf(rendered.host), "Usuń"), "onClick");
       await invoke(button(rendered.host, "Usuń ten okres"), "onClick");
       await flushUntil(() => save.mock.calls.length > 0);
       expect(save.mock.calls[0]?.[0]).toEqual({ revision: "rev-1", kind: "plan", replace: { account: "claude-2", from: "2026-02-28" }, row: null });
-      await invoke(button(rendered.host, "Zachowaj korektę"), "onClick");
+      await invoke(button(formOf(rendered.host), "Anuluj"), "onClick");
       const form = formOf(rendered.host);
       await invoke(button(form, "Podgląd"), "onClick");
       await flushUntil(() => !button(form, "Zapisz").hasAttribute("disabled"));
@@ -582,7 +582,7 @@ describe("AccountPeriodsSettings", () => {
       const table = nodes(rendered.host).find((node) => node.tagName === "TABLE" && node.attributes["aria-label"] === "Abonament")!;
       const rows = nodes(table).filter((node) => node.tagName === "TR").slice(1);
       // Without billing cycles (this view reads none) the per-cycle price is unknown and the total is the declared payment.
-      expect(rows.map((row) => row.textContent)).toEqual(["Max · ×20×202026-02-28 00:002026-03-28 00:0028—101,81 €Twój wpis"]);
+      expect(rows.map((row) => row.textContent)).toEqual(["Max · ×20×202026-02-28 00:002026-03-28 00:0028—101,81 €Twój wpis✎Usuń"]);
       await invoke(rows[0]!, "onClick");
       expect(labelled(formOf(rendered.host), "Do").value).toBe("2026-03-28T00:00");
     } finally { await cleanup(rendered); }
@@ -786,75 +786,110 @@ describe("AccountPeriodsSettings", () => {
       to_date: null, projection: null, per_window_point: 0.2262, unmetered: null, others: [], flags: ["capacity_uncalibrated"],
       run: { from: row.start, anchor: row.start, until: null }, declared_from: null, ...row,
     });
+    // The declared 28.02-28.03 period and a cycle from readings after it (no declaration covers it).
     const cycles: BillingCyclesView = { accounts: [{ provider: "claude", account: "claude-2", counter: "weekly_all", stale: false, cycles: [
       cycle({ start: "2026-02-28T00:00:00.000Z", end: "2026-03-28T00:00:00.000Z", declared_from: "2026-02-28" }),
-      cycle({ start: "2026-03-28T00:00:00.000Z", end: "2026-04-28T00:00:00.000Z", basis: "inferred", used_pp: null, used_pct: null,
-        price: { amount: 200, currency: "USD", source: "inferred" }, per_window_point: null, run: { from: "2026-02-28T00:00:00.000Z", anchor: "2026-02-28T00:00:00.000Z", until: null } }),
+      cycle({ start: "2026-03-28T00:00:00.000Z", end: "2026-04-28T00:00:00.000Z", basis: "observed", anchor_uncertain: true, used_pp: null, used_pct: null,
+        price: { amount: 200, currency: "USD", source: "catalog" }, per_window_point: null, run: { from: "2026-03-28T00:00:00.000Z", anchor: "2026-03-28T00:00:00.000Z", until: null } }),
     ] }] };
     const subscriptionRows = (host: TestNode) => nodes(nodes(host).find((node) => node.tagName === "TABLE" && node.attributes["aria-label"] === "Abonament")!)
       .filter((node) => node.tagName === "TR").slice(1);
-    /** The cycles listed under their plan row. */
+    /** The rows that carry a cycle (a period of one cycle carries it on its own row). */
     const cycleRows = (host: TestNode) => subscriptionRows(host).filter((row) => row.attributes["data-cycle-row"]);
+    const tier = { label: "Max 20x", multiplier: 20 };
+    const labelledButton = (host: TestNode, label: string) => {
+      const found = nodes(host).find((node) => node.tagName === "BUTTON" && node.attributes["aria-label"] === label);
+      if (!found) throw new Error("Missing button: " + label);
+      return found;
+    };
 
-    test("the plan lane marks each cycle with its price and use, and the fold lists them with Potwierdź for an inferred one", async () => {
+    test("the plan lane marks each cycle with its price and use; no row offers to confirm a guessed cycle", async () => {
       const rendered = await render(fixture(), "all", [], undefined, undefined, cycles);
       try {
         await selectAccount(rendered.host, "account_0002@example.test");
         await invoke(button(rendered.host, "Cała historia"), "onClick");
-        await flushUntil(() => rendered.host.textContent.includes("Abonament1"));
-        await invoke(button(rendered.host, "Abonament1"), "onClick");
+        await flushUntil(() => rendered.host.textContent.includes("Abonament2"));
+        await invoke(button(rendered.host, "Abonament2"), "onClick");
         const marks = nodes(rendered.host).filter((node) => node.className.startsWith("account-history-cycle "));
         expect(marks.map((node) => [node.className, node.textContent])).toEqual([
           ["account-history-cycle is-declared", "101,81 € · 60%"],
-          ["account-history-cycle is-inferred", "? Max · ×20 $200"],
+          ["account-history-cycle is-observed is-uncertain", "≈$200"],
         ]);
         expect(cycleRows(rendered.host).map((row) => row.textContent)).toEqual([
-          "cykl ?2026-03-28 00:002026-04-28 00:0031$200 kat.$2004,50—6526 / ——przyjęte z odczytów✎Potwierdź",
-          "cykl2026-02-28 00:002026-03-28 00:0028101,81 €$118,504,5060 %6526 / —$0,26Twój wpis✎",
+          "Max · ×20 ≈—2026-03-28 00:002026-04-28 00:0031$200 kat.$2004,50—6526 / ——z odczytów✎",
+          "Max · ×20×202026-02-28 00:002026-03-28 00:0028101,81 €$118,504,5060 %6526 / —$0,26Twój wpis✎Usuń",
         ]);
         // The rate behind the dollars stays in the tooltip.
         expect(cycleRows(rendered.host)[1]!.children[6]!.attributes.title).toBe("Dowód płatności · NBP 041/A/NBP/2026 2026-02-27: EUR 4,2000 PLN · USD 3,6084 PLN");
-        expect(rendered.host.textContent).toContain("? przyjęte z odczytów");
+        expect(rendered.host.textContent).not.toContain("Potwierdź");
       } finally { await cleanup(rendered); }
     });
 
-    test("the plans table takes its prices from the cycles: the latest cycle's price and the payments in USD; the editor shows the dollars", async () => {
+    test("the period row shows its one cycle's price; the editor shows the dollars", async () => {
       const rendered = await render(fixture(), "all", [], undefined, undefined, cycles);
       try {
         await selectAccount(rendered.host, "account_0002@example.test");
         await invoke(button(rendered.host, "Cała historia"), "onClick");
-        await flushUntil(() => rendered.host.textContent.includes("Abonament1"));
-        const table = nodes(rendered.host).find((node) => node.tagName === "TABLE" && node.attributes["aria-label"] === "Abonament")!;
-        const row = nodes(table).filter((node) => node.tagName === "TR")[1]!;
-        // The plan reads to its last cycle's end; per cycle as paid, the total in USD (the inferred catalog cycle is not a payment).
-        expect(row.textContent).toBe("▾Max · ×20×202026-02-28 00:002026-04-28 00:0059101,81 €$118,50Twój wpis");
-        expect(row.children[6]!.attributes.title).toBe("101,81 € · 1 cykl · kurs NBP każdej płatności");
+        await flushUntil(() => rendered.host.textContent.includes("Abonament2"));
+        const row = subscriptionRows(rendered.host)[1]!;
+        expect(row.textContent).toBe("Max · ×20×202026-02-28 00:002026-03-28 00:0028101,81 €$118,504,5060 %6526 / —$0,26Twój wpis✎Usuń");
         await invoke(row, "onClick");
         expect(formOf(rendered.host).textContent).toContain("≈ $118,50 · NBP 2026-02-27");
         expect(labelled(formOf(rendered.host), "Waluta").value).toBe("EUR");
       } finally { await cleanup(rendered); }
     });
 
-    test("one plan row holds its cycles: a declared period without a cycle yet ends the plan, and ▾ folds the cycles away", async () => {
+    test("each declared period is one row with exactly its dates; ✎ opens that period and Usuń asks to remove exactly it", async () => {
       const data = fixture();
-      const tier = { label: "Max 20x", multiplier: 20 };
       data.planPeriods.push(
         plan({ id: 21, account: "claude-2", plan: "max-20x", from: "2026-03-28", until: "2026-04-28", origin: "declared", readings: 0, tier }),
         plan({ id: 22, account: "claude-2", plan: "max-20x", from: "2026-04-28", until: "2026-05-28", origin: "declared", amountMinor: 18000, currency: "EUR", readings: 0, tier }));
-      const rendered = await render(data, "all", [], undefined, undefined, cycles);
+      const view: BillingCyclesView = { accounts: [{ ...cycles.accounts[0]!, cycles: [cycles.accounts[0]!.cycles[0]!,
+        cycle({ start: "2026-03-28T00:00:00.000Z", end: "2026-04-28T00:00:00.000Z", declared_from: "2026-03-28",
+          price: { amount: 101.81, currency: "EUR", source: "repeated", usd: 118.5, fx: cycles.accounts[0]!.cycles[0]!.price.fx } })] }] };
+      const rendered = await render(data, "all", [], undefined, undefined, view);
+      const save = spyOn(api, "savePeriodEdit").mockResolvedValue({ preview: emptyPreview(), applied: true, view: fixture({ revision: "rev-2" }) });
       try {
         await selectAccount(rendered.host, "account_0002@example.test");
         await invoke(button(rendered.host, "Cała historia"), "onClick");
-        await flushUntil(() => rendered.host.textContent.includes("Abonament1"));
+        await flushUntil(() => rendered.host.textContent.includes("Abonament3"));
         expect(subscriptionRows(rendered.host).map((row) => [row.className, row.children[0]!.textContent, row.children[2]!.textContent, row.children[3]!.textContent])).toEqual([
-          ["is-plan", "▾Max · ×20", "2026-02-28 00:00", "2026-05-28 00:00"],
-          ["is-cycle", "cykl · w przeliczeniu", "2026-04-28 00:00", "2026-05-28 00:00"],
-          ["is-cycle", "cykl ?", "2026-03-28 00:00", "2026-04-28 00:00"],
-          ["is-cycle", "cykl", "2026-02-28 00:00", "2026-03-28 00:00"],
+          ["is-plan", "Max · ×20", "2026-04-28 00:00", "2026-05-28 00:00"],
+          ["is-plan", "Max · ×20", "2026-03-28 00:00", "2026-04-28 00:00"],
+          ["is-plan", "Max · ×20", "2026-02-28 00:00", "2026-03-28 00:00"],
         ]);
-        expect(subscriptionRows(rendered.host)[1]!.children[5]!.textContent).toBe("180 €");
-        await invoke(button(rendered.host, "▾"), "onClick");
-        expect(subscriptionRows(rendered.host).map((row) => row.className)).toEqual(["is-plan"]);
+        expect(subscriptionRows(rendered.host)[0]!.children[6]!.textContent).toBe("180 €");
+        await invoke(bar(rendered.host, "Max · ×20 2026-03-28 00:00 – 2026-04-28 00:00"), "onClick");
+        expect(labelled(formOf(rendered.host), "Od").value).toBe("2026-03-28T00:00");
+        expect(labelled(formOf(rendered.host), "Do").value).toBe("2026-04-28T00:00");
+        // Edit mode lists the periods alone: the cycles wait until Gotowe.
+        expect(cycleRows(rendered.host)).toHaveLength(0);
+        await invoke(button(formOf(rendered.host), "Anuluj"), "onClick");
+        await invoke(labelledButton(rendered.host, "Usuń: Max · ×20 2026-04-28 00:00 – 2026-05-28 00:00"), "onClick");
+        expect(formOf(rendered.host).textContent).toContain("Usunąć ten okres?");
+        await invoke(button(rendered.host, "Usuń ten okres"), "onClick");
+        await flushUntil(() => save.mock.calls.length > 0);
+        expect(save.mock.calls[0]?.[0]).toMatchObject({ kind: "plan", replace: { account: "claude-2", from: "2026-04-28" }, row: null });
+        await invoke(button(rendered.host, "Gotowe"), "onClick");
+        expect(button(rendered.host, "Edytuj okresy")).toBeDefined();
+      } finally { await cleanup(rendered, [save]); }
+    });
+
+    test("a stretch between two declared periods is a gap row; + Dodaj opens a new period on its dates", async () => {
+      const data = fixture();
+      data.planPeriods.push(plan({ id: 22, account: "claude-2", plan: "max-20x", from: "2026-04-28", until: "2026-05-28", origin: "declared", readings: 0, tier }));
+      const rendered = await render(data, "all", [], undefined, undefined, { accounts: [{ ...cycles.accounts[0]!, cycles: [cycles.accounts[0]!.cycles[0]!] }] });
+      try {
+        await selectAccount(rendered.host, "account_0002@example.test");
+        await invoke(button(rendered.host, "Cała historia"), "onClick");
+        await flushUntil(() => rendered.host.textContent.includes("Abonament3"));
+        const gap = subscriptionRows(rendered.host)[1]!;
+        expect([gap.className, gap.children[0]!.textContent, gap.children[2]!.textContent, gap.children[3]!.textContent, gap.children[11]!.textContent])
+          .toEqual(["is-gap", "Przerwa", "2026-03-28 00:00", "2026-04-28 00:00", "Bez planu"]);
+        await invoke(labelledButton(rendered.host, "Dodaj okres: Przerwa 2026-03-28 00:00 – 2026-04-28 00:00"), "onClick");
+        const form = formOf(rendered.host);
+        expect(labelled(form, "Od").value).toBe("2026-03-28T00:00");
+        expect(labelled(form, "Do").value).toBe("2026-04-28T00:00");
       } finally { await cleanup(rendered); }
     });
 
@@ -864,7 +899,7 @@ describe("AccountPeriodsSettings", () => {
       try {
         await selectAccount(rendered.host, "account_0002@example.test");
         await invoke(button(rendered.host, "Cała historia"), "onClick");
-        await flushUntil(() => rendered.host.textContent.includes("Abonament1"));
+        await flushUntil(() => rendered.host.textContent.includes("Abonament2"));
         const mark = () => nodes(rendered.host).find((node) => node.attributes["data-cycle"] === "2026-02-28T00:00:00.000Z")!;
         // The pointer lands in the middle of the declared cycle on a 1000 px track starting at x = 0.
         const middle = (parseFloat(mark().style.left!) + parseFloat(mark().style.width!) / 2) * 10;
@@ -876,25 +911,25 @@ describe("AccountPeriodsSettings", () => {
         expect(mark().className).toContain("is-selected");
         expect(target.className).not.toContain("is-selected");
         const rows = cycleRows(rendered.host);
-        expect(rows.map((row) => row.className)).toEqual(["is-cycle", "is-cycle is-selected"]);
+        expect(rows.map((row) => row.className)).toEqual(["is-plan", "is-plan is-selected"]);
         await invoke(rows[0]!, "onMouseEnter");
-        const inferred = nodes(rendered.host).find((node) => node.attributes["data-cycle"] === "2026-03-28T00:00:00.000Z")!;
-        expect(inferred.className).toContain("is-hovered");
+        const later = nodes(rendered.host).find((node) => node.attributes["data-cycle"] === "2026-03-28T00:00:00.000Z")!;
+        expect(later.className).toContain("is-hovered");
         await invoke(rows[0]!, "onMouseLeave");
-        expect(inferred.className).not.toContain("is-hovered");
+        expect(later.className).not.toContain("is-hovered");
         expect(save).not.toHaveBeenCalled();
         expect(formOf(rendered.host)).toBeUndefined();
       } finally { await cleanup(rendered, [save]); }
     });
 
-    test("✎ on a declared cycle edits its row; the renewal day and an annual period are saved with it", async () => {
+    test("✎ on a declared period edits its row; the renewal day and an annual period are saved with it", async () => {
       const rendered = await render(fixture(), "all", [], undefined, undefined, cycles);
       const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview({ billing: { provider: "claude", account: "claude-2", from: "2026-02-20T00:00:00.000Z" } }));
       try {
         await selectAccount(rendered.host, "account_0002@example.test");
-        await flushUntil(() => rendered.host.textContent.includes("Abonament1"));
-        await invoke(button(rendered.host, "Abonament1"), "onClick");
-        await invoke(bar(rendered.host, "cykl 2026-02-28 00:00 – 2026-03-28 00:00"), "onClick");
+        await flushUntil(() => rendered.host.textContent.includes("Abonament2"));
+        await invoke(button(rendered.host, "Abonament2"), "onClick");
+        await invoke(bar(rendered.host, "Max · ×20 2026-02-28 00:00 – 2026-03-28 00:00"), "onClick");
         const form = formOf(rendered.host);
         expect(labelled(form, "Od").value).toBe("2026-02-28T00:00");
         await invoke(labelled(form, "Dzień odnowienia"), "onChange", { target: { value: "2026-02-20T00:00" } });
@@ -907,44 +942,66 @@ describe("AccountPeriodsSettings", () => {
       } finally { await cleanup(rendered, [preview]); }
     });
 
-    test("a saved edit shows its billing periods as being recalculated until the producer has stored them", async () => {
+    test("the server's pending reason words the recalculation: new readings move no row, a period change only the cycles it reaches", async () => {
+      const stale = (pending: BillingCyclesView["accounts"][number]["pending"]): BillingCyclesView =>
+        ({ accounts: cycles.accounts.map((entry) => ({ ...entry, stale: true, pending })) });
+      for (const [pending, text, marks] of [
+        [{ reason: "figures", from: null }, null, [false, false]],
+        [{ reason: "periods", from: "2026-03-28T00:00:00.000Z" }, "Przeliczam od 28.03 — daty i ceny mogą się zmienić.", [true, false]],
+        [{ reason: "rules", from: null }, "Przeliczam cykle według nowych zasad — daty i ceny mogą się zmienić.", [true, true]],
+      ] as const) {
+        const rendered = await render(fixture(), "all", [], undefined, undefined, stale(pending));
+        try {
+          await selectAccount(rendered.host, "account_0002@example.test");
+          await flushUntil(() => rendered.host.textContent.includes("Abonament2"));
+          await invoke(button(rendered.host, "Abonament2"), "onClick");
+          const status = nodes(rendered.host).find((node) => node.attributes.role === "status" && node.className.includes("ui-loading-status"))!;
+          if (text) expect(status.textContent).toBe(text);
+          else expect(status.attributes.title).toBe("Nowe odczyty — liczby odświeżą się za chwilę; daty cykli się nie zmienią.");
+          expect(cycleRows(rendered.host).map((row) => row.className.includes("is-pending"))).toEqual([...marks]);
+        } finally { await cleanup(rendered, []); }
+      }
+    });
+
+    test("a saved edit shows its billing periods as being recalculated once the owner is done editing", async () => {
       const rendered = await render(fixture(), "all", [], undefined, undefined, cycles);
       const range = { provider: "claude", account: "claude-2", from: "2026-03-28T00:00:00.000Z" };
       const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview({ billing: range }));
       const save = spyOn(api, "savePeriodEdit").mockResolvedValue({ preview: emptyPreview({ billing: range }), applied: true, view: fixture({ revision: "rev-2" }) });
       try {
         await selectAccount(rendered.host, "account_0002@example.test");
-        await flushUntil(() => rendered.host.textContent.includes("Abonament1"));
-        await invoke(button(rendered.host, "Abonament1"), "onClick");
-        await invoke(bar(rendered.host, "cykl 2026-02-28 00:00 – 2026-03-28 00:00"), "onClick");
+        await flushUntil(() => rendered.host.textContent.includes("Abonament2"));
+        await invoke(button(rendered.host, "Abonament2"), "onClick");
+        await invoke(bar(rendered.host, "Max · ×20 2026-02-28 00:00 – 2026-03-28 00:00"), "onClick");
         const form = formOf(rendered.host);
         await invoke(button(form, "Podgląd"), "onClick");
         await flushUntil(() => !button(form, "Zapisz").hasAttribute("disabled"));
         await invoke(form, "onSubmit", { preventDefault() {} });
-        await flushUntil(() => rendered.host.textContent.includes("Przeliczam cykle od 28.03…"));
+        await flushUntil(() => save.mock.calls.length > 0 && formOf(rendered.host) === undefined);
+        // While editing the table holds the periods alone; Gotowe brings the cycles back with the recalculation.
+        expect(rendered.host.textContent).not.toContain("Przeliczam od 28.03");
+        await invoke(button(rendered.host, "Gotowe"), "onClick");
+        await flushUntil(() => rendered.host.textContent.includes("Przeliczam od 28.03 — daty i ceny mogą się zmienić."));
         // Only the cycle the edit reaches waits for its new values; the earlier one is final.
         expect(cycleRows(rendered.host).map((row) => row.className.includes("is-pending"))).toEqual([true, false]);
       } finally { await cleanup(rendered, [preview, save]); }
     });
 
-    test("Potwierdź opens a row for exactly the inferred cycle with its impact checked; only Zapisz saves it", async () => {
+    test("✎ on a cycle from readings starts a declaration of its run", async () => {
       const rendered = await render(fixture(), "all", [], undefined, undefined, cycles);
       const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview());
-      const save = spyOn(api, "savePeriodEdit").mockResolvedValue({ preview: emptyPreview(), applied: true, view: fixture({ revision: "rev-2" }) });
       try {
         await selectAccount(rendered.host, "account_0002@example.test");
-        await flushUntil(() => rendered.host.textContent.includes("Abonament1"));
-        await invoke(button(rendered.host, "Abonament1"), "onClick");
-        await invoke(button(rendered.host, "Potwierdź"), "onClick");
-        await flushUntil(() => preview.mock.calls.length > 0);
-        expect(preview.mock.calls[0]?.[0]).toMatchObject({ kind: "plan", replace: null, row: { provider: "claude", account: "claude-2", plan: "max-20x",
-          from: "2026-03-28T00:00:00.000Z", until: "2026-04-28T00:00:00.000Z", evidence: "confirmed-cycle" } });
-        expect(save.mock.calls).toHaveLength(0);
+        await flushUntil(() => rendered.host.textContent.includes("Abonament2"));
+        await invoke(button(rendered.host, "Abonament2"), "onClick");
+        await invoke(bar(rendered.host, "Max · ×20 2026-03-28 00:00 – 2026-04-28 00:00"), "onClick");
         const form = formOf(rendered.host);
-        await flushUntil(() => !button(form, "Zapisz").hasAttribute("disabled"));
-        await invoke(form, "onSubmit", { preventDefault() {} });
-        await flushUntil(() => save.mock.calls.length > 0);
-      } finally { await cleanup(rendered, [preview, save]); }
+        expect(labelled(form, "Od").value).toBe("2026-03-28T00:00");
+        expect(labelled(form, "Do").value).toBe("");
+        await invoke(button(form, "Podgląd"), "onClick");
+        await flushUntil(() => preview.mock.calls.length > 0);
+        expect(preview.mock.calls[0]?.[0]).toMatchObject({ kind: "plan", replace: null, row: { account: "claude-2", plan: "max-20x", evidence: "owner" } });
+      } finally { await cleanup(rendered, [preview]); }
     });
   });
 });

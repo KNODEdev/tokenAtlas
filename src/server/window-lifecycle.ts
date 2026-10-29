@@ -1,4 +1,4 @@
-import { effectiveDatedPeriods, planPeriodIndex, type DatedPeriod } from "./account-periods";
+import { effectivePlanPeriods, planPeriodIndex, type DatedPeriod } from "./account-periods";
 import { subscriptionAccountingAdapters } from "./subscription-accounting-adapters";
 import { probeWindowPlan } from "./window-plan-periods";
 import { canonicalTime, subtractMinutes, sameReset, RESET_JOIN_MS, segmentReadings,
@@ -10,7 +10,7 @@ export function segmentLimitReadings(provider: string, account: string, counter:
   periods: readonly DatedPeriod[], state?: SegmenterState): RawSegment[] {
   const meterPlan = subscriptionAccountingAdapters().find(adapter => adapter.aliases.includes(provider.toLowerCase()))?.windowMeterPlan ?? (() => null);
   const index = planPeriodIndex(periods);
-  const own = effectiveDatedPeriods(periods).filter(p => p.provider === provider && p.subject.toLowerCase() === account.toLowerCase());
+  const own = effectivePlanPeriods(periods).filter(p => p.provider === provider && p.subject.toLowerCase() === account.toLowerCase());
   const observedPlans = periods.filter(p => p.provider === provider && p.subject.toLowerCase() === account.toLowerCase()
     && p.origin === "observed" && meterPlan(p.value)).sort((a, b) => Date.parse(a.from) - Date.parse(b.from));
   const readingKey = (ts: string, percent: number) => `${ts}|${percent}`;

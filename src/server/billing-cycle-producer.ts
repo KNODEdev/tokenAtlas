@@ -45,8 +45,10 @@ import { resolvePlanFacts, type PlansCatalog } from "../shared/plan-catalog";
  * 17: global plan facts price Free at zero while retaining its capacity cycles.
  * 18: Codex cycles store the banked resets granted in them, from the reset-credit readings (banked-grants.ts).
  * 19: grant timestamps determine cycle membership; observation-only counts remain lower bounds.
+ * 20: one plan at a time: an open declared plan ends where a reading of another plan starts (user decision 29.10).
+ * 21: no inferred continuation; a stretch between two declarations stays a gap whatever readings show (owner, 29.10).
  */
-export const BILLING_CYCLES_VERSION = 19;
+export const BILLING_CYCLES_VERSION = 21;
 const RULES_KEY = "billing_cycles_rules";
 const MARKS_KEY = "billing_cycles_marks";
 /** How often every account's cycles are derived again to catch the clock and moved evidence. */

@@ -50,12 +50,17 @@
 .account-periods-form-extra > div { padding-top: 12px; }
 .account-periods-form input:not(.ui-dropdown-required), .account-periods-form .ui-dropdown { min-height: 36px; font-family: inherit; }
 .account-periods-form label { font-size: var(--fs-4); }
-.account-history-timeline-tools { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-8); margin: var(--s-9) 0 var(--s-8); }
-.account-history-chart { overflow-x: auto; }
+.account-history-timeline-tools { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-8); padding: var(--s-6) 0 var(--s-4); }
+/* Pinned while the tables under it scroll (usePinnedChart); the sheet's paper shows nothing through it. */
+.account-history-timeline.is-pinned > .account-history-pinned { position: sticky; top: 0; z-index: 3; padding-bottom: var(--s-4); background: var(--surface); border-bottom: 1px solid var(--line2); }
+.account-history-timeline.is-pinned .account-history-assignments th { top: var(--account-history-pinned); }
+.account-history-timeline.is-pinned :is(tr, [role="tabpanel"]) { scroll-margin-top: calc(var(--account-history-pinned) + 40px); }
+/* Clipped, not scrolled: the minimum width of a bar at the very end must not add a scrollbar. */
+.account-history-chart { overflow-x: clip; }
 .account-history-axis, .account-history-lane { display: grid; grid-template-columns: 136px minmax(0, 1fr); gap: 12px; min-width: 0; }
-.account-history-axis { margin-bottom: 10px; font-family: var(--font-figure); font-size: var(--fs-2); color: var(--muted); }
+.account-history-axis { margin-bottom: 6px; font-family: var(--font-figure); font-size: var(--fs-2); color: var(--muted); }
 .account-history-axis > div { display: flex; justify-content: space-between; }
-.account-history-lane { align-items: center; margin: 14px 0; }
+.account-history-lane { align-items: center; margin: 8px 0; }
 /* Computer names never break mid-word: a long one is cut with an ellipsis and read in full from the tooltip. */
 .account-history-lane > span { min-width: 0; font-size: var(--fs-4); }
 .account-history-lane > span > :is(strong, small) { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -128,6 +133,10 @@
 /* Subscription: a plan row folds its cycles; the cycle rows sit under the plan name, quieter. */
 .account-history-subscription .account-history-fold { display: inline-block; width: var(--s-8); color: var(--muted); }
 .account-history-subscription tr.is-cycle > td:first-child { padding-left: var(--s-8); color: var(--muted); }
+/* A gap between declared periods reads as empty time, not as a plan. */
+.account-history-subscription tr.is-gap td { color: var(--muted); }
+.account-history-subscription-tools { display: flex; gap: var(--s-4); align-items: center; justify-content: flex-end; margin-bottom: var(--s-4); }
+.account-history-subscription-tools .account-periods-note { margin: 0 auto 0 0; }
 /* The Overview drawer holds one account's whole history, so it needs the timeline's width. */
 .subscription-periods-drawer { width: min(1480px, 96vw); }
 .account-periods-local { display: block; margin-top: 6px; font-size: var(--fs-3); color: var(--muted); }
@@ -174,6 +183,17 @@
 /* Settings → Accounts uses the workspace, rail, facts and detail-tab primitives (ui.css, paper-atlas §7); only its own parts are here. */
 .account-periods-choice-meta b { color: var(--text); font-weight: var(--fw-semibold); }
 .account-periods-account-choice .account-periods-strip { width: 76px; }
+/* A long rail of similar addresses (user request 29.10): each vendor under a ruled heading, accounts parted by solid rules. */
+/* Rail and sheet parted by a rule and a gutter (user choice 29.10): the picked account no longer joins the sheet as a
+   tab; the accent wash marks it instead (paper atlas: a wash, never a side stripe). */
+.account-periods-workspace { column-gap: var(--s-6); }
+.account-periods-accounts { scrollbar-width: thin; border-right: 1px solid var(--line2); }
+.account-periods-accounts .ui-rail-item[aria-pressed="true"], .account-periods-accounts .ui-rail-item[aria-pressed="true"]:hover {
+  width: 100%; margin-right: 0; border-radius: var(--r-chip); box-shadow: none; background: var(--accent-soft); }
+.account-periods-accounts .ui-rail-group { margin-top: var(--s-10); }
+.account-periods-accounts .ui-rail-heading { margin: 0; padding: 0 var(--s-6) var(--s-3); border-bottom: 1px solid var(--line2); }
+.account-periods-accounts .ui-rail-item { border-top-style: solid; }
+.account-periods-accounts .ui-rail-heading + * > .ui-rail-item { border-top: 0; }
 .account-periods-all-choice { border-top: 0; border-bottom: var(--rule); }
 .account-periods-all-choice strong { font-weight: var(--fw-semibold); }
 .account-periods-more, .account-periods-empty { padding: var(--s-3) var(--s-6) 0; }

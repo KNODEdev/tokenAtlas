@@ -1,4 +1,4 @@
-import { canonicalPeriodPlan, isFreePlan, isNoPlan } from "./period-end";
+import { canonicalPeriodPlan, endOpenDeclarations, isFreePlan, isNoPlan } from "./period-end";
 import type { ContextPrice } from "./context-price";
 
 /**
@@ -83,8 +83,6 @@ export interface DerivedCycle {
 }
 
 const DAY_MS = 86_400_000;
-/** Evidence right after a renewal may still be the old cycle's (late readings, a failed payment): 24 h of tolerance. */
-export const CONTINUATION_GRACE_MS = DAY_MS;
 /** Windows further apart than this do not belong to one run when an observed run's anchor is walked back. */
 const WINDOW_RUN_GAP_MS = 7 * DAY_MS;
 
@@ -177,30 +175,32 @@ function repeatable(row: CyclePlanRow, from: number, anchor: number, months: num
  *   continuation take it again (`repeated`, user decision 18.10), otherwise the catalog price in USD; a payment right after a
  *   plan change inside the previous plan's cycle is a prorated surcharge: its later cycles repeat the last full payment of
  *   the same plan on the account instead, else the catalog (user decision 18.10, rules 14);
- * - after a declared `until` that no other declaration covers, a cycle is inferred while an observed row of the same plan
- *   outside every declaration has a reading in `[start_k + 24 h, end_k)`; the first cycle without one ends the chain, and
- *   a `none` row (or any declaration) blocks it (§3, §12.1);
- * - what remains of observed rows (cut at the declared end of the same plan, outside declarations and inferred cycles) is
+ * - a stretch between two declarations that neither covers is a gap: no cycles, whatever readings show there (owner
+ *   decision 29.10, replacing the inferred continuation of §3 and §12.1);
+ * - what remains of observed rows (cut at the declared end of the same plan, outside declarations and their gaps) is
  *   a run whose payment day is the first limit window carrying that plan (§12.2), flagged uncertain;
  * - a plan change starts a new run, so the cycle before it ends early (decision 2); `none` and plans the catalog prices at
  *   0 have no cycles; only cycles that have started by `now` are listed.
  */
-export function deriveBillingCycles(rows: readonly CyclePlanRow[], windows: readonly CycleWindowStart[], options: DeriveCyclesOptions): DerivedCycle[] {
-  const { now } = options;
+export function deriveBillingCycles(allRows: readonly CyclePlanRow[], windows: readonly CycleWindowStart[], options: DeriveCyclesOptions): DerivedCycle[] {
   const plan = (value: string) => canonicalPeriodPlan(value);
+  // One plan at a time: an open declared row ends where a reading of another plan starts after it (rule 20).
+  const rows = endOpenDeclarations(allRows, () => "", (row) => plan(row.plan));
   const declared = rows.filter((row) => row.origin === "declared").map((row) => ({
     row, plan: plan(row.plan), from: instantOf(row.from), until: row.until === null ? Infinity : instantOf(row.until),
   })).sort((a, b) => a.from - b.from);
   const covered: Range[] = declared.map(({ from, until }) => ({ from, until }));
-  const isCovered = (at: number) => declared.some((d) => d.from <= at && at < d.until);
   const observed = rows.filter((row) => row.origin === "observed").map((row) => {
     const from = instantOf(row.from), until = row.until === null ? Infinity : instantOf(row.until);
-    // A reading proves the plan only where it was taken: an open row is evidence up to its last reading.
-    const seen = row.lastSeen ? instantOf(row.lastSeen) + 1 : until === Infinity ? from + 1 : until;
-    return { plan: plan(row.plan), from, until, seen: Math.min(until, seen) };
+    return { plan: plan(row.plan), from, until };
   });
-  // Strong evidence: observed rows outside every declaration (§3), up to their last reading.
-  const evidence = subtract(observed.map((o) => ({ plan: o.plan, from: o.from, until: o.seen })), covered);
+  // Stretches between declarations that none of them covers: the owner left them without a plan.
+  const gaps: Range[] = [];
+  let reach = -Infinity;
+  for (const d of declared) {
+    if (Number.isFinite(reach) && d.from > reach) gaps.push({ from: reach, until: d.from });
+    reach = Math.max(reach, d.until);
+  }
   // Effective observed stretches: a declared end of the same plan closes them (22.09 rule), declarations cover them.
   const effective = subtract(observed.map((o) => {
     let until = o.until;
@@ -209,10 +209,9 @@ export function deriveBillingCycles(rows: readonly CyclePlanRow[], windows: read
       until = Math.min(until, d.until);
     }
     return { plan: o.plan, from: o.from, until };
-  }).filter((o) => o.until > o.from), covered);
+  }).filter((o) => o.until > o.from), [...covered, ...gaps]);
 
   const runs: Run[] = [];
-  const chains: Range[] = [];
   const scheduleOf = (d: typeof declared[number]) => ({ months: d.row.cycleMonths === 12 ? 12 : 1, anchor: d.row.anchor ? instantOf(d.row.anchor) : d.from });
   // A payment right after a change of plan inside the previous plan's cycle is a prorated surcharge (user decision 18.10):
   // it is never repeated; later cycles take the last full payment of the same plan on the account, else the catalog.
@@ -232,34 +231,12 @@ export function deriveBillingCycles(rows: readonly CyclePlanRow[], windows: read
     const repeat = surcharge(d) ? earlier.at(-1) ?? null : repeatable(d.row, d.from, anchor, months);
     runs.push({ plan: d.plan, basis: "declared", from: d.from, until: d.until, anchor, months, anchorUncertain: false,
       amountMinor: d.row.amountMinor ?? null, currency: d.row.currency ?? null, declaredFrom: d.row.from, repeat });
-    if (d.until === Infinity || isCovered(d.until) || !hasCycles(d.plan, d.until, months, options)) continue;
-    // Continuation (§3): the declared schedule goes on while each next cycle has strong evidence of the same plan.
-    const next = Math.min(Infinity, ...declared.filter((other) => other.from >= d.until).map((other) => other.from));
-    let k = cycleIndexAt(anchor, months, d.until);
-    if (addMonthsUtc(anchor, k * months) < d.until) k++;
-    for (; ; k++) {
-      const start = addMonthsUtc(anchor, k * months);
-      if (start >= next || start > now) break;
-      // Readings of another plan own their stretch (observed before inferred).
-      if (effective.some((o) => o.plan !== d.plan && o.from <= start && start < o.until)) break;
-      const other = Math.min(Infinity, ...effective.filter((o) => o.plan !== d.plan && o.from > start).map((o) => o.from));
-      const end = Math.min(addMonthsUtc(anchor, (k + 1) * months), next, other);
-      // Within its first day a cycle cannot have evidence past the tolerance yet: a reading since its start keeps the chain
-      // provisionally (otherwise the run would flip to "from readings" for a day every month); a day later the strict rule holds.
-      const since = start + CONTINUATION_GRACE_MS <= now ? start + CONTINUATION_GRACE_MS : start;
-      const proven = evidence.some((e) => e.plan === d.plan && e.from < end && e.until > since);
-      if (!proven) break;
-      runs.push({ plan: d.plan, basis: "inferred", from: start, until: end, anchor, months, anchorUncertain: false,
-        amountMinor: null, currency: null, declaredFrom: null, repeat });
-      chains.push({ from: start, until: end });
-      if (end < addMonthsUtc(anchor, (k + 1) * months)) break;
-    }
   }
-  // Observed runs: what readings show outside declarations and inferred cycles.
-  const pieces = subtract(effective, chains).sort((a, b) => a.from - b.from);
-  const taken = [...covered, ...chains];
+  // Observed runs: what readings show outside declarations and their gaps.
+  const pieces = [...effective].sort((a, b) => a.from - b.from);
+  const taken = [...covered, ...gaps];
   for (const piece of pieces) {
-    // Nothing earlier may be reached back over: a declaration, an inferred cycle or another observed stretch.
+    // Nothing earlier may be reached back over: a declaration, a gap or another observed stretch.
     const floor = Math.max(-Infinity, ...[...taken, ...pieces.filter((other) => other !== piece)]
       .filter((range) => range.until <= piece.from).map((range) => range.until));
     const anchor = firstWindowOfRun(windows, piece.plan, piece.from, floor);

@@ -371,27 +371,29 @@ function PeriodsBody({ data, reload, provider, providerAliases, focus, extras }:
   }
   /**
    * A billing cycle opens the plan editor (§8): a declared cycle edits its row (renewal day, end, amount, plan); a cycle
-   * from readings starts a declaration of its run from the guessed payment day; an inferred one ("Confirm") a row for
-   * exactly that cycle, with its impact already checked.
+   * from readings starts a declaration of its run from the guessed payment day.
    */
-  function onCycle(owner: { provider: string; account: string; aliases: string[] }, cycle: BillingCycle, confirm?: boolean) {
+  function onCycle(owner: { provider: string; account: string; aliases: string[] }, cycle: BillingCycle) {
     const at = (value: string | null) => value === null ? null : startOf(value);
     const record = cycle.declared_from === null ? undefined : view.planPeriods.find((row) => row.origin === "declared"
       && owner.aliases.includes(row.account) && at(row.from) === at(cycle.declared_from));
     if (record) { openPlan({ provider: owner.provider, account: record.account, aliases: owner.aliases, from: record.from, until: record.until, records: [record] }, undefined, record); return; }
     const account = owner.account;
     const known = view.accounts.some((a) => a.provider === owner.provider && a.id === account);
-    const inferred = cycle.basis === "inferred";
     const next: Draft = {
       kind: "plan", anchor: `plan|cycle|${owner.provider}|${account}|${cycle.start}`, provider: owner.provider, lockAccount: true,
       account: known ? account : OTHER, accountOther: known ? "" : account, plan: planDisplay(cycle.plan),
-      from: toField(inferred ? cycle.start : cycle.run.from), until: inferred ? toField(cycle.end) : "",
-      exact: { from: inferred ? cycle.start : cycle.run.from, until: inferred ? cycle.end : null },
-      amount: "", currency: currencyOf(owner.provider, account), evidence: inferred ? "confirmed-cycle" : "owner", note: "", replace: null, renewal: "", cycleMonths: String(cycle.cycle_months),
+      from: toField(cycle.run.from), until: "", exact: { from: cycle.run.from, until: null },
+      amount: "", currency: currencyOf(owner.provider, account), evidence: "owner", note: "", replace: null, renewal: "", cycleMonths: String(cycle.cycle_months),
     };
-    const context = { plan: { provider: owner.provider, account, aliases: owner.aliases, from: inferred ? cycle.start : cycle.run.from,
-      until: inferred ? cycle.end : null, records: [] } };
-    if (confirm) openDragged(next, context); else open(next, context);
+    open(next, { plan: { provider: owner.provider, account, aliases: owner.aliases, from: cycle.run.from, until: null, records: [] } });
+  }
+  /** Remove in the subscription table: the period's own editor, its removal already asked. */
+  function onRemovePlan(selection: PlanPeriodSelection) {
+    const record = selection.records[0];
+    if (!record) return;
+    openPlan(selection, undefined, record);
+    setRemoving(`plan|${record.id}`);
   }
   function openSource(source: PeriodSource, row: TimelineRow) {
     open(sourceDraft(row), { source: { source, row } });
@@ -494,6 +496,7 @@ function PeriodsBody({ data, reload, provider, providerAliases, focus, extras }:
         renderSources={sourceTable} onPlanPeriod={onPlanPeriod} onSourcePeriod={onSourcePeriod} editing={busy || !!draft} focus={focus}
         priceCoverage={focus == null ? { subjects: coverage.data?.subjects.filter((subject) => matches(subject.provider)) ?? null, error: coverage.error } : undefined}
         onPriceGap={onPriceGap} {...extras}
+        onRemovePlan={onRemovePlan}
         {...(focus == null ? { billingCycles: billing.data?.accounts ?? null, billingPending, onCycle } : {})}
         addPlan={(provider, account) => open({
           kind: "plan", anchor: `plan|new|${provider}|${account}`, provider, lockAccount: !!account,
@@ -745,15 +748,18 @@ function PeriodEditor({ draft, view, busy, preview, error, stale, knownPlans, pa
           {stale && <> <GhostButton onClick={onReload}>{t("Refresh", "Odśwież")}</GhostButton></>}
         </p>}
         {removing && <div role="alert" className="account-periods-preview">
-          <p>{t("Remove your correction? Original readings will apply again; missing periods remain unknown.", "Usunąć Twoją korektę? Znów będą obowiązywać odczyty, a brakujące okresy pozostaną nieustalone.")}</p>
+          <p>{draft.kind === "plan"
+            ? t("Remove this period? Between your other periods its dates become a gap; outside them the readings apply.",
+              "Usunąć ten okres? Między Twoimi innymi okresami jego daty staną się przerwą, poza nimi obowiązują odczyty.")
+            : t("Remove your correction? Original readings will apply again; missing periods remain unknown.", "Usunąć Twoją korektę? Znów będą obowiązywać odczyty, a brakujące okresy pozostaną nieustalone.")}</p>
           <GhostButton disabled={busy} onClick={onConfirmRemove}>{t("Remove this period", "Usuń ten okres")}</GhostButton>{" "}
-          <GhostButton disabled={busy} onClick={onCancelRemove}>{t("Keep correction", "Zachowaj korektę")}</GhostButton>
+          <GhostButton disabled={busy} onClick={onCancelRemove}>{t("Cancel", "Anuluj")}</GhostButton>
         </div>}
         <div className="account-periods-actions">
           <GhostButton onClick={onPreview} disabled={busy || removing} emphasis={!canSave}>{t("Preview", "Podgląd")}</GhostButton>
           <GhostButton type="submit" disabled={busy || !canSave || removing} emphasis={canSave}
             title={canSave ? undefined : t("Check the impact before saving.", "Sprawdź skutki zmiany przed zapisem.")}>{busy ? t("Saving…", "Zapisywanie…") : t("Save", "Zapisz")}</GhostButton>
-          {onRemove && <GhostButton onClick={onRemove} disabled={busy || removing}>{t("Remove correction", "Usuń korektę")}</GhostButton>}
+          {onRemove && <GhostButton onClick={onRemove} disabled={busy || removing}>{draft.kind === "plan" ? t("Remove", "Usuń") : t("Remove correction", "Usuń korektę")}</GhostButton>}
           <GhostButton onClick={onCancel} disabled={busy}>{t("Cancel", "Anuluj")}</GhostButton>
         </div>
       </fieldset>

@@ -11,9 +11,9 @@ import { effectivePeriodRows, formatStamp, planDisplay, type SourceTimeline } fr
 import type { TimelineRow } from "./AccountPeriodsSettings";
 import { subscriptionPlan } from "../lib/subscription-plan";
 import { formatPlanLabel } from "../../shared/plan-label";
-import type { BillingCycle } from "../../shared/billing-cycles";
-import { CycleLaneMarks, cycleBasis, cycleFigures, cycleMarks, cycleMoney, cyclePrice, cycleUsd } from "./BillingCycles";
-import { DataTable, TableRow, DetailTabs, HelpDot, type DetailTab } from "./ui";
+import type { BillingCycle, BillingCyclesPending } from "../../shared/billing-cycles";
+import { CycleLaneMarks, cycleBasis, cycleFigures, cycleMarks, cycleMoney, cyclePrice, cycleUsd, pendingNotice } from "./BillingCycles";
+import { DataTable, TableRow, DetailTabs, GhostButton, HelpDot, type DetailTab } from "./ui";
 
 const DAY = 86_400_000;
 /** Timeline ranges in days; 0 is the whole history. */
@@ -38,8 +38,12 @@ export function effectivePlanRows(plans: PlanPeriodRow[]) {
   return [...new Set(plans.map((row) => row.account))].flatMap((account) => effectivePeriodRows(plans.filter((row) => row.account === account)));
 }
 export interface PlanSegment { from: number; until: number; label: string | null; conflict: boolean; records: PlanPeriodRow[] }
-/** A plan stretch with its billing cycles and the declared periods that have no cycle yet; a loose cycle has no stretch. */
-interface PlanGroup { key: string; segment: PlanSegment | null; cycles: BillingCycle[]; pending: PlanPeriodRow[]; from: number; until: number | null }
+/**
+ * A row of the subscription table with its billing cycles: one declared period as written, a plan known only from readings,
+ * a gap between two declarations, or a cycle outside all of them.
+ */
+interface PlanGroup { key: string; kind: "record" | "readings" | "gap" | "loose"; record: PlanPeriodRow | null; segment: PlanSegment | null;
+  cycles: BillingCycle[]; from: number; until: number | null; readings?: string[]; bars?: string[] }
 export function planSegments(plans: PlanPeriodRow[], from: number, until: number): PlanSegment[] {
   const rows = effectivePlanRows(plans);
   const bounds = [...new Set([from, until, ...rows.flatMap((row) => [Date.parse(row.from), end(row.until)])])]
@@ -105,7 +109,7 @@ interface Drag { key: string; mode: PeriodShift["mode"]; x: number; left: number
 export type { DetailTab } from "./ui";
 
 /** Without a shift the callbacks open the editor; with one they apply the dragged dates. */
-export function AccountHistoryTimeline({ plans, timelines, provider, account, aliases, onPlanPeriod, onSourcePeriod, editing, priceGaps = [], cycles = [], cyclesStale = false, cyclesPendingFrom = null, onCycle,
+export function AccountHistoryTimeline({ plans, timelines, provider, account, aliases, onPlanPeriod, onSourcePeriod, editing, priceGaps = [], cycles = [], cyclesStale = false, cyclesPendingFrom = null, cyclesPending = null, onCycle, onRemovePlan,
   sections = [], detail: detailProp, onDetail, reveal = false, onRevealed }: {
   plans: PlanPeriodRow[]; timelines: SourceTimeline[]; provider: string; account: string; aliases: string[];
   onPlanPeriod: (selection: PlanPeriodSelection, shift?: PeriodShift) => void;
@@ -118,7 +122,11 @@ export function AccountHistoryTimeline({ plans, timelines, provider, account, al
   cyclesStale?: boolean;
   /** The start a just-saved edit recalculates from; null when the cycles are only refreshing in the background. */
   cyclesPendingFrom?: string | null;
-  onCycle?: (cycle: BillingCycle, confirm?: boolean) => void;
+  /** Why the server's rows are stale and from when; null or absent from servers before it was added. */
+  cyclesPending?: BillingCyclesPending | null;
+  onCycle?: (cycle: BillingCycle) => void;
+  /** Opens the editor of one declared period with its removal to confirm. */
+  onRemovePlan?: (selection: PlanPeriodSelection) => void;
   /** Tabs after the history tables in the switcher under the chart. */
   sections?: DetailTab[];
   /** The switcher's open tab when the caller keeps it (null: the first one); `onDetail` reports a choice. */
@@ -139,6 +147,8 @@ export function AccountHistoryTimeline({ plans, timelines, provider, account, al
   const [selected, setSelected] = useState<string | null>(null);
   /** A table row under the pointer outlines its bar on the chart. */
   const [hovered, setHovered] = useState<string | null>(null);
+  /** Edit mode lists only the owner's periods and gaps; cycles and amounts return when the owner is done (29.10). */
+  const [editMode, setEditMode] = useState(false);
   /** Plans whose cycles the owner folded away in the subscription table; every plan starts unfolded. */
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
   // The switcher under the chart shows one table at a time; a bar clicked on the chart opens its table.
@@ -146,11 +156,12 @@ export function AccountHistoryTimeline({ plans, timelines, provider, account, al
   const detail = detailProp !== undefined ? detailProp : ownDetail;
   const chooseDetail = (key: string) => { setOwnDetail(key); onDetail?.(key); };
   const details = useRef<HTMLDivElement>(null);
+  const pinned = usePinnedChart();
   const tableRows = useRef(new Map<string, HTMLTableRowElement>());
   const rowRef = (key: string) => (node: HTMLTableRowElement | null) => {
     if (node) tableRows.current.set(key, node); else tableRows.current.delete(key);
   };
-  useEffect(() => { if (selected) chooseDetail(selected.startsWith("plan|") || selected.startsWith("cycle|") ? "subscription" : "computers"); }, [selected]);
+  useEffect(() => { if (selected) chooseDetail(/^(plan|cycle|record|gap)\|/.test(selected) ? "subscription" : "computers"); }, [selected]);
   useEffect(() => { if (selected) tableRows.current.get(selected)?.scrollIntoView?.({ block: "nearest" }); }, [selected, detail]);
   useEffect(() => {
     if (!reveal) return;
@@ -180,7 +191,11 @@ export function AccountHistoryTimeline({ plans, timelines, provider, account, al
   const dayMonth = (value: string) => new Date(Date.parse(value)).toLocaleDateString(t("en-GB", "pl-PL"), { day: "2-digit", month: "2-digit" });
   const sourceTitle = (row: TimelineRow) => `${formatStamp(row.from)} → ${row.until ? formatStamp(row.until) : t("now", "teraz")}`;
   const basis = (row: TimelineRow) => row.period?.origin === "declared" ? t("Your declaration", "Twój wpis") : t("From readings", "Z odczytów");
-  const marked = (key: string) => `${selected === key ? " is-selected" : ""}${hovered === key ? " is-hovered" : ""}`;
+  /** A plan bar also lights up for the table row of a declared period it draws. */
+  const marked = (key: string, records: readonly PlanPeriodRow[] = []) => {
+    const hit = (value: string | null) => value === key || records.some((row) => value === `record|${row.id}`);
+    return `${hit(selected) ? " is-selected" : ""}${hit(hovered) ? " is-hovered" : ""}`;
+  };
   const hover = (key: string) => ({ onMouseEnter: () => setHovered(key), onMouseLeave: () => setHovered((current) => current === key ? null : current) });
   /** Days with one decimal; an ongoing period counts until now. */
   const locale = t("en-GB", "pl-PL");
@@ -242,31 +257,46 @@ export function AccountHistoryTimeline({ plans, timelines, provider, account, al
     return segment?.label && !segment.conflict ? planName(segment.label, provider) : null;
   };
   /**
-   * The subscription table: each plan stretch with the billing cycles it holds, newest first. A cycle belongs to the stretch
-   * it starts in; an inferred one past the declared end, to the stretch its run began in. A declared period that has no cycle
-   * yet stands in for it, so a plan with cycles reads from its first cycle's start to its last one's end.
+   * The subscription table (owner decision 29.10): one row per declared period, with exactly its dates, and the billing
+   * cycles of that period under it; a stretch between two declarations is a gap row whatever readings show there; a plan
+   * known only from readings outside the declarations keeps a row of its own. ✎ and Remove act on exactly that row.
    */
   const groups: PlanGroup[] = (() => {
-    const stretches = allSegments.filter((segment) => segment.label !== null);
-    const within = (at: number) => stretches.find((segment) => segment.from <= at && at < segment.until);
-    const owned = new Map<PlanSegment, BillingCycle[]>();
-    const loose: BillingCycle[] = [];
-    for (const cycle of withCycles ? [...cycles].sort((a, b) => Date.parse(a.start) - Date.parse(b.start)) : []) {
-      const segment = within(Date.parse(cycle.start)) ?? within(Date.parse(cycle.run.from));
-      if (segment) owned.set(segment, [...owned.get(segment) ?? [], cycle]); else loose.push(cycle);
+    const declared = plans.filter((row) => row.origin === "declared").sort((a, b) => Date.parse(a.from) - Date.parse(b.from));
+    const gaps: Array<{ from: number; until: number }> = [];
+    let reach = -Infinity;
+    for (const row of declared) {
+      if (Number.isFinite(reach) && Date.parse(row.from) > reach) gaps.push({ from: reach, until: Date.parse(row.from) });
+      reach = Math.max(reach, end(row.until));
     }
-    const result = stretches.map((segment): PlanGroup => {
-      const own = owned.get(segment) ?? [];
-      const last = own.at(-1);
-      const pending = last ? segment.records.filter((row) => row.origin === "declared" && Date.parse(row.from) >= Date.parse(last.end)) : [];
-      const stop = Math.max(...own.map((cycle) => Date.parse(cycle.end)), ...pending.map((row) => end(row.until)));
-      return { key: `plan|${segment.from}`, segment, cycles: own, pending,
-        from: last ? Date.parse(own[0]!.start) : segment.from,
-        until: last ? (stop === Infinity ? null : stop) : planSelection(segment).until ? segment.until : null };
-    });
-    // A cycle outside every plan stretch still gets its row (inference needs a reading of the plan, so none in practice).
-    result.push(...loose.map((cycle): PlanGroup => ({ key: `cycle|${cycle.start}`, segment: null, cycles: [cycle], pending: [],
-      from: Date.parse(cycle.start), until: Date.parse(cycle.end) })));
+    const inGap = (start: number, stop: number) => gaps.some((gap) => gap.from <= start && stop <= gap.until);
+    const readings = allSegments.filter((segment) => segment.label !== null && !segment.conflict
+      && !segment.records.some((row) => row.origin === "declared") && !inGap(segment.from, segment.until));
+    const owned = new Map<PlanPeriodRow | PlanSegment, BillingCycle[]>();
+    const loose: BillingCycle[] = [];
+    const readingAt = (at: number) => readings.find((segment) => segment.from <= at && at < segment.until);
+    for (const cycle of withCycles ? [...cycles].sort((a, b) => Date.parse(a.start) - Date.parse(b.start)) : []) {
+      const record = cycle.declared_from === null ? undefined : declared.find((row) => Date.parse(row.from) === Date.parse(cycle.declared_from!));
+      const owner = record ?? readingAt(Date.parse(cycle.start)) ?? readingAt(Date.parse(cycle.run.from));
+      if (owner) owned.set(owner, [...owned.get(owner) ?? [], cycle]); else loose.push(cycle);
+    }
+    const result: PlanGroup[] = [
+      ...declared.map((row): PlanGroup => ({ key: `record|${row.id}`, kind: "record", record: row,
+        segment: { from: Date.parse(row.from), until: end(row.until), label: planDisplay(row.plan), conflict: false, records: [row] },
+        cycles: owned.get(row) ?? [], from: Date.parse(row.from), until: row.until === null ? null : Date.parse(row.until),
+        bars: allSegments.filter((segment) => segment.records.includes(row)).map((segment) => `plan|${segment.from}`) })),
+      ...readings.map((segment): PlanGroup => {
+        const own = owned.get(segment) ?? [];
+        return { key: `plan|${segment.from}`, kind: "readings", record: null, segment, cycles: own,
+          from: own.length ? Math.min(segment.from, Date.parse(own[0]!.start)) : segment.from,
+          until: own.length ? Math.max(...own.map((cycle) => Date.parse(cycle.end))) : planSelection(segment).until ? segment.until : null };
+      }),
+      ...gaps.map((gap): PlanGroup => ({ key: `gap|${gap.from}`, kind: "gap", record: null, segment: null, cycles: [], from: gap.from, until: gap.until,
+        readings: [...new Set(allSegments.filter((segment) => segment.label !== null && gap.from <= segment.from && segment.until <= gap.until)
+          .map((segment) => planName(segment.label!, provider)))] })),
+      ...loose.map((cycle): PlanGroup => ({ key: `cycle|${cycle.start}`, kind: "loose", record: null, segment: null, cycles: [cycle],
+        from: Date.parse(cycle.start), until: Date.parse(cycle.end) })),
+    ];
     return result.filter((group) => (group.until ?? now) > from).sort((a, b) => b.from - a.from);
   })();
   // A cycle picked on the chart unfolds its plan.
@@ -311,7 +341,13 @@ export function AccountHistoryTimeline({ plans, timelines, provider, account, al
   };
   const stamp = (ms: number | null) => ms === null ? t("now", "teraz") : formatStamp(iso(ms));
   const ongoing = (cycle: BillingCycle) => `${cycle.current ? ` · ${t("ongoing", "trwa")}` : ""}${cycleMarks(cycle) ? ` ${cycleMarks(cycle)}` : ""}`;
-  const recalculating = (cycle: BillingCycle) => cyclesStale && cyclesPendingFrom !== null && Date.parse(cycle.end) > Date.parse(cyclesPendingFrom);
+  // A just-saved edit holds its own start until the server reports the period change it caused.
+  const pending: BillingCyclesPending | null = cyclesPendingFrom !== null && cyclesPending?.reason !== "periods"
+    ? { reason: "periods", from: cyclesPendingFrom } : cyclesPending;
+  const notice = withCycles && cyclesStale && pending ? pendingNotice({ stale: true, pending }, t, locale) : null;
+  // Fresh readings move only figures; a cycle's dates and prices wait only when it reaches the change.
+  const recalculating = (cycle: BillingCycle) => cyclesStale && !!pending && pending.reason !== "figures"
+    && (pending.reason === "rules" || pending.from === null || Date.parse(cycle.end) > Date.parse(pending.from));
   const rowClass = (...names: Array<string | false>) => names.filter(Boolean).join(" ") || undefined;
   /** A cycle's cells from Price on: price, USD, windows, use, API value against capacity and one window point. */
   const cycleCells = (cycle: BillingCycle) => {
@@ -325,65 +361,78 @@ export function AccountHistoryTimeline({ plans, timelines, provider, account, al
       <td className="mono">{figures.point}</td>
     </>;
   };
-  /** ✎ edits the cycle, "Confirm" accepts an inferred one; neither bubbles to the row. */
-  const cycleActions = (cycle: BillingCycle) => {
-    const act = (confirm?: boolean) => (event?: { stopPropagation(): void }) => { event?.stopPropagation(); setSelected(`cycle|${cycle.start}`); onCycle!(cycle, confirm); };
+  const quiet = (act: () => void) => (event?: { stopPropagation(): void }) => { event?.stopPropagation(); act(); };
+  /** ✎ edits the cycle's period; it does not bubble to the row. */
+  const cycleActions = (cycle: BillingCycle) => <td className="account-history-cycle-actions">
+    <button type="button" className="account-history-edit" disabled={editing} title={t("Edit cycle", "Edytuj cykl")}
+      aria-label={`${t("Edit", "Edytuj")}: ${t("cycle", "cykl")} ${formatStamp(cycle.start)} – ${formatStamp(cycle.end)}`}
+      onClick={quiet(() => { setSelected(`cycle|${cycle.start}`); onCycle?.(cycle); })}>✎</button>
+  </td>;
+  const recordSelection = (row: PlanPeriodRow): PlanPeriodSelection => ({ provider, account: row.account, aliases, from: row.from, until: row.until, records: [row] });
+  /** What a row's ✎ opens: the declared period itself, a new period on a gap's dates, a declaration of a readings plan. */
+  const editGroup = (group: PlanGroup) => {
+    setSelected(group.key);
+    if (group.record) onPlanPeriod(recordSelection(group.record));
+    else if (group.kind === "gap") onPlanPeriod({ provider, account, aliases, from: iso(group.from), until: group.until === null ? null : iso(group.until), records: [] });
+    else if (group.segment) onPlanPeriod(planSelection(group.segment));
+    else onCycle?.(group.cycles[0]!);
+  };
+  const groupActions = (group: PlanGroup) => {
+    const label = `${group.kind === "gap" ? t("Gap", "Przerwa") : planName(group.record?.plan ?? group.segment?.label ?? group.cycles[0]!.plan, provider)} ${stamp(group.from)} – ${stamp(group.until)}`;
     return <td className="account-history-cycle-actions">
-      <button type="button" className="account-history-edit" disabled={editing} title={t("Edit cycle", "Edytuj cykl")}
-        aria-label={`${t("Edit", "Edytuj")}: ${t("cycle", "cykl")} ${formatStamp(cycle.start)} – ${formatStamp(cycle.end)}`} onClick={act()}>✎</button>
-      {cycle.basis === "inferred" && <button type="button" disabled={editing} onClick={act(true)}>{t("Confirm", "Potwierdź")}</button>}
+      {group.kind === "gap"
+        ? <button type="button" disabled={editing} aria-label={`${t("Add a period", "Dodaj okres")}: ${label}`}
+          onClick={quiet(() => { setEditMode(true); editGroup(group); })}>+ {t("Add", "Dodaj")}</button>
+        : <button type="button" className="account-history-edit" disabled={editing} title={t("Edit period", "Edytuj okres")}
+          aria-label={`${t("Edit", "Edytuj")}: ${label}`} onClick={quiet(() => { setEditMode(true); editGroup(group); })}>✎</button>}
+      {group.record && onRemovePlan && <button type="button" disabled={editing} aria-label={`${t("Remove", "Usuń")}: ${label}`}
+        onClick={quiet(() => { setEditMode(true); setSelected(group.key); onRemovePlan(recordSelection(group.record!)); })}>{t("Remove", "Usuń")}</button>}
     </td>;
   };
+  const emptyFigures = withCycles ? <><td /><td /><td /><td /></> : null;
   const subscriptionRows = groups.flatMap((group) => {
-    const { segment } = group;
+    const { segment, record } = group;
     const tier = segment && !segment.conflict ? segmentTier(segment) : null;
-    // A plan of one cycle is that cycle: one row carries both.
-    const single = group.cycles.length === 1 && !group.pending.length ? group.cycles[0]! : null;
-    const nested = single ? [] : group.cycles;
+    // In edit mode a row is the period alone; otherwise a period of one cycle is that cycle: one row carries both.
+    const single = !editMode && group.cycles.length === 1 ? group.cycles[0]! : null;
+    const nested = editMode || single ? [] : group.cycles;
     const open = !folded.has(group.key);
-    const keys = [...new Set([group.key, ...single ? [`cycle|${single.start}`] : []])];
+    const keys = [...new Set([group.key, ...group.bars ?? [], ...single ? [`cycle|${single.start}`] : []])];
     const marked = selected ? keys.includes(selected) : !!single?.current;
     const { perCycle, total } = groupPayments(group);
-    const name = !segment ? planName(group.cycles[0]!.plan, provider, group.cycles[0]!.start) : segment.conflict ? t("Conflicting readings", "Sprzeczne odczyty")
+    const name = group.kind === "gap" ? t("Gap", "Przerwa")
+      : !segment ? planName(group.cycles[0]!.plan, provider, group.cycles[0]!.start)
       : tier ? formatPlanLabel(tier.label, tier.multiplier) : planName(segment.label!, provider, iso(segment.from));
-    const choose = segment ? () => { setSelected(group.key); onPlanPeriod(planSelection(segment)); } : () => { setSelected(group.key); onCycle?.(single!); };
-    const fold = nested.length + group.pending.length === 0 ? <span className="account-history-fold" aria-hidden="true" /> : <button type="button" className="ui-disclosure account-history-fold" aria-expanded={open}
+    const fold = nested.length === 0 ? <span className="account-history-fold" aria-hidden="true" /> : <button type="button" className="ui-disclosure account-history-fold" aria-expanded={open}
       aria-label={open ? t("Hide cycles", "Zwiń cykle") : t("Show cycles", "Pokaż cykle")}
-      onClick={(event?: { stopPropagation(): void }) => { event?.stopPropagation(); setFolded((current) => { const next = new Set(current); if (open) next.add(group.key); else next.delete(group.key); return next; }); }}>{open ? "▾" : "▸"}</button>;
+      onClick={quiet(() => setFolded((current) => { const next = new Set(current); if (open) next.add(group.key); else next.delete(group.key); return next; }))}>{open ? "▾" : "▸"}</button>;
+    const basisText = group.kind === "gap" ? t("No plan", "Bez planu") : group.kind === "loose" ? cycleBasis(group.cycles[0]!, t)
+      : record ? t("Your declaration", "Twój wpis") : t("From readings", "Z odczytów");
+    const declaredPrice = record?.amountMinor == null ? "—" : cycleMoney(record.amountMinor / 100, record.currency ?? null, locale);
+    const gapTitle = group.readings?.length ? `${t("Readings show here", "Odczyty pokazują tu")}: ${group.readings.join(", ")}` : undefined;
     const rows = [<TableRow key={group.key} ref={(node) => keys.forEach((key) => rowRef(key)(node))} {...hover(group.key)}
-      className={rowClass("is-plan", marked && "is-selected", !!single && recalculating(single) && "is-pending")} {...single ? { "data-cycle-row": single.start } : {}}
-      onClick={editing ? undefined : choose}>
-      <td>{fold}<button type="button" disabled={editing}>{name}</button>{single ? ongoing(single) : ""}</td>
+      className={rowClass(group.kind === "gap" ? "is-gap" : "is-plan", marked && "is-selected", !!single && recalculating(single) && "is-pending")} {...single ? { "data-cycle-row": single.start } : {}}
+      onClick={editing ? undefined : () => { if (group.kind === "gap") setEditMode(true); editGroup(group); }}>
+      <td title={gapTitle}>{fold}<button type="button" disabled={editing}>{name}</button>{single ? ongoing(single) : ""}</td>
       <td className="mono"><span className={`account-history-tier${tierClass(tier)}`}>{tier?.multiplier != null ? `×${tier.multiplier}` : "—"}</span></td>
       <td className="mono">{stamp(group.from)}</td>
       <td className="mono">{stamp(group.until)}</td>
       <td className="mono">{days(group.from, group.until ?? now)}</td>
-      {single ? cycleCells(single) : <>
+      {single ? cycleCells(single) : group.kind === "gap" ? <><td className="mono">—</td><td className="mono">—</td>{emptyFigures}</>
+        : editMode ? <><td className="mono">{declaredPrice}</td><td className="mono">—</td>{emptyFigures}</> : <>
         <td className="mono" title={perCycle.title}>{perCycle.text}</td>
         <td className="mono" title={total.title}>{total.text}</td>
-        {withCycles && <><td /><td /><td /><td /></>}
+        {emptyFigures}
       </>}
-      <td>{!segment ? cycleBasis(single!, t) : segment.records.some((row) => row.origin === "declared") ? t("Your declaration", "Twój wpis") : t("From readings", "Z odczytów")}</td>
-      {withCycles && (single ? cycleActions(single) : <td />)}
+      <td>{basisText}</td>
+      {groupActions(group)}
     </TableRow>];
     if (!open) return rows;
-    for (const row of group.pending) rows.push(<TableRow key={`pending|${row.id}`} className="is-cycle"
-      onClick={editing ? undefined : () => { setSelected(group.key); onPlanPeriod({ provider, account: row.account, aliases, from: row.from, until: row.until, records: [row] }); }}>
-      <td>{t("cycle", "cykl")} · {Date.parse(row.from) > now ? t("upcoming", "nadchodzi") : t("being calculated", "w przeliczeniu")}</td>
-      <td />
-      <td className="mono">{stamp(Date.parse(row.from))}</td>
-      <td className="mono">{row.until ? stamp(Date.parse(row.until)) : "—"}</td>
-      <td className="mono">{row.until ? days(Date.parse(row.from), Date.parse(row.until)) : "—"}</td>
-      <td className="mono">{row.amountMinor == null ? "—" : cycleMoney(row.amountMinor / 100, row.currency ?? null, locale)}</td>
-      <td className="mono">—</td><td /><td /><td /><td />
-      <td>{t("Your declaration", "Twój wpis")}</td>
-      <td />
-    </TableRow>);
     rows.push(...[...nested].reverse().map((cycle) => {
       const key = `cycle|${cycle.start}`;
       return <TableRow key={key} ref={rowRef(key)} {...hover(key)} data-cycle-row={cycle.start}
         className={rowClass("is-cycle", (selected ? selected === key : cycle.current) && "is-selected", recalculating(cycle) && "is-pending")}
-        onClick={editing ? undefined : () => { setSelected(key); onCycle!(cycle); }}>
+        onClick={editing ? undefined : () => { setSelected(key); onCycle?.(cycle); }}>
         <td>{t("cycle", "cykl")}{ongoing(cycle)}</td>
         <td />
         <td className="mono">{formatStamp(cycle.start)}</td>
@@ -399,11 +448,18 @@ export function AccountHistoryTimeline({ plans, timelines, provider, account, al
   // History tables mirror the periods chart; the limit windows chart carries its own table.
   const historyTabs: DetailTab[] = tab !== "periods" ? [] : [
     ...(groups.length > 0 ? [{ key: "subscription", label: t("Subscription", "Abonament"), badge: groups.length, render: () => <div data-billing-cycles>
-      {withCycles && cyclesStale && <p className="account-periods-note ui-loading-status" role="status">
+      <div className="account-history-subscription-tools">
+        {editMode ? <>
+          <span className="account-periods-note">{t("Each change is saved at once. Cycles and amounts show again when you finish.",
+            "Każda zmiana zapisuje się od razu. Cykle i kwoty pokażą się po zakończeniu.")}</span>
+          <GhostButton disabled={editing} onClick={() => onPlanPeriod({ provider, account, aliases, from: iso(now), until: null, records: [] })}>
+            + {t("Add period", "Dodaj okres")}</GhostButton>
+          <GhostButton emphasis disabled={editing} onClick={() => setEditMode(false)}>{t("Done", "Gotowe")}</GhostButton>
+        </> : <GhostButton disabled={editing} onClick={() => setEditMode(true)}>{t("Edit periods", "Edytuj okresy")}</GhostButton>}
+      </div>
+      {!editMode && withCycles && cyclesStale && <p className="account-periods-note ui-loading-status" role="status" title={notice?.title || undefined}>
         <span className="ui-loading-spinner" aria-hidden="true" />
-        {cyclesPendingFrom
-          ? `${t("Recalculating cycles from", "Przeliczam cykle od")} ${dayMonth(cyclesPendingFrom)}…`
-          : t("Cycles are updating in the background.", "Cykle aktualizują się w tle.")}
+        {notice ? notice.text : t("Cycles are updating in the background.", "Cykle aktualizują się w tle.")}
       </p>}
       <DataTable tableId="AccountHistoryTimeline:subscription" className="account-history-assignments account-history-cycles account-history-subscription" aria-label={t("Subscription", "Abonament")}>
         <thead><TableRow header><th data-column-id="c0">{t("Plan", "Plan")}</th><th data-column-id="c1">{t("Multiplier", "Mnożnik")}</th>
@@ -421,9 +477,9 @@ export function AccountHistoryTimeline({ plans, timelines, provider, account, al
             <th data-column-id="c10">{t("1 window point", "1 pkt okna")}</th>
           </>}
           <th data-column-id="c11">{t("Basis", "Podstawa")}</th>
-          {withCycles && <th data-column-id="c12">{t("Action", "Akcja")}<HelpDot label={t("Action", "Akcja")}>{t(
-            "To record a cancellation, add a “No subscription” period from its end — readings then no longer extend the plan.",
-            "Rezygnację zapisz jako okres „Brak abonamentu” od dnia końca — wtedy odczyty nie przedłużą planu.")}</HelpDot></th>}
+          <th data-column-id="c12">{t("Action", "Akcja")}<HelpDot label={t("Action", "Akcja")}>{t(
+            "✎ changes exactly this period, Remove deletes it. Between your periods a gap stays a gap: readings never fill it or extend a period past its end.",
+            "✎ zmienia dokładnie ten okres, Usuń go kasuje. Między Twoimi okresami przerwa zostaje przerwą: odczyty jej nie wypełniają i nie przedłużają okresu po jego końcu.")}</HelpDot></th>
         </TableRow></thead>
         <tbody>{subscriptionRows}</tbody>
       </DataTable>
@@ -444,7 +500,8 @@ export function AccountHistoryTimeline({ plans, timelines, provider, account, al
   ];
   const keys = [...historyTabs, ...sections].map((item) => item.key);
   const active = detail && keys.includes(detail) ? detail : keys[0] ?? null;
-  return <div className="account-history-timeline">
+  return <div className={`account-history-timeline${pinned.className}`} ref={pinned.root} style={pinned.style}>
+    <div className="account-history-pinned" ref={pinned.block}>
     <div className="account-history-timeline-tools">
       <div className="ui-tabs" role="tablist" aria-label={t("History view", "Widok historii")}>
         <button type="button" role="tab" className="ui-tab" aria-selected={tab === "periods"} onClick={() => setTab("periods")}>{t("Periods", "Okresy")}</button>
@@ -461,7 +518,7 @@ export function AccountHistoryTimeline({ plans, timelines, provider, account, al
           const key = `plan|${segment.from}`;
           const draggable = segment.records.length > 0 && !editing;
           return <div key={key}
-            className={`account-history-bar ${segment.label === null ? "is-unknown" : segment.conflict ? "is-conflict" : `is-plan${tierClass(segmentTier(segment))}`}${draggable ? " is-draggable" : ""}${marked(key)}`}
+            className={`account-history-bar ${segment.label === null ? "is-unknown" : segment.conflict ? "is-conflict" : `is-plan${tierClass(segmentTier(segment))}`}${draggable ? " is-draggable" : ""}${marked(key, segment.records)}`}
             style={position(key, segment.from, segment.until)} title={`${segment.label ? segment.records.map((row) => planName(row.plan, row.provider)).filter((value, index, all) => all.indexOf(value) === index).join(" / ") : t("Plan not established", "Plan nieustalony")} · ${shortDate(segment.from)} → ${shortDate(segment.until)}`}
             {...(draggable ? dragProps(key, segment.from, segment.until, (shift) => onPlanPeriod(planSelection(segment), shift), cycleAt) : {})}>
             <span>{segment.conflict ? t("Conflicting readings", "Sprzeczne odczyty") : segment.label ? planName(segment.label, provider) : ""}</span>
@@ -508,9 +565,37 @@ export function AccountHistoryTimeline({ plans, timelines, provider, account, al
       {cycles.some((cycle) => cycle.basis === "inferred") && <span>? {t("inferred from readings", "przyjęte z odczytów")}</span>}
       {cycles.some((cycle) => cycle.anchor_uncertain) && <span>≈ {t("payment date uncertain", "data płatności niepewna")}</span>}
     </div>}
+    </div>
     {keys.length > 0 && <DetailTabs panelRef={details} label={t("Details", "Szczegóły")} active={active} onChange={chooseDetail}
       groups={[{ label: t("History", "Historia"), tabs: historyTabs }, { label: t("Account settings", "Ustawienia konta"), tabs: sections }]} />}
   </div>;
+}
+
+/** At most this share of the scrolling sheet may stay pinned; a taller chart (many window lanes) scrolls with the page. */
+const PIN_SHARE = 0.5;
+
+/**
+ * Keeps the chart in view while the tables under it scroll, so a hovered or selected row still shows its bar (user
+ * request 29.10). Its height goes to `--account-history-pinned`, which puts the table heads just under it.
+ */
+function usePinnedChart() {
+  const root = useRef<HTMLDivElement>(null), block = useRef<HTMLDivElement>(null);
+  /** The pinned chart's height in px; null while it scrolls with the sheet. */
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    // Test DOMs have neither the observer nor `closest`: the chart then simply scrolls with the sheet.
+    if (typeof ResizeObserver === "undefined") return;
+    const chart = block.current, sheet = root.current?.closest?.<HTMLElement>(".ui-workspace-sheet");
+    if (!chart || !sheet) return;
+    const update = () => setHeight(chart.offsetHeight <= sheet.clientHeight * PIN_SHARE ? chart.offsetHeight : null);
+    const observer = new ResizeObserver(update);
+    observer.observe(chart);
+    observer.observe(sheet);
+    update();
+    return () => observer.disconnect();
+  }, []);
+  const style = height === null ? undefined : { "--account-history-pinned": `${height}px` } as CSSProperties;
+  return { root, block, className: height === null ? "" : " is-pinned", style };
 }
 
 const usageTone = (value: number) => value >= 90 ? "var(--crit)" : value >= 70 ? "var(--warn)" : "var(--ok)";

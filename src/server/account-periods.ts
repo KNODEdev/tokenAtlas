@@ -1,5 +1,5 @@
 import { normEraKey, normEraVendor } from "./eras";
-import { canonicalPeriodPlan, respectDeclaredEnds } from "../shared/period-end";
+import { canonicalPeriodPlan, endOpenDeclarations, respectDeclaredEnds } from "../shared/period-end";
 
 /**
  * Dated periods: "for subject S, from instant A until instant B, the value was V". One
@@ -162,12 +162,24 @@ export function effectiveDatedPeriods<P extends IndexedPeriod = DatedPeriod>(per
 }
 
 /**
+ * Plan periods as every plan reader takes them: an open declared plan ends where another plan starts after it
+ * (endOpenDeclarations), then declared ends close observed runs. Plan names are compared in catalog form, so a reading of
+ * "default_claude_ai" does not end a declared "pro". Account periods keep effectiveDatedPeriods: there a declaration is
+ * the correction of a reading.
+ */
+export function effectivePlanPeriods<P extends IndexedPeriod = DatedPeriod>(periods: readonly P[]): P[] {
+  const plan = (p: P) => canonicalPeriodPlan(p.value).toLowerCase();
+  return respectDeclaredEnds(endOpenDeclarations(periods, p => periodSubjectKey(p.provider, p.subject), plan),
+    p => periodSubjectKey(p.provider, p.subject), plan);
+}
+
+/**
  * Whether an account has a plan at `at`. Null when the account has no plan history, so the caller keeps
  * its older signal; a history whose last plan has ended means the subscription is no longer active.
  * Plan names are compared in catalog form, so a declared "pro" ends an observed "default_claude_ai" run.
  */
 export function planActivityAt(periods: readonly DatedPeriod[], at: string): (provider: string, subject: string) => boolean | null {
-  const index = buildPeriodIndex(periods.map((period) => ({ ...period, value: canonicalPeriodPlan(period.value) })));
+  const index = buildPeriodIndex(effectivePlanPeriods(periods).map((period) => ({ ...period, value: canonicalPeriodPlan(period.value) })));
   return (provider, subject) => index.periodsOf(provider, subject).length ? index.resolve(provider, subject, at).value !== null : null;
 }
 
@@ -180,7 +192,7 @@ export function planActivityAt(periods: readonly DatedPeriod[], at: string): (pr
 export function planPeriodIndex<P extends IndexedPeriod = DatedPeriod>(periods: readonly P[] | undefined): PeriodIndex<P> | null {
   if (!periods?.length) return null;
   try {
-    return buildPeriodIndex(periods.map((period) => ({ ...period, value: canonicalPeriodPlan(period.value) })));
+    return buildPeriodIndex(effectivePlanPeriods(periods).map((period) => ({ ...period, value: canonicalPeriodPlan(period.value) })));
   } catch (error) {
     console.warn("[plan periods] unusable:", error instanceof Error ? error.message : error);
     return null;
@@ -193,6 +205,6 @@ export function planPeriodIndex<P extends IndexedPeriod = DatedPeriod>(periods: 
  */
 export function planPeriodsShape(periods: readonly DatedPeriod[], provider?: string, subject?: string): unknown[] {
   const key = provider && subject ? periodSubjectKey(provider, subject) : null;
-  return effectiveDatedPeriods(periods).filter((p) => key === null || periodSubjectKey(p.provider, p.subject) === key)
+  return effectivePlanPeriods(periods).filter((p) => key === null || periodSubjectKey(p.provider, p.subject) === key)
     .map((p) => [p.provider, p.subject, p.origin, p.from, p.until, canonicalPeriodPlan(p.value)]);
 }

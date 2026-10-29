@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildPeriodIndex, observedPeriods, planActivityAt, validatePeriods, type DatedPeriod, type PeriodReading } from "./account-periods";
+import { buildPeriodIndex, effectiveDatedPeriods, effectivePlanPeriods, observedPeriods, planActivityAt, planPeriodIndex, validatePeriods, type DatedPeriod, type PeriodReading } from "./account-periods";
 
 const reading = (ts: string, value: string, subject = "claude/PC"): PeriodReading => ({ provider: "claude", subject, ts, value });
 const declared = (from: string, until: string | null, value: string, subject = "claude/PC"): DatedPeriod => ({
@@ -79,5 +79,24 @@ describe("planActivityAt", () => {
     expect(active("claude", "history")).toBe(false);
     // No plan history says nothing; the caller keeps its own signal.
     expect(active("claude", "unknown")).toBeNull();
+  });
+});
+
+describe("effectivePlanPeriods", () => {
+  const observed = (from: string, until: string | null, value: string): DatedPeriod => ({
+    provider: "claude", subject: "acct", from, until, value, origin: "observed", firstSeen: from, lastSeen: until ?? from, readings: 1, evidence: "profile-reading",
+  });
+  it("ends an open declared plan where a reading of another plan starts, never at a reading of the same plan", () => {
+    const rows = [declared("2026-10-24T12:47:00.000Z", null, "pro", "acct"), observed("2026-10-24T12:55:18.153Z", "2026-10-24T14:06:34.705Z", "default_claude_ai"),
+      observed("2026-10-24T14:16:34.923Z", null, "default_claude_max_20x")];
+    expect(effectivePlanPeriods(rows)[0]!.until).toBe("2026-10-24T14:16:34.923Z");
+    const index = planPeriodIndex(rows)!;
+    expect(index.resolve("claude", "acct", "2026-10-24T13:00:00.000Z").value).toBe("pro");
+    expect(index.resolve("claude", "acct", "2026-10-28T00:00:00.000Z")).toMatchObject({ value: "max-20x", basis: "observed" });
+    expect(effectivePlanPeriods(rows.slice(0, 2))[0]!.until).toBeNull();
+    // An earlier reading still running when the declaration starts is what the declaration corrects.
+    expect(effectivePlanPeriods([declared("2026-10-24T12:47:00.000Z", null, "pro", "acct"), observed("2026-10-01T00:00:00.000Z", null, "max-20x")])[0]!.until).toBeNull();
+    // Account periods keep declarations as corrections of readings.
+    expect(effectiveDatedPeriods(rows)[0]!.until).toBeNull();
   });
 });

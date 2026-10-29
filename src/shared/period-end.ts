@@ -24,6 +24,24 @@ export const isNoPlan = (value: string | null | undefined): boolean => value ===
 export const looksLikeNoPlan = (value: string | null | undefined): boolean =>
   typeof value === "string" && value.trim().toLowerCase() === NO_PLAN;
 
+/**
+ * One plan at a time (owner rule 29.10): a new plan ends the previous one. An open declared row therefore ends where a
+ * row of another value starts after it, so a statement without an end cannot hide a later reading of a new plan.
+ */
+export function endOpenDeclarations<T extends PeriodBounds>(rows: readonly T[], subject: (row: T) => string, value: (row: T) => string): T[] {
+  return rows.map(row => {
+    if (row.origin !== "declared" || row.until !== null) return row;
+    const from = Date.parse(row.from);
+    let until = Infinity;
+    for (const other of rows) {
+      if (other === row || other.origin === "inferred" || subject(other) !== subject(row) || value(other) === value(row)) continue;
+      const start = Date.parse(other.from);
+      if (start > from && start < until) until = start;
+    }
+    return until === Infinity ? row : { ...row, until: new Date(until).toISOString() };
+  });
+}
+
 /** A declared end closes the overlapping observed run of the same value, without erasing evidence. */
 export function respectDeclaredEnds<T extends PeriodBounds>(rows: readonly T[], subject: (row: T) => string, value: (row: T) => string): T[] {
   return rows.map(row => {

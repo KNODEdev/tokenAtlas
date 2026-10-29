@@ -19,7 +19,7 @@ import { windowFromReset, limitPace, windowElapsedPercent } from "../providers/c
 import { segmentPace, boostFactorAt, claudeAccountId, buildClaudeLimit } from "./claude-limit";
 import type { ClaudeAccountMeters, ClaudeAccountSplitWindow, ClaudeAccountSplitsResponse } from "../shared/claude-code-capacity";
 import { MIN_RAIL_SHAPE_POINTS } from "../web/lib/windows";
-import { planPeriodIndex, effectiveDatedPeriods } from "./account-periods";
+import { planPeriodIndex, effectivePlanPeriods } from "./account-periods";
 import { parseCapacityCounter } from "../shared/manual-capacity";
 import type { AppContext } from "./app-context-types";
 import { accountResolverOf, resolveAccountScope } from "./account-scope";
@@ -604,7 +604,7 @@ function claudeAnchoredWindows(ctx: AppContext, account: string, nowMs: number,
   if (!prepared) try { periods = loadPeriods(ctx.sqlite, PLAN_PERIODS); }
   catch (error) { console.warn("[windows] plan periods unreadable:", error instanceof Error ? error.message : error); }
   const planIndex = planPeriodIndex(periods);
-  const accountPlans = effectiveDatedPeriods(periods).filter(p => p.provider === "claude" && p.subject.toLowerCase() === account.toLowerCase());
+  const accountPlans = effectivePlanPeriods(periods).filter(p => p.provider === "claude" && p.subject.toLowerCase() === account.toLowerCase());
   const price = (model: string | null, day: string, speed: string | null) =>
     getClaudeRate(ctx.rateCards, model, day, speed);
   const limitReport = buildClaudeLimit(ctx.sqlite, cfg, price, new Date(nowMs).toISOString(),

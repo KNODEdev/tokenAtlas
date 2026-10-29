@@ -7,7 +7,7 @@ export { probeWindowPlan } from "./window-plan-periods";
 export { segmentLimitReadings } from "./window-lifecycle";
 import type { Database } from "bun:sqlite";
 import type { ManualCapacityMeasurement } from "../shared/manual-capacity";
-import { effectiveDatedPeriods, planPeriodIndex, type DatedPeriod, type PeriodIndex } from "./account-periods";
+import { effectivePlanPeriods, planPeriodIndex, type DatedPeriod, type PeriodIndex } from "./account-periods";
 import { claudeEventOwnedBySql } from "./claude-event-account";
 import type { AccountResolver } from "./account-resolver";
 import { readPreparedProbeAccountHistory, readPreparedProbeAccountingRevision, ProbeAccountIndexUnavailable } from "./current/probe-account-reader";
@@ -173,7 +173,7 @@ export interface WindowResolution {
 export function windowResolution(provider: string, account: string, counter: string, periods: readonly DatedPeriod[],
   measurements: readonly ManualCapacityMeasurement[] = []): WindowResolution {
   return { provider, account, counter, index: planPeriodIndex(periods),
-    periods: effectiveDatedPeriods(periods).filter(p => p.provider === provider && p.subject.toLowerCase() === account.toLowerCase()),
+    periods: effectivePlanPeriods(periods).filter(p => p.provider === provider && p.subject.toLowerCase() === account.toLowerCase()),
     measurements: measurements.filter(m => m.account.toLowerCase() === account.toLowerCase() && m.counter === counter) };
 }
 
