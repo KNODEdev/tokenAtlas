@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/KNODEdev/tokenAtlas/discussions
+    about: Ask questions and discuss how you use tokenAtlas.
+  - name: Private security report
+    url: https://github.com/KNODEdev/tokenAtlas/blob/main/SECURITY.md
+    about: Follow the security policy before sharing vulnerability details.
+  - name: Support development
+    url: https://tokenatlas.dev/#support
+    about: Voluntary support is independent of bug reports and contributions.

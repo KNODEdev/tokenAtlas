@@ -1,5 +1,55 @@
 # Initial source snapshot — 25 October 2026
 
+## Public Windows installation preparation — 29 October 2026
+
+Verification used a clean `git archive` of `2a8dd02` with a frozen Bun install,
+workspace-local temporary storage and synthetic databases. The installed app,
+live database and existing archive were not changed. A later concurrent PNG-export
+commit is outside this run's source scope. All checks were local; no GitHub Actions
+were used.
+
+TypeScript checking and the isolated frontend build pass. The build still reports
+chunks larger than 500 kB. Locked Rust tests pass 21/21 for the parser and 38/38 for
+the monitor. The new portable Windows parser was built with Cargo 1.99.0 and
+`RUSTFLAGS=-Ctarget-cpu=x86-64-v2`; all 53 dependencies in its Windows graph have
+copied notices, and all three lockfile hashes match the notice inventory.
+
+Parser helper release `parser-0ab55c4340b9` is published on GitHub, with the binary,
+checksums and notices. Its source hash is
+`0ab55c4340b9f467b6301b09ef0022a6aa3ba4d27f6e268d0cd7b7f3dafee536`;
+the binary SHA-256 is
+`0c146478744f71cb6f3fb0b7092e0dc4ac84e24064a6a13b59cfcf113e58246f`.
+This closes the stale parser-manifest mismatch described below. It is a helper
+release for the source installer, not a stable application release.
+
+A fresh server using isolated home/config/archive/state/database paths returned
+200 for `/`, `/api/setup?summary=1` and all 20 referenced JS/CSS assets. First-run
+locations were unconfirmed, import remained stopped, and a foreign-origin setup
+request returned 403. The trial server was closed afterwards. This is a first-start
+smoke check, not the owner's forthcoming clean-PC acceptance trial.
+
+The broad default-budget test run is not a clean pass. It exposed a stale snapshot
+fixture lacking the Codex `source_offset` column and an implicit rollback-journal
+read transaction. The fixture now includes that column and the read explicitly
+uses `BEGIN DEFERRED`, preserving SQLite's prior behavior. The repaired snapshot
+file passes 28/28 tests (270 assertions); manifest and transaction checks pass 6/6.
+Four migration/import files that had hit five-second deadlines pass 17/17 with a
+30-second default budget (297 assertions), retaining their data and performance
+assertions. Other broad-run failures include a project-cost fixture's immutable
+base-proof mismatch; a clean full-suite pass is not claimed. The README records
+the 30-second integration command for repeatability.
+
+Gitleaks 8.30.1 scanned all 39 reachable commits through `4019ae7`. The same two
+generic-key findings were inspected in their original commit: an OAuth client ID
+(also present in the distributed CLI) and the exact Git blob SHA-1 of
+`src/web/tokens.css`, independently reproduced with `git hash-object`. They are
+not access credentials. No findings were suppressed and no history was rewritten.
+
+Standard user acceptance is **GitHub → Code → Download ZIP → `_dev.bat`** with
+anonymous parser download. A specially assembled local bundle is not an acceptance
+path. Linux/macOS installation, real provider sign-in/import and all UI states
+remain outside this preparation's verified scope.
+
 ## Test repair follow-up — 28 October 2026
 
 The 18 failures recorded in the 27 October audit were mapped back to their 14 test

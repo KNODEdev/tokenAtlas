@@ -72,10 +72,12 @@ not certify their installation or runtime. Mobile is not a supported target.
 Use a current Bun compatible with the committed lockfile. This preparation was
 checked with the versions recorded in [VERIFICATION.md](VERIFICATION.md).
 
-## Start on Windows
+## Setting up on a new machine
 
-1. Obtain a reviewed source release and extract it to a writable local directory.
-2. Install Rust/MSVC if no matching public parser binary is available.
+1. On [GitHub](https://github.com/KNODEdev/tokenAtlas), choose **Code → Download ZIP**
+   and extract the complete archive to a writable local directory on Windows.
+2. The launcher downloads the matching Windows x64 parser automatically and checks
+   its SHA-256. Rust/MSVC is needed only when building the parser from source.
 3. Run `_dev.bat`. It checks dependencies, prepares the parser, builds the web
    interface and starts the local server.
 4. Open `http://127.0.0.1:7331`. On a new installation, confirm the archive and
@@ -106,7 +108,7 @@ From the source directory, with Bun and Rust/MSVC installed:
 ```powershell
 bun install --frozen-lockfile
 bun run typecheck
-bun test ./src ./scripts
+bun test ./src ./scripts --timeout 30000
 cargo test --locked --manifest-path native/tokenatlas-parse/Cargo.toml
 cargo test --locked --manifest-path native/tokenatlas-monitor/Cargo.toml
 bun run build:web
@@ -117,6 +119,10 @@ Run builds and installation trials in a disposable copy: `build:web` writes to
 Tests that explicitly require private integration data do not establish a clean
 installation pass when that data is absent. Verification is local; this project
 does not use GitHub Actions.
+
+The 30-second default test budget accommodates integration cases that migrate
+synthetic databases and start native processes on Windows. Explicit performance
+assertions and individual test budgets still apply.
 
 ## License, attribution and support
 

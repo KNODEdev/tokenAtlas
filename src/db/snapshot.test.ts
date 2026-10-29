@@ -172,7 +172,7 @@ function createCoreTables(sqlite: Database): void {
     CREATE TABLE events (
       home TEXT, path TEXT, ts TEXT, surface TEXT, nested TEXT, model TEXT, effort TEXT,
       project TEXT, in_tok INTEGER, cached_in INTEGER, cache_write INTEGER, out_tok INTEGER,
-      reasoning_out INTEGER, cwd TEXT, project_id TEXT
+      reasoning_out INTEGER, cwd TEXT, project_id TEXT, source_offset INTEGER
     );
     CREATE TABLE ratelimit (
       home TEXT, path TEXT, ts TEXT, window_minutes INTEGER, used_percent REAL,

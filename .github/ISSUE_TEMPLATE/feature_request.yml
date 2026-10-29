@@ -1,0 +1,18 @@
+name: Feature request
+description: Propose a focused improvement or integration.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the task and who needs it. Keep examples synthetic.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Explain the desired result and any alternatives you considered.
+    validations:
+      required: true

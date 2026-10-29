@@ -13,10 +13,11 @@ a channel from the website after confirming that the relevant profile and
 payment method are actually active. Availability varies; this document
 does not claim that every named service is currently accepting payments.
 
-The GitHub repository also contains `.github/FUNDING.yml` for the GitHub
-Sponsors button (`KNODEdev`). That configuration is not proof that the
-Sponsors profile can already accept contributions; verify activation
-before promoting it.
+The GitHub repository's Sponsor button links to
+[GitHub Sponsors (`KNODEdev`)](https://github.com/sponsors/KNODEdev) and the
+website's support section through `.github/FUNDING.yml`. The Sponsors listing
+was confirmed public on 29 October 2026. Available amounts and payment options
+are shown by the payment service when you contribute.
 
 ## Three independent ways to support the project
 

@@ -1,4 +1,28 @@
-# Initial public source snapshot — 2026-10-25
+# Public Windows source preview — 2026-10-29
+
+Install through the ordinary GitHub path: **Code → Download ZIP**, extract the
+complete folder, then run `_dev.bat`. No separate application package is required.
+The launcher downloads Windows x64 parser `parser-0ab55c4340b9` and verifies its
+SHA-256 against `native/tokenatlas-parse/release.json`; Rust/MSVC is optional when
+using that published parser. The source remains under active development.
+
+Local preparation passes a frozen dependency installation, TypeScript checking,
+an isolated frontend build, 21 parser and 38 monitor Rust tests, and a fresh
+isolated first-start HTTP trial with 20 JS/CSS assets. Snapshot fixture repair
+passes 28 tests; four migration/import integration files pass 17 tests with a
+30-second default budget. Parser-manifest and transaction checks pass 6 tests.
+
+The broad suite is not a clean pass: its default five-second budgets interrupted
+several integrations, and a project-cost fixture reported an immutable base-proof
+mismatch. This preview does not certify a stable release, clean-PC installation,
+real-history import or macOS/Linux support. The owner's clean-PC trial is separate.
+See VERIFICATION.md for scope and retained earlier evidence.
+
+The repository supports Issues and Discussions. Its Sponsor button points to the
+public GitHub Sponsors profile and the official website's support section.
+Contributions and financial support remain independent.
+
+## Initial source snapshot — 2026-10-25
 
 This package contains only the tokenAtlas application. The website repository
 and the private development Git history are excluded. Project-owned code is

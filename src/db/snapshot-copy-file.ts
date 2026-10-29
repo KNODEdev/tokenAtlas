@@ -22,7 +22,7 @@ export function copySnapshotDatabaseFile(source: string, destination: string, on
       } finally { checkpoint.close(true); }
     } else {
       // A rollback-journal reader prevents changes to the main file until this copy finishes.
-      admission.exec("BEGIN");
+      admission.exec("BEGIN DEFERRED");
       transaction = true;
       admission.query("PRAGMA schema_version").get();
     }

@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a reproducible problem with tokenAtlas.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share a small synthetic example. Do not attach real transcripts, databases,
+        account identifiers, credentials or unredacted logs. Report vulnerabilities
+        privately using SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: Release name or Git commit
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System and installation
+      placeholder: Windows version, Bun version, source ZIP or Git checkout
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include the relevant provider and a synthetic example when possible.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Distinguish recorded usage, estimates and missing measurements.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Optional redacted diagnostics
+      description: Remove private paths, identifiers, conversation text and credentials.
