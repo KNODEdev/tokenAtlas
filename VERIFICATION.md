@@ -50,6 +50,20 @@ anonymous parser download. A specially assembled local bundle is not an acceptan
 path. Linux/macOS installation, real provider sign-in/import and all UI states
 remain outside this preparation's verified scope.
 
+After publishing `6c3e237`, the ordinary public GitHub main source download was
+fetched without credentials. It contained no parser binary. The unchanged
+`build-native-parser.ps1` downloaded `parser-0ab55c4340b9` with an empty GitHub CLI
+configuration and Rust/MSVC detection disabled; its checksum matched the manifest.
+This checks the public installer download path. The owner's clean-PC trial still
+establishes the complete installation experience.
+
+The older broad baseline run was stopped after 45 reported failure cases and was
+not completed. That count includes the subsequently repaired snapshot fixture,
+transaction and manifest cases, plus integration timeouts and remaining
+project-cost base-proof / compressed-source pipeline mismatches. Do not interpret
+the combined scoped repair results as a clean full-suite result. Synthetic fixture
+databases were removed after verification; compact reports and logs were retained.
+
 ## Test repair follow-up — 28 October 2026
 
 The 18 failures recorded in the 27 October audit were mapped back to their 14 test
