@@ -8,10 +8,11 @@ import { snapshotId, readSnapshotIdentity, identityFingerprint, buildManifest } 
 import { ATLAS_SNAPSHOT_DATABASE_SUFFIX, ATLAS_SNAPSHOT_MANIFEST_SUFFIX } from "./snapshot-contracts";
 import { removeStalePublicationTemps, retainNewestValidatedSnapshots } from "./snapshot-retention";
 import { discoverNewestValidAtlasSnapshot, discoverAtlasSnapshotCandidates } from "./snapshot-discovery";
-import { SnapshotDatabase } from "./snapshot-database";
+import { databaseSchemaVersion, SnapshotDatabase } from "./snapshot-database";
 import { syncFile, renamePublicationFile, establishDurablePair } from "./snapshot-files";
 import { confirmPublishedSnapshot } from "./snapshot-validation";
 import { backupSnapshotDatabase } from "./snapshot-backup";
+import { copySnapshotDatabaseFile } from "./snapshot-copy-file";
 
 function resultFromCandidate(
   candidate: AtlasSnapshotCandidate,
@@ -97,12 +98,12 @@ export function publishAtlasSnapshot(options: PublishAtlasSnapshotOptions): Atla
           .filter((candidate) => candidate.valid && candidate.compatible && candidate.manifest)
         : [];
       const source = new SnapshotDatabase(options.dbPath, { readonly: true });
+      let snapshotTotalBytes: number | undefined;
       try {
-        const sourceIdentity = readSnapshotIdentity(source, archiveRoot);
-        if (sourceIdentity.schemaVersion > currentSchemaVersion) {
+        if (databaseSchemaVersion(source) > currentSchemaVersion) {
           throw new Error("source database schema is newer than this application");
         }
-        const sourceFingerprint = identityFingerprint(sourceIdentity);
+        const sourceFingerprint = existing.length ? identityFingerprint(readSnapshotIdentity(source, archiveRoot)) : null;
         const identical = existing.find(
           (candidate) => identityFingerprint(candidate.manifest!) === sourceFingerprint,
         );
@@ -113,15 +114,20 @@ export function publishAtlasSnapshot(options: PublishAtlasSnapshotOptions): Atla
             options.mode === "manual" ? "identical-snapshot" : "unchanged-data",
           );
         }
-        options.failpoints?.beforeDatabaseCopy?.();
-        if (options.onProgress) {
-          const snapshotTotalBytes = databaseBytes(source);
-          options.onProgress({ phase: "snapshot-copy", snapshotFile: databaseTemp,
-            ...(snapshotTotalBytes ? { snapshotTotalBytes } : {}) });
-        }
-        backupSnapshotDatabase(options.dbPath, databaseTemp);
+        if (options.onProgress) snapshotTotalBytes = databaseBytes(source);
       } finally {
         source.close();
+      }
+      options.failpoints?.beforeDatabaseCopy?.();
+      const copying = (totalBytes = snapshotTotalBytes) => options.onProgress?.({
+        phase: "snapshot-copy", snapshotFile: databaseTemp,
+        ...(totalBytes ? { snapshotTotalBytes: totalBytes } : {}),
+      });
+      if (options.copyMethod === "file") {
+        copySnapshotDatabaseFile(options.dbPath, databaseTemp, copying);
+      } else {
+        copying();
+        backupSnapshotDatabase(options.dbPath, databaseTemp);
       }
       // Snapshot bootstrap must not inherit another machine's pending transport side effects.
       // Only the COPY is scrubbed; the source queue remains authoritative and recoverable.

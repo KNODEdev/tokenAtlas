@@ -8,6 +8,7 @@ import { atlasIndexSnapshotPool } from "../../src/config/paths";
 test("serves the application and live snapshot status while preparation is blocked, then releases the port", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-preparation-"));
   const publicDirectory = path.join(root, "public"), release = path.join(root, "release"), snapshot = path.join(root, "copy.sqlite");
+  const releaseChecksum = path.join(root, "release-checksum");
   fs.mkdirSync(publicDirectory);
   fs.writeFileSync(path.join(publicDirectory, "index.html"), "real application bundle");
   const script = path.join(root, "prepare.ts");
@@ -17,7 +18,9 @@ test("serves the application and live snapshot status while preparation is block
     console.log('[tokenAtlas startup] '+JSON.stringify({phase:"snapshot-copy",snapshotFile:${JSON.stringify(snapshot)},snapshotTotalBytes:8192}));
     const signal=new Int32Array(new SharedArrayBuffer(4));
     while(!fs.existsSync(${JSON.stringify(release)})) Atomics.wait(signal,0,0,20);
-    console.log('[tokenAtlas startup] '+JSON.stringify({phase:"snapshot-validation",snapshotFile:${JSON.stringify(snapshot)}}));`);
+    console.log('[tokenAtlas startup] '+JSON.stringify({phase:"snapshot-validation",snapshotFile:${JSON.stringify(snapshot)}}));
+    console.log('[tokenAtlas startup] '+JSON.stringify({phase:"snapshot-checksum",snapshotFile:${JSON.stringify(snapshot)},snapshotTotalBytes:2048,snapshotProcessedBytes:1024}));
+    while(!fs.existsSync(${JSON.stringify(releaseChecksum)})) Atomics.wait(signal,0,0,20);`);
   const preparation = startPreparation({ port: 0, dbPath: path.join(root, "source.sqlite"), publicDirectory,
     commands: [{ phase: "migration-check", cmd: [process.execPath, script] }] });
   const port = preparation.server.port;
@@ -38,6 +41,15 @@ test("serves the application and live snapshot status while preparation is block
       snapshotDirectory: atlasIndexSnapshotPool(path.join(root, "source.sqlite")) });
     expect(fs.existsSync(path.join(root, "source.sqlite"))).toBe(false);
     fs.writeFileSync(release, "continue");
+    const checksumDeadline = Date.now() + 5_000;
+    do {
+      status = await (await fetch(`${base}/api/startup`)).json();
+      if (Date.now() > checksumDeadline) throw new Error("Checksum progress was not delivered");
+      if (status.phase !== "snapshot-checksum") await Bun.sleep(20);
+    } while (status.phase !== "snapshot-checksum");
+    expect(status).toMatchObject({ phase: "snapshot-checksum", snapshotBytes: 2048,
+      snapshotTotalBytes: 2048, snapshotProcessedBytes: 1024 });
+    fs.writeFileSync(releaseChecksum, "continue");
     expect(await preparation.done).toBe(0);
     const next = Bun.serve({ port, hostname: "127.0.0.1", fetch: () => new Response("ready") });
     try { expect(await (await fetch(base)).text()).toBe("ready"); } finally { next.stop(true); }

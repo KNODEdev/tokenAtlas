@@ -9,7 +9,9 @@ import {
   ATLAS_SNAPSHOT_PUBLICATION_LEASE,
   discoverAtlasSnapshotCandidates,
   publishAtlasSnapshot,
+  validateAtlasSnapshotFiles,
 } from "./snapshot";
+import type { StartupUpdate } from "../shared/startup";
 
 const roots: string[] = [];
 
@@ -97,10 +99,12 @@ describe("local snapshot publication flow", () => {
     const dbPath = path.join(root, "atlas.sqlite");
     minimalSnapshotDatabase(dbPath);
     const stages: string[] = [];
+    const checksumProgress: StartupUpdate[] = [];
     let expectedBytes: number | undefined;
     const result = publishAtlasSnapshot({ dbPath, poolPath: path.join(root, "pool"), archiveRoot: root,
       mode: "manual", onProgress(update) {
-        stages.push(update.phase);
+        if (stages.at(-1) !== update.phase) stages.push(update.phase);
+        if (update.phase === "snapshot-checksum" && update.snapshotProcessedBytes != null) checksumProgress.push(update);
         if (update.phase === "snapshot-copy") expectedBytes = update.snapshotTotalBytes;
         if (update.phase === "snapshot-validation" || update.phase === "snapshot-checksum")
           expect(fs.statSync(update.snapshotFile!).size).toBeGreaterThan(0);
@@ -110,6 +114,49 @@ describe("local snapshot publication flow", () => {
     expect(stages).toEqual(["snapshot-wait", "snapshot-copy", "snapshot-validation", "snapshot-checksum", "snapshot-publication", "snapshot-retention"]);
     // Backup retains all source pages, including free ones.
     expect(expectedBytes).toBe(result.manifest!.sizeBytes);
+    expect(checksumProgress[0]?.snapshotProcessedBytes).toBe(0);
+    expect(checksumProgress.at(-1)?.snapshotProcessedBytes).toBe(result.manifest!.sizeBytes);
+    expect(checksumProgress.every((update, index) => update.snapshotTotalBytes === result.manifest!.sizeBytes
+      && (index === 0 || update.snapshotProcessedBytes! >= checksumProgress[index - 1]!.snapshotProcessedBytes!))).toBe(true);
+  });
+
+  test("creates a fresh safety copy without a full integrity scan and retains full restore validation", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "tokenatlas-snapshot-fresh-checks-"));
+    roots.push(root);
+    const dbPath = path.join(root, "atlas.sqlite");
+    minimalSnapshotDatabase(dbPath);
+    const queries: string[] = [];
+    const original = Database.prototype.prepare;
+    const spy = spyOn(Database.prototype, "prepare").mockImplementation((function (
+      this: Database, ...args: Parameters<Database["prepare"]>
+    ) {
+      queries.push(args[0]);
+      return Reflect.apply(original, this, args);
+    }) as Database["prepare"]);
+    try {
+      const result = publishAtlasSnapshot({ dbPath, poolPath: path.join(root, "pool"), archiveRoot: root,
+        mode: "manual", requireFreshCopy: true });
+      expect(result.status).toBe("created");
+      expect(queries.some(sql => /PRAGMA\s+(integrity_check|quick_check|foreign_key_check)/i.test(sql))).toBe(false);
+      expect(queries.filter(sql => /^SELECT COUNT\(\*\) AS n FROM \"(?:events|claude_events|oc_events|grok_events|gemini_events)\"$/.test(sql))).toHaveLength(5);
+      queries.length = 0;
+      expect(validateAtlasSnapshotFiles(result.databasePath!, result.manifest!).valid).toBe(true);
+      expect(queries.some(sql => /PRAGMA\s+integrity_check/i.test(sql))).toBe(true);
+    } finally { spy.mockRestore(); }
+  });
+
+  test("publishes a pre-migration file copy without starting SQLite's backup process", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "tokenatlas-snapshot-os-copy-"));
+    roots.push(root);
+    const dbPath = path.join(root, "atlas.sqlite");
+    minimalSnapshotDatabase(dbPath);
+    const spy = spyOn(Bun, "spawnSync").mockImplementation(() => { throw new Error("SQLite backup must not run"); });
+    try {
+      const result = publishAtlasSnapshot({ dbPath, poolPath: path.join(root, "pool"), archiveRoot: root,
+        mode: "manual", requireFreshCopy: true, copyMethod: "file" });
+      expect(result.status).toBe("created");
+      expect(validateAtlasSnapshotFiles(result.databasePath!, result.manifest!).valid).toBe(true);
+    } finally { spy.mockRestore(); }
   });
 
   test("keeps the previous snapshot and removes partial backup files when the backup process fails", () => {

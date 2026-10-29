@@ -150,7 +150,7 @@ describe("pre-migration snapshot policy", () => {
       publish,
     })).toBe(snapshot);
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toEqual({ dbPath: pending, mode: "manual", currentSchemaVersion: 26, requireFreshCopy: true });
+    expect(calls[0]).toEqual({ dbPath: pending, mode: "manual", currentSchemaVersion: 26, requireFreshCopy: true, copyMethod: "file" });
 
     expect(snapshotBeforePendingMigrations(pending, {
       targetSchemaVersion: 25,

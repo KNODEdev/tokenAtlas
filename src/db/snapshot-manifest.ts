@@ -5,8 +5,8 @@ import { ATLAS_SNAPSHOT_MANIFEST_VERSION, ATLAS_SNAPSHOT_KIND } from "./snapshot
 import { createHash } from "node:crypto";
 import path from "node:path";
 import type { Database } from "./sqlite";
-import { probeFactsDigest, validateProbeFacts } from "./probe-facts";
-import { databaseSchemaVersion, readRevisions, readVendorDataRevisions, readVendorRowCounts, SnapshotDatabase, sqliteIntegrityErrors, validateRequiredSchema } from "./snapshot-database";
+import { probeFactsDigest } from "./probe-facts";
+import { databaseSchemaVersion, readRevisions, readVendorDataRevisions, readVendorRowCounts, SnapshotDatabase, validateRequiredSchema } from "./snapshot-database";
 import fs from "node:fs";
 import { sha256File } from "./snapshot-files";
 
@@ -198,8 +198,8 @@ export function buildManifest(
   const sqlite = new SnapshotDatabase(databasePath, { readonly: true });
   try {
     options.onProgress?.({ phase: "snapshot-validation", snapshotFile: databasePath });
-    if (databaseSchemaVersion(sqlite) >= 24) validateProbeFacts(sqlite);
-    const schemaErrors = [...sqliteIntegrityErrors(sqlite), ...validateRequiredSchema(sqlite)];
+    // A fresh consistent copy preserves the source state; full scans belong to restore validation.
+    const schemaErrors = validateRequiredSchema(sqlite);
     if (schemaErrors.length > 0) throw new Error(schemaErrors.join("; "));
     const identity = readSnapshotIdentity(sqlite, options.archiveRoot);
     options.onProgress?.({ phase: "snapshot-checksum", snapshotFile: databasePath });
@@ -211,7 +211,10 @@ export function buildManifest(
       sourceMachine: options.sourceMachine,
       createdAt: options.now.toISOString(),
       sizeBytes: fs.statSync(databasePath).size,
-      checksum: { algorithm: "sha256", value: sha256File(databasePath) },
+      checksum: { algorithm: "sha256", value: sha256File(databasePath, (snapshotProcessedBytes, snapshotTotalBytes) => {
+        options.onProgress?.({ phase: "snapshot-checksum", snapshotFile: databasePath,
+          snapshotProcessedBytes, snapshotTotalBytes });
+      }) },
     } satisfies Omit<AtlasIndexSnapshotManifest, "identityFingerprint">;
     return { ...manifest, identityFingerprint: identityFingerprint(manifest) };
   } finally {

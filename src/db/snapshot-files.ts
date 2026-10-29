@@ -3,16 +3,26 @@ import fs from "node:fs";
 import path from "node:path";
 import { ATLAS_SNAPSHOT_BARRIER_SUFFIX } from "./snapshot-contracts";
 
-export function sha256File(filePath: string): string {
+export function sha256File(filePath: string, onProgress?: (processedBytes: number, totalBytes: number) => void): string {
   const hash = createHash("sha256");
   const descriptor = fs.openSync(filePath, "r");
   const buffer = Buffer.allocUnsafe(1024 * 1024);
   try {
+    const totalBytes = fs.fstatSync(descriptor).size;
+    let processedBytes = 0;
+    let lastUpdate = performance.now();
+    onProgress?.(0, totalBytes);
     for (;;) {
       const bytes = fs.readSync(descriptor, buffer, 0, buffer.length, null);
       if (bytes === 0) break;
       hash.update(buffer.subarray(0, bytes));
+      processedBytes += bytes;
+      if (onProgress && performance.now() - lastUpdate >= 200) {
+        onProgress(processedBytes, totalBytes);
+        lastUpdate = performance.now();
+      }
     }
+    onProgress?.(processedBytes, totalBytes);
   } finally {
     fs.closeSync(descriptor);
   }

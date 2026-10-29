@@ -190,6 +190,7 @@ export function snapshotBeforePendingMigrations(
       mode: "manual",
       currentSchemaVersion: targetSchemaVersion,
       requireFreshCopy: true,
+      copyMethod: "file",
       ...(options.onProgress ? { onProgress: options.onProgress } : {}),
     });
   } catch (error) {

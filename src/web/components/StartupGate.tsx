@@ -44,7 +44,7 @@ export function StartupGate({ children }: { children: ReactNode }) {
     "migration-check": t("Checking the database", "Sprawdzanie bazy"),
     "snapshot-wait": t("Waiting for the snapshot", "Oczekiwanie na kopię"),
     "snapshot-copy": t("Database snapshot", "Kopia bazy"),
-    "snapshot-validation": t("Checking the snapshot", "Sprawdzanie kopii"),
+    "snapshot-validation": t("Snapshot metadata", "Metadane kopii"),
     "snapshot-checksum": t("Snapshot checksum", "Suma kontrolna kopii"),
     "snapshot-publication": t("Saving the snapshot", "Zapisywanie kopii"),
     "snapshot-retention": t("Removing the older snapshot", "Usuwanie starszej kopii"),
@@ -57,9 +57,12 @@ export function StartupGate({ children }: { children: ReactNode }) {
   const elapsed = state ? Math.max(0, Math.floor((stoppedAt - Date.parse(state.startedAt)) / 1000)) : 0;
   const label = disconnected ? t("Connecting", "Łączenie") : labels[state?.phase ?? "server"];
   const gb = (bytes: number) => (bytes / 1_000_000_000).toLocaleString(locale, { maximumFractionDigits: 2 });
-  // Hold below 100% until SQLite finishes the backup, even if the source grew during startup.
-  const copying = state?.phase === "snapshot-copy" && state.snapshotBytes != null && state.snapshotTotalBytes != null;
-  const percent = copying ? Math.min(99, Math.floor(state.snapshotBytes! / state.snapshotTotalBytes! * 100)) : null;
+  const processedBytes = state?.phase === "snapshot-copy" ? state.snapshotBytes
+    : state?.phase === "snapshot-checksum" ? state.snapshotProcessedBytes : null;
+  const measuring = processedBytes != null && state?.snapshotTotalBytes != null && state.snapshotTotalBytes > 0;
+  // The file can reach its final size before SQLite commits the backup.
+  const percent = measuring ? Math.min(state?.phase === "snapshot-copy" ? 99 : 100,
+    Math.floor(processedBytes! / state!.snapshotTotalBytes! * 100)) : null;
   const migrations = state?.snapshotMigrations?.length ? state.snapshotMigrations.join(", ") : null;
   return <div className="first-run">
     <section className="ui-card first-run-panel startup-panel" aria-busy={state?.phase !== "failed"}>
@@ -71,7 +74,7 @@ export function StartupGate({ children }: { children: ReactNode }) {
         <strong title={state?.error ? browserSafeDiagnostic(state.error) : undefined}>{label}</strong>
         <span className="mono">{Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}</span>
         {state?.snapshotBytes != null && <span className="mono">
-          {copying ? `${gb(state.snapshotBytes)} / ${gb(state.snapshotTotalBytes!)} GB` : `${gb(state.snapshotBytes)} GB`}
+          {measuring ? `${gb(processedBytes!)} / ${gb(state.snapshotTotalBytes!)} GB` : `${gb(state.snapshotBytes)} GB`}
         </span>}
         {percent != null && <span className="mono">{percent}%</span>}
       </output>

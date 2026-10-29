@@ -104,6 +104,8 @@ export interface PublishAtlasSnapshotOptions {
   /** Always copy, never answer with an existing snapshot. The identity fingerprint omits some
    * durable state, so a pre-migration snapshot cannot trust an "identical" older copy. */
   requireFreshCopy?: boolean;
+  /** Pre-migration startup can checkpoint under its writer lock and copy the file through the OS. */
+  copyMethod?: "file";
   onProgress?: (update: StartupUpdate) => void;
   failpoints?: AtlasSnapshotPublishFailpoints;
 }

@@ -5,7 +5,10 @@ import { ensureWindowAnswersSchema, markWindowAnswersDirty, readWindowAnswer, st
 import { pathToFileURL } from "node:url";
 import { ledgerRevision } from "./ledger-revision";
 import { createProbeCollection, acceptProbeFact, mapProbeLegacy, backfillProbeFacts } from "./probe-facts";
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, describe, expect, setDefaultTimeout, spyOn, test } from "bun:test";
+
+// These integration cases migrate and copy databases and start backup/catch-up processes.
+setDefaultTimeout(30_000);
 import { Database } from "./sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { createHash } from "node:crypto";

@@ -14,17 +14,21 @@ export function startPreparation(options: {
   const publicDirectory = path.resolve(options.publicDirectory ?? path.join(import.meta.dir, "../../public"));
   const startedAt = new Date().toISOString();
   const state: StartupStatus = { phase: "migration-check", startedAt, stageStartedAt: startedAt,
-    snapshotDirectory: atlasIndexSnapshotPool(dbPath), snapshotBytes: null, snapshotTotalBytes: null,
+    snapshotDirectory: atlasIndexSnapshotPool(dbPath), snapshotBytes: null, snapshotTotalBytes: null, snapshotProcessedBytes: null,
     snapshotMigrations: null, error: null };
   let snapshotFile: string | undefined;
   let copiedBytes: number | null = null;
   let child: ReturnType<typeof Bun.spawn> | undefined;
   let closed = false;
   const update = (next: StartupUpdate) => {
-    if (state.phase !== next.phase) state.stageStartedAt = new Date().toISOString();
+    if (state.phase !== next.phase) {
+      state.stageStartedAt = new Date().toISOString();
+      state.snapshotProcessedBytes = null;
+    }
     state.phase = next.phase;
     if (next.snapshotFile) snapshotFile = next.snapshotFile;
     if (next.snapshotTotalBytes != null) state.snapshotTotalBytes = next.snapshotTotalBytes;
+    if (next.snapshotProcessedBytes != null) state.snapshotProcessedBytes = next.snapshotProcessedBytes;
     if (next.snapshotMigrations) state.snapshotMigrations = next.snapshotMigrations;
   };
   const status = (): StartupStatus => {
@@ -84,6 +88,7 @@ export function startPreparation(options: {
                 if (STARTUP_PHASES.includes(next.phase!)
                   && (next.snapshotFile === undefined || typeof next.snapshotFile === "string")
                   && (next.snapshotTotalBytes === undefined || (Number.isFinite(next.snapshotTotalBytes) && next.snapshotTotalBytes > 0))
+                  && (next.snapshotProcessedBytes === undefined || (Number.isSafeInteger(next.snapshotProcessedBytes) && next.snapshotProcessedBytes >= 0))
                   && (next.snapshotMigrations === undefined
                     || (Array.isArray(next.snapshotMigrations) && next.snapshotMigrations.every((tag) => typeof tag === "string"))))
                   update(next as StartupUpdate);
