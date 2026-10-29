@@ -107,8 +107,8 @@ export const DATA_VIEWS:Readonly<Record<string,DataView>> = {
   "/api/model-usage-share":rows({...withWindowSums(current((ctx,url)=>handleModelUsageShare(ctx,url))),clock:false}),
   "/api/codex-accounting":{...current((ctx,url)=>handleCodexAccounting(ctx,new Request(url))),clock:false,sources:["events","ratelimit","probe_windows",WINDOW_USAGE_CLOCK]},
   "/api/history-coverage":{...current(handleHistoryCoverage),preparationClock:false},
-  "/api/codex-timeline-markers":{...current((ctx,url)=>handleCodexTimelineMarkers(ctx.sqlite,new Request(url),undefined,ctx.rateCards)),preparationClock:false},
-  "/api/subscription-timeline-markers":{...current((ctx,url)=>handleCodexTimelineMarkers(ctx.sqlite,new Request(url),undefined,ctx.rateCards,url.searchParams.get("provider")??"")),preparationClock:false},
+  "/api/codex-timeline-markers":rows({build:(ctx,url)=>handleCodexTimelineMarkers(ctx.sqlite,new Request(url),undefined,ctx.rateCards),sources:["model_timeline_first"],clock:false}),
+  "/api/subscription-timeline-markers":rows({build:(ctx,url)=>handleCodexTimelineMarkers(ctx.sqlite,new Request(url),undefined,ctx.rateCards,url.searchParams.get("provider")??""),sources:["model_timeline_first"],clock:false}),
 };
 /**
  * Whether answers of a route read stored window sums: a declared view only when it declares their clock; any
@@ -210,7 +210,8 @@ export const DIRECT_DATA_ROUTES:Readonly<Record<string,string>>={
 export async function serveDataView(ctx:AppContext,url:URL):Promise<Response> {
   const view=DATA_VIEWS[url.pathname];
   if(!view)throw new Error(`Unregistered data view: ${url.pathname}`);
-  const version=dataVersion(ctx.sqlite,{capacityCycles:view.sources.includes("capacity_cycle_results"),firstTokenTimes:view.sources.includes("response_time_hours"),contextPrices:contextRequested(url) ? url.pathname : false});
+  const version=dataVersion(ctx.sqlite,{capacityCycles:view.sources.includes("capacity_cycle_results"),firstTokenTimes:view.sources.includes("response_time_hours"),contextPrices:contextRequested(url) ? url.pathname : false,
+    modelTimeline:view.sources.includes("model_timeline_first") ? url.searchParams.get("provider") || "codex" : undefined});
   let response:Response;
   try { response=await view.build(ctx,url); }
   catch(error) {

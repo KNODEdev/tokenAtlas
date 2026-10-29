@@ -39,7 +39,9 @@ import { ledgerProviderOf } from "./subscription-accounting-adapters";
 import { advanceCodexContextPrices } from "./codex-context-producer";
 import { advanceCodexContextDetails } from "./codex-context-model-producer";
 import { advanceFirstTokenTimes, type FirstTokenReader } from "./first-token-producer";
-import { advanceModelSpeeds } from "../db/model-speed-register";
+import { advanceModelSpeeds, installModelSpeedTracking } from "../db/model-speed-register";
+import { advanceModelTimelines } from "../db/model-timeline";
+import { advanceCodexStampDays } from "../db/codex-stamp-days";
 
 /**
  * The background writer's job queue (U2.1). Outside a sync run, every multi-row write to the
@@ -150,6 +152,7 @@ const JOBS: readonly BackgroundJob[] = [
   } },
   { scope: "usage-prices", run(turn) {
     if (!turn.rates) return false;
+    if (turn.canWrite()) installModelSpeedTracking(turn.db);
     // The same homes and source homes the report readers use; a different set changes the scope's source stamp.
     const prices = advanceAllUsagePrices(turn.db, turn.rates, turn.config.sources, codexPhysicalSourceHomes(turn.config.sources),
       { limit: 500, steps: 4, turnMs: turn.turnMs, canWrite: turn.canWrite });
@@ -157,7 +160,29 @@ const JOBS: readonly BackgroundJob[] = [
   } },
   { scope: "model-speed-modes", run(turn) {
     const status = advanceModelSpeeds(turn.db, { canWrite: turn.canWrite, budgetMs: Math.min(100, turn.turnMs || 100) });
-    turn.backlog.report("model-speed-modes", "events", "preparing model execution timings", "records", status.pending ? 1 : 0);
+    turn.backlog.report("model-speed-modes", "events", "preparing model execution timings", "records", status.remaining ?? 0);
+    return status.processed > 0 && status.pending;
+  } },
+  { scope: "model-timelines", run(turn) {
+    const deadline = performance.now() + Math.min(100, turn.turnMs || 100);
+    let status = { processed: 0, pending: false };
+    do {
+      const batch = advanceModelTimelines(turn.db, { canWrite: turn.canWrite, budgetMs: Math.max(0, deadline - performance.now()) });
+      status = { processed: status.processed + batch.processed, pending: batch.pending };
+      if (!batch.processed) break;
+    } while (status.pending && turn.canWrite() && performance.now() < deadline);
+    if (status.pending) {
+      const done = turn.progress.entries().find(entry => entry.scope === "model-timelines")?.done ?? 0;
+      turn.progress.report("model-timelines", "records", "preparing model timeline", "records", done + status.processed, null);
+    } else turn.progress.end("model-timelines");
+    return status.processed > 0 && status.pending;
+  } },
+  { scope: "codex-read-dependencies", run(turn) {
+    const status = advanceCodexStampDays(turn.db, { canWrite: turn.canWrite, budgetMs: Math.min(100, turn.turnMs || 100) });
+    if (status.pending) {
+      const done = turn.progress.entries().find(entry => entry.scope === "codex-read-dependencies")?.done ?? 0;
+      turn.progress.report("codex-read-dependencies", "days", "preparing read dependencies", "days", done + status.processed, null);
+    } else turn.progress.end("codex-read-dependencies");
     return status.processed > 0 && status.pending;
   } },
   { scope: "codex-context-prices", run(turn) {

@@ -12,6 +12,7 @@ import { codexLedgerPublished, codexLedgerQueuedBands, codexLedgerQueuedRuleScop
 import { ACTIVITY_CUTOFF_MINUTES, activityColumn, ensureUsageLedgerSchema, LONG_CALL_OUT, TIMED_SUMS } from "./usage-ledger";
 import { codexProjectSql, currentProjectRules } from "../projects/rules-now";
 import { subjectOf } from "../projects/resolve";
+import { CODEX_STAMP_DAYS_SCHEMA, refreshCodexStampDays } from "./codex-stamp-days";
 
 export const CODEX_LEDGER_ALGORITHM = "codex-two-base-exact-v1";
 export interface LedgerBaseBand {
@@ -129,7 +130,7 @@ export const CODEX_PRICE_LEDGER_SCHEMA_SQL = `
 export const CODEX_LEDGER_REPLAYS_INDEX_SQL = `CREATE INDEX IF NOT EXISTS codex_price_ledger_events_replays
   ON codex_price_ledger_events(copy_id,source_offset) WHERE identity LIKE 'c:%'`;
 export function createCodexLedgerSchema(db: Database): void {
-  db.transaction(() => { db.exec(CODEX_PRICE_LEDGER_SCHEMA_SQL); db.exec(CODEX_LEDGER_REPLAYS_INDEX_SQL); }).immediate();
+  db.transaction(() => { db.exec(CODEX_PRICE_LEDGER_SCHEMA_SQL); db.exec(CODEX_LEDGER_REPLAYS_INDEX_SQL); db.exec(CODEX_STAMP_DAYS_SCHEMA); }).immediate();
   ensureUsageLedgerSchema(db);
 }
 
@@ -186,6 +187,7 @@ export function rebuildCodexLedgerPartitions(db: Database, partitions: readonly 
       GROUP BY day,dim_id,api_band,credit_band,COALESCE(api_reason,''),COALESCE(credit_reason,''),${zeroAmount("api")},${zeroAmount("credit")},copy_state`)
       .run(...params);
   }
+  refreshCodexStampDays(db, [...new Set([...unique.values()].map(partition => partition.day))]);
   return unique.size;
 }
 /** Both grains of one pricing day from its canonical events; the unit of work after copy resolution. */
@@ -211,6 +213,7 @@ export function rebuildCodexLedgerDay(db: Database, day: string): number {
       GROUP BY day,hour,dim_id,api_band,credit_band,COALESCE(api_reason,''),COALESCE(credit_reason,''),${zeroAmount("api")},${zeroAmount("credit")},copy_state`).run(day).changes;
   }
   publishActivityIntervals(db, "codex", [day]);
+  refreshCodexStampDays(db, [day]);
   return partitions;
 }
 

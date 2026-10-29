@@ -18,6 +18,7 @@ import { MIN_COMPATIBLE_ATLAS_SCHEMA_VERSION, type AtlasSnapshotPublishResult, t
 import { publishAtlasSnapshot } from "./snapshot-publish";
 import { installFactDayRevisions } from "./fact-day-revisions";
 import { asSchemaWriter } from "./schema-writer";
+import { installModelSpeedTracking } from "./model-speed-register";
 const DEFAULT_MIGRATIONS_FOLDER = path.resolve(import.meta.dir, "../../drizzle");
 /** Hashes of migration files that were later edited without changing a single statement.
  * A database that applied the earlier text is on the same lineage, so it must still verify.
@@ -301,6 +302,8 @@ export function applyDrizzleMigrations(
   assertMigrationHistory(db, migrationsFolder);
   const evidence = migrationTrackingEvidence(db.$client, migrationsFolder);
   migrate(db, { migrationsFolder });
+  // Queue shape upgrades must repair retained source triggers before any writer can resume.
+  installModelSpeedTracking(db.$client);
   if (evidence && db.$client.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='analysis_tracking_handoff'").get())
     db.$client.query("UPDATE analysis_tracking_handoff SET columns=?,triggers=? WHERE source='claude_events'")
       .run(evidence.columns, evidence.triggers);

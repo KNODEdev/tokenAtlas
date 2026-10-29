@@ -6,7 +6,9 @@ import { createCodexLedgerSchema, readCodexLedgerPublishedBand, persistCodexLedg
 import { CODEX_LEDGER_VARIANTS, readCodexLedgerSeries } from "./codex-price-ledger-read";
 import { CODEX_LEDGER_SCOPE, codexLedgerReadContext, ledgerAmountFromCompatibility, readCodexLedgerCompatibilityDimRows,
   readPublishedCodexLedgerContext, sumCodexLedgerCompatibilityAmounts, readCodexLedgerCompatibilityTotals, readCodexLedgerOwnedSeries,
-  codexLedgerApiTokenAmounts } from "./codex-ledger-adapters";
+  codexLedgerApiTokenAmounts, codexLedgerReadStamp } from "./codex-ledger-adapters";
+import { processCodexLedgerBatch } from "./codex-ledger-producer";
+import { refreshCodexStampDays, advanceCodexStampDays } from "./codex-stamp-days";
 import { readCodexRegisterDays, readCodexMeterModels, sumCodexRegisterAmounts } from "./usage-price-read-codex";
 import { codexUsagePriceReadiness, readUsagePriceAccountTotals, sumUsagePriceAmounts } from "./usage-price-read-subscription";
 import { readRegisterDays } from "./usage-price-read-account";
@@ -63,6 +65,53 @@ const period = (from: string, until: string | null, value: string): DatedPeriod 
 const resolver = () => buildAccountResolver([period(day, "2026-09-02", "owner")]);
 
 describe("published Codex compatibility adapters", () => {
+  test("cold prepared dependency reads never scan aggregates and independent basis fingerprints survive repartitioning", () => fixture([
+    { ts: `${day}T12:00:00Z` }, { ts: "2026-09-02T12:00:00Z" },
+  ], (db, context) => {
+    const apiRange = { ...range, dependencyBases: ["api_equivalent_usd"] as const };
+    const before = codexLedgerReadStamp(db, context, apiRange);
+    const other = codexLedgerReadStamp(db, context, { since: "2026-09-02", until: "2026-09-02" });
+    db.transaction(() => {
+      db.exec(`UPDATE codex_price_ledger_aggregates SET credit_band=credit_band+100 WHERE day='2026-09-01'`);
+      refreshCodexStampDays(db, [day]);
+    }).immediate();
+    const query = db.query.bind(db), queries = spyOn(db, "query").mockImplementation(((sql: string) => {
+      if (/FROM codex_price_ledger_aggregates\b/.test(sql)) throw new Error("HTTP aggregate scan forbidden");
+      return query(sql);
+    }) as typeof db.query);
+    try {
+      expect(codexLedgerReadStamp(db, context, apiRange)).toBe(before);
+      expect(codexLedgerReadStamp(db, { ...context, referenceDay: day }, apiRange)).toBeTruthy();
+      expect(codexLedgerReadStamp(db, context, { since: "2026-09-02", until: "2026-09-02" })).toBe(other);
+    } finally { queries.mockRestore(); }
+    db.exec(`INSERT INTO codex_stamp_dirty VALUES('2026-09-02')`);
+    expect(codexLedgerReadStamp(db, context, apiRange)).toBe(before);
+    expect(() => codexLedgerReadStamp(db, context, { since: "2026-09-02", until: "2026-09-02" })).toThrow("background preparation");
+    expect(advanceCodexStampDays(db, { budgetMs: 10000 })).toEqual({ processed: 1, pending: false });
+    expect(codexLedgerReadStamp(db, context, { since: "2026-09-02", until: "2026-09-02" })).toBe(other);
+  }));
+  test("pending read stamps ignore unrelated writes and follow partial producer publications in their own scope", () => fixture([
+    { ts: `${day}T12:00:00Z` }, { ts: "2026-09-02T12:00:00Z" },
+  ], (db, context) => {
+    db.exec(`CREATE TABLE unrelated_timing(n INTEGER); INSERT INTO unrelated_timing VALUES(0);
+      INSERT INTO usage_ledger_dirty(provider,kind,value) VALUES('codex','day','2026-09-01'),('codex','day','2026-09-02')`);
+    const otherRange = { since: "2026-09-02", until: "2026-09-02" };
+    const before = codexLedgerReadStamp(db, context, range), otherBefore = codexLedgerReadStamp(db, context, otherRange);
+    const covered = db.query("SELECT covered FROM usage_ledger_state WHERE provider='codex'").get();
+    db.exec("UPDATE unrelated_timing SET n=n+1");
+    const queries = spyOn(db, "query");
+    try {
+      expect(codexLedgerReadStamp(db, context, range)).toBe(before);
+      expect(queries.mock.calls.some(([sql]) => sql.includes("FROM codex_price_ledger_aggregates a"))).toBe(false);
+    } finally { queries.mockRestore(); }
+    db.exec(`UPDATE codex_price_ledger_events SET api_whole=api_whole+1 WHERE day='2026-09-01'`);
+    processCodexLedgerBatch(db, { bands: context.policy.baseBands, policy: context.policy.policy,
+      rulesRevision: context.rulesRevision!, factsRevision: 0, batchSize: 1, budgetMs: 0, anchorOf: () => null });
+    expect(codexLedgerFactsPending(db)).toBe(true);
+    expect(db.query("SELECT covered FROM usage_ledger_state WHERE provider='codex'").get()).toEqual(covered);
+    expect(codexLedgerReadStamp(db, context, range)).not.toBe(before);
+    expect(codexLedgerReadStamp(db, context, otherRange)).toBe(otherBefore);
+  }));
   test("UTC calendar ranges retain interior aggregates and admit original offset pricing days only at their exact edges",()=>fixture([
     {ts:"2026-08-31T23:30:00-02:00",input:100},
     {ts:"2026-09-01T04:00:00+02:00",input:200},

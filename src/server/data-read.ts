@@ -40,8 +40,6 @@ export const EXCEPTION_VIEWS: Readonly<Record<string, string>> = {
   "/api/gauge": "Codex meter samples of the range",
   "/api/planhealth": "Codex meter samples and calls over the whole history",
   "/api/history-coverage": "Codex meter samples over the whole history",
-  "/api/codex-timeline-markers": "first call of each model over the whole history",
-  "/api/subscription-timeline-markers": "first call of each model over the whole history",
 };
 
 /** Bumped when a stored view's answer changes shape or meaning: older stored answers are recomputed. */
@@ -225,6 +223,7 @@ export function createDataRead(workerFactory = createDataReadWorker, options: { 
       ? new Date(Date.now()).toISOString().slice(0, 10) : null;
     const rows = dataVersion(ctx.sqlite, { windowSums: readsWindowSums(url.pathname), capacityCycles: view?.sources.includes("capacity_cycle_results") ?? false,
       firstTokenTimes: view?.sources.includes("response_time_hours") ?? false,
+      modelTimeline: view?.sources.includes("model_timeline_first") ? url.searchParams.get("provider") || "codex" : undefined,
       contextPrices: contextRequested(url) ? url.pathname : false });
     return { rows, key: JSON.stringify([rows, dataConfigurationStamp(ctx, false), day]) };
   };

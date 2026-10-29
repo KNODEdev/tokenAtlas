@@ -167,12 +167,16 @@ function readStepProgress(db: Database): LedgerProducerProgress {
     pending, blockedTotal: 0, blocked: [], ready: pending === 0 && readCodexLedgerState(db)?.status === "ready" };
 }
 /**
- * Publishes the ledger once nothing is left: ready under this algorithm, at the facts revision and rules of this
- * batch. A step that did work, or a head that differs, moves the revision; an idle check writes nothing.
+ * Every committed step advances its read fence; only an empty queue publishes complete source coverage.
+ * A step that did work, or a head that differs, moves the revision; an idle check writes nothing.
  */
 function finish(db: Database, options: LedgerProducerOptions, expectedBaseRevision: string, worked: boolean): void {
   guardRulePolicy(db, options, expectedBaseRevision);
-  if (codexLedgerWorkPending(db) || codexLedgerFillState(db)) return;
+  if (codexLedgerWorkPending(db) || codexLedgerFillState(db)) {
+    // Readers follow committed partial publications without invalidating on unrelated database writes.
+    if (worked) db.query(`UPDATE usage_ledger_state SET revision=revision+1 WHERE provider='${CODEX_LEDGER_PROVIDER}'`).run();
+    return;
+  }
   const state = readCodexLedgerState(db);
   if (!state) return;
   const policy = options.policy ? JSON.stringify(options.policy) : null;

@@ -17,6 +17,10 @@ export type SingleSourceKind = "register" | "producer" | "ingest" | "detail" | "
 export interface SingleSourceEntry { reads: number; sums: number; kind: SingleSourceKind; reason: string }
 
 export const SINGLE_SOURCE_ALLOWED: Readonly<Record<string, SingleSourceEntry>> = {
+  "db/model-speed-register.ts": { reads: 9, sums: 0, kind: "producer", reason: "projects canonical accepted ledger calls and indexed effort metadata into durable timing facts and hourly sums through a bounded background queue" },
+  "db/model-timeline.ts": { reads: 3, sums: 0, kind: "producer", reason: "resumes source-row preparation, handles bulk first-fill notifications and replaces only changed source-day model minima; ordinary timeline reads use the durable prepared register" },
+  "db/codex-stamp-days.ts": { reads: 1, sums: 0, kind: "producer", reason: "publishes exact collapsed day/model/base fingerprints and compact tier evidence atomically with changed ledger aggregates" },
+  "server/model-speed-read.ts": { reads: 0, sums: 1, kind: "register", reason: "reads prepared timing hours and sums indexed timing facts only for hours cut by dated account ownership boundaries; never rebuilds or reprices history" },
   "db/activity-intervals.ts": { reads: 2, sums: 0, kind: "producer", reason: "persists machine interval unions from published call gaps for changed ledger days" },
   "db/codex-context-details.ts": { reads: 2, sums: 0, kind: "producer", reason: "updates dirty context day contributions and queues their affected windows from stored ledger facts" },
   "db/codex-context-producer.ts": { reads: 3, sums: 0, kind: "producer", reason: "advances bounded event cursors and dirty model scopes into durable context prices" },
@@ -40,7 +44,7 @@ export const SINGLE_SOURCE_ALLOWED: Readonly<Record<string, SingleSourceEntry>> 
   "db/usage-ledger-read.ts": { reads: 6, sums: 0, kind: "register", reason: "usage ledger readiness and day reads behind ledger-sums, including unencoded account-history day measures and the stored contributions of a period-cut source day" },
   "db/usage-ledger-events.ts": { reads: 9, sums: 0, kind: "register", reason: "the usage ledger's priced events for the window producers, and the identities with a copy of a project in range" },
   "db/codex-price-ledger.ts": { reads: 34, sums: 11, kind: "register", reason: "Codex ledger state, aggregates (whole hours and the pieces a window or range cuts), per-file model rows, window cohorts, calls and source burn read API, the timed sums of days whose response times alone changed and the activity gaps and sums" },
-  "db/codex-ledger-adapters.ts": { reads: 8, sums: 1, kind: "register", reason: "Codex ledger read contexts and stamps for readers, including SQL-summed canonical stored day groups for account history (period-cut days use the shared slicer)" },
+  "db/codex-ledger-adapters.ts": { reads: 6, sums: 1, kind: "register", reason: "Codex ledger read contexts and prepared dependency fingerprints, including SQL-summed canonical stored day groups for account history (period-cut days use the shared slicer)" },
   "db/codex-ledger-canonical.ts": { reads: 18, sums: 0, kind: "register", reason: "the canonical-copy predicate every Codex fact read uses; a fork's replayed parent calls and readings are found here, and the conversations still holding a removed call's response id" },
 
   // Producers.
@@ -80,7 +84,6 @@ export const SINGLE_SOURCE_ALLOWED: Readonly<Record<string, SingleSourceEntry>> 
   "server/api-codex-ledger.ts": { reads: 2, sums: 0, kind: "detail", reason: "Codex call list of one window from the ledger" },
   "server/codex-limit-windows.ts": { reads: 2, sums: 0, kind: "detail", reason: "transcript limit readings and models of one file" },
   "server/codex-source-account.ts": { reads: 3, sums: 0, kind: "detail", reason: "distinct Codex homes for account discovery (an index skip-scan)" },
-  "server/codex-timeline-markers.ts": { reads: 1, sums: 0, kind: "detail", reason: "first use of each model (timeline markers)" },
   "server/codex-ledger-settings-http.ts": { reads: 1, sums: 0, kind: "detail", reason: "service-tier call counts for the ledger settings form" },
   "server/claude-event-account.ts": { reads: 4, sums: 0, kind: "detail", reason: "Claude session identities (account keys)" },
   "server/vendor-discovery.ts": { reads: 1, sums: 0, kind: "detail", reason: "distinct Claude account keys for discovery" },

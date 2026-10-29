@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { codexLedgerFactsPending } from "./read-freshness";
 import { analysisHash } from "./analysis";
+import { codexStampDays, type CodexStampDay } from "./codex-stamp-days";
 import { CodexLedgerNotReady, codexLedgerBandRevision, requireCodexLedgerReady, codexLedgerHasPendingWork, codexLedgerQuotedDayRange,
   codexLedgerScopeIntersects, metadataColumns, withPlaceProjects, readCodexLedgerPublishedBand, readCodexLedgerCohorts, type LedgerCohortRow, type LedgerCohortSpec, type LedgerRange,
   readCodexLedgerPieceSums, type LedgerStoredGroup } from "./codex-price-ledger";
@@ -66,7 +67,9 @@ export function codexLedgerPendingReason(db: Database, options: CodexLedgerReadD
     if (codexLedgerBaseChanges(previous.baseBands, options.policy.baseBands)
       .some(scope => codexLedgerScopeIntersects(db, scope, options.range))) return "usage-price-rules-pending";
     if (tiersChanged) {
-      const cohorts = observedTierCohorts(db, options.range);
+      let cohorts: TierCohort[];
+      try { cohorts = observedTierCohorts(db, options.range); }
+      catch (error) { if (error instanceof CodexLedgerNotReady) return "usage-price-preparation-required"; throw error; }
       if (tierSemantics(previous, options.range, cohorts) !== tierSemantics(options.policy, options.range, cohorts)) return "usage-price-rules-pending";
     }
   }
@@ -76,19 +79,21 @@ export function codexLedgerPendingReason(db: Database, options: CodexLedgerReadD
 }
 const contextOf = (db: Database, context?: CodexLedgerReadContext, range?: LedgerRange) => context ?? readPublishedCodexLedgerContext(db, range);
 interface TierCohort { day: string; model: string | null; service_tier: string | null }
-function observedTierCohorts(db: Database, range: LedgerRange): TierCohort[] {
+function preparedStampDays(db: Database, range: LedgerRange): CodexStampDay[] {
   if (range.dependencyBases?.length === 0) return [];
-  const bounds = codexLedgerQuotedDayRange(range), terms = ["a.grain='day'"], params: string[] = [];
-  if (bounds.since) { terms.push("a.day>=?"); params.push(bounds.since); }
-  if (bounds.until) { terms.push("a.day<=?"); params.push(bounds.until); }
-  if (range.dependencyModels) {
-    const names = range.dependencyModels.filter((model): model is string => model !== null);
-    terms.push(`(${names.length ? `d.model IN (${names.map(()=>"?").join(",")})` : "0"}${range.dependencyModels.includes(null) ? " OR d.model IS NULL" : ""})`);
-    params.push(...names);
+  const days = codexStampDays(db, { ...range, ...codexLedgerQuotedDayRange(range) });
+  if (!days) throw new CodexLedgerNotReady("Codex read dependencies await background preparation");
+  return days;
+}
+function observedTierCohorts(db: Database, range: LedgerRange, prepared?: CodexStampDay[]): TierCohort[] {
+  if (range.dependencyBases?.length === 0) return [];
+  const unique = new Map<string, TierCohort>();
+  for (const row of prepared ?? preparedStampDays(db, range)) for (const tier of JSON.parse(row.tiers) as (string | null)[]) {
+    const cohort = { day: row.day, model: JSON.parse(row.model) as string | null, service_tier: tier };
+    unique.set(JSON.stringify([cohort.day, cohort.model, cohort.service_tier]), cohort);
   }
-  const cohorts = db.query(`SELECT DISTINCT a.day,d.model,d.service_tier FROM codex_price_ledger_aggregates a
-    JOIN codex_price_ledger_dims d ON d.id=a.dim_id WHERE ${terms.join(" AND ")} ORDER BY a.day,d.model,d.service_tier`)
-    .all(...params) as TierCohort[];
+  const cohorts = [...unique.values()].sort((a, b) => a.day.localeCompare(b.day)
+    || String(a.model).localeCompare(String(b.model)) || String(a.service_tier).localeCompare(String(b.service_tier)));
   if (range.fromMs === undefined && range.toMs === undefined && range.instantValidity === undefined) return cohorts;
   return cohorts.filter(cohort => {
     // Interior quoted days are wholly inside the UTC request even with a source offset.
@@ -133,20 +138,20 @@ export function codexLedgerReadStamp(db: Database, context: CodexLedgerReadConte
     // A cached stamp never bypasses current publication/readiness evidence.
     requireCodexLedgerReadReady(db, context, range);
     const head = readCodexLedgerState(db)!;
+    const prepared = preparedStampDays(db, range);
     const key = analysisHash([range,context.referenceDay ?? null]);
-    // While newer facts are processed, committed sums move step by step without a new head: the stamp
-    // follows every commit, and says the answer is pending, so a view saved now is rebuilt once current.
+    // The producer advances its own revision in each partial publication transaction. Unrelated
+    // timing/probe/provider writes must not force a scan of every historical aggregate on HTTP.
     const pending = codexLedgerFactsPending(db);
-    const commit = pending ? (db.query("SELECT CAST(total_changes() AS TEXT) changes").get() as { changes: string }).changes + ":"
-      + (db.query("PRAGMA data_version").get() as { data_version: number }).data_version : null;
     // Its groups carry their project by the rules at read time (projects/rules-now.ts).
     const rules = range.dependencyProjects === false ? null : projectRulesStamp(db);
-    const fence = analysisHash([head.version,head.covered,head.rules_digest,context.rulesRevision,context.policy.policy,commit,rules]);
+    const fence = analysisHash([head.version,prepared,head.rules_digest,context.rulesRevision,context.policy.policy,pending,rules,
+      range.fromMs !== undefined || range.toMs !== undefined || range.instantValidity !== undefined ? head.revision : null]);
     let cache = readStamps.get(db);
     if (!cache) { cache = new Map(); readStamps.set(db,cache); }
     const cached = cache.get(key);
     if (cached?.fence === fence) return cached.stamp;
-    const stamp = analysisHash([computeCodexLedgerReadStamp(db,context,range,head),pending ? "pending" : "current",rules]);
+    const stamp = analysisHash([computeCodexLedgerReadStamp(db,context,range,head,prepared),pending ? "pending" : "current",rules]);
     if (cache.size >= 128) cache.delete(cache.keys().next().value!);
     cache.set(key,{fence,stamp});
     return stamp;
@@ -154,43 +159,19 @@ export function codexLedgerReadStamp(db: Database, context: CodexLedgerReadConte
   // Both bases, policy proof and pending work belong to one SQLite read snapshot.
   return withCodexLedgerStoredSnapshot(db, compute);
 }
-function computeCodexLedgerReadStamp(db: Database, context: CodexLedgerReadContext, range: LedgerRange, head: CodexLedgerState): string {
-  const bounds = codexLedgerQuotedDayRange(range);
+function computeCodexLedgerReadStamp(db: Database, context: CodexLedgerReadContext, range: LedgerRange, head: CodexLedgerState, prepared: CodexStampDay[]): string {
   const baseBands = context.policy.baseBands.filter(band => admittedPolicyModelBasis(range, band.model, band.basis));
   // Only published cohorts are dependencies. An unused context/model/rate must not evict a prepared report.
   const bases = (range.dependencyBases ?? ["api_equivalent_usd", "chatgpt_credits"]).map(basis => {
-    const prefix = basis === "api_equivalent_usd" ? "api" : "credit", terms = ["a.grain='day'"], params: string[] = [];
-    if (bounds.since) { terms.push("a.day>=?"); params.push(bounds.since); }
-    if (bounds.until) { terms.push("a.day<=?"); params.push(bounds.until); }
-    if (range.dependencyModels) {
-      const names = range.dependencyModels.filter((model): model is string => model !== null);
-      terms.push(`(${names.length ? `d.model IN (${names.map(()=>"?").join(",")})` : "0"}${range.dependencyModels.includes(null) ? " OR d.model IS NULL" : ""})`);
-      params.push(...names);
-    }
-    // Dependency checks need exact amounts and band identities, not project metadata or report token columns.
-    const rows = db.query(`SELECT a.day,a.dim_id,a.${prefix}_band band,a.${prefix}_reason reason,a.${prefix}_zero zero,
-      CAST(a.calls AS TEXT) calls,CAST(a.${prefix}_whole_hi AS TEXT) whole_hi,CAST(a.${prefix}_whole_lo AS TEXT) whole_lo,
-      CAST(a.${prefix}_fraction_hi AS TEXT) fraction_hi,CAST(a.${prefix}_fraction_lo AS TEXT) fraction_lo
-      FROM codex_price_ledger_aggregates a JOIN codex_price_ledger_dims d ON d.id=a.dim_id WHERE ${terms.join(" AND ")}`)
-      .all(...params) as { day: string; dim_id: number; band: number; reason: string; zero: number; calls: string;
-        whole_hi: string | null; whole_lo: string | null; fraction_hi: string | null; fraction_lo: string | null }[];
-    const sums = new Map<string, { calls: bigint; whole: bigint; fraction: bigint }>();
-    // Collapse the other base's partitions, preserving this base's exact limb totals.
-    for (const row of rows) {
-      const key = JSON.stringify([row.day,row.dim_id,row.band,row.reason,row.zero]), sum = sums.get(key) ?? { calls: 0n, whole: 0n, fraction: 0n };
-      sum.calls += BigInt(row.calls);
-      sum.whole += BigInt(row.whole_hi ?? "0") * 1000000000n + BigInt(row.whole_lo ?? "0");
-      sum.fraction += BigInt(row.fraction_hi ?? "0") * 1000000000n + BigInt(row.fraction_lo ?? "0");
-      sums.set(key,sum);
-    }
-    const evidence = [...new Set(rows.map(row=>row.band))].filter(id=>id>0).sort((a,b)=>a-b).map(id=>{
+    const rows = prepared.filter(row => row.basis === basis);
+    const evidence = [...new Set(rows.flatMap(row => JSON.parse(row.bands) as number[]))].sort((a,b)=>a-b).map(id=>{
       const band = readCodexLedgerPublishedBand(db,id);
       if (!band || band.basis !== basis) throw new Error("Published cohort has no matching immutable base proof");
       return [id,codexLedgerBandRevision(band),band.evidence];
     });
-    return [basis,[...sums].sort(([a],[b])=>a.localeCompare(b)).map(([key,sum])=>[key,String(sum.calls),String(sum.whole),String(sum.fraction)]),evidence];
+    return [basis,rows.map(row => [row.day,row.model,row.signature]),evidence];
   });
-  const cohorts = observedTierCohorts(db,range);
+  const cohorts = observedTierCohorts(db,range,prepared);
   const tierEvidence = cohorts.flatMap(cohort => (range.dependencyBases ?? ["api_equivalent_usd", "chatgpt_credits"])
     .flatMap(basis => cohortTiers(context.policy,cohort,basis).map(tier => {
       const rule = context.policy.resolveTierRule(cohort.model,basis,tier,cohort.day);

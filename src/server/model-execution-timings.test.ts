@@ -56,7 +56,7 @@ test("execution timing projection preserves canonical calls, separates settings,
     drain(f.db);
     expect(f.db.query("SELECT effort FROM model_speed_facts WHERE provider='claude' AND event_id=?").get(canonical.row_id)).toEqual({ effort: "max" });
     const snapshot = f.db.query("SELECT * FROM model_speed_hours ORDER BY provider,key,hour").all();
-    f.db.exec("DELETE FROM model_speed_facts; DELETE FROM model_speed_hours; INSERT INTO model_speed_queue SELECT provider,row_id FROM usage_ledger_facts");
+    f.db.exec("DELETE FROM model_speed_facts; DELETE FROM model_speed_hours; INSERT INTO model_speed_queue(provider,event_id) SELECT provider,row_id FROM usage_ledger_facts");
     drain(f.db);
     expect(f.db.query("SELECT * FROM model_speed_hours ORDER BY provider,key,hour").all()).toEqual(snapshot);
     const changes = f.db.query("SELECT total_changes() n").get();

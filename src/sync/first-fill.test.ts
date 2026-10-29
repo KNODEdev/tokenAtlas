@@ -7,6 +7,7 @@ import {FirstFillPublication,publishFirstFill,recoverFirstFills,tablesAreEmpty} 
 import {identityFacts} from "./accepted-facts";
 import {removeTestFixture} from "../test-cleanup";
 import * as remapModule from "../projects/remap";
+import { advanceModelTimelines, readModelTimeline } from "../db/model-timeline";
 const remapReal=remapModule.remap;
 
 const fixtures:string[]=[];
@@ -16,6 +17,21 @@ afterEach(()=>{
 const fixture=()=>{const f=createTestDatabase();fixtures.push(f.directory);return f;};
 const TS="2026-02-01T12:34:56.000Z";
 const spec={identity:["store","path"],tables:[{table:"claude_events",order:["store","call_id"]},{table:"claude_limit_hits",order:["store","call_id"]}]};
+
+test("first fill suspends only owned timeline triggers and hands changed source days back to the prepared register",()=>{
+  const f=fixture(),db=new Database(f.dbPath);
+  try {
+    advanceModelTimelines(db,{budgetMs:10000});
+    db.transaction(()=>publishFirstFill(db,["claude_events"],()=>{
+      expect(db.query("SELECT name FROM sqlite_master WHERE type='trigger' AND name='model_timeline_claude_insert'").get()).toBeNull();
+      db.exec("INSERT INTO claude_events(store,call_id,path,ts,model) VALUES('p','a','p','2026-01-01','m'),('p','b','p','2026-02-01','m')");
+    })).immediate();
+    expect(db.query("SELECT day FROM model_timeline_dirty WHERE provider='claude' ORDER BY day").all())
+      .toEqual([{day:'2026-01-01'},{day:'2026-02-01'}]);
+    while(advanceModelTimelines(db,{budgetMs:10000}).pending){}
+    expect(readModelTimeline(db,'claude').models).toEqual([{model:'m',first_ts:'2026-01-01'}]);
+  } finally {db.close();}
+});
 
 test("bulk first fill equals ordinary typed facts, bookmarks, digests, analysis day clocks and changed source days",()=>{
   const a=fixture(),b=fixture(),ordinary=new Database(a.dbPath),bulk=new Database(b.dbPath);

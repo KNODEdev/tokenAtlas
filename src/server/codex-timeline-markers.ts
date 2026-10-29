@@ -1,4 +1,4 @@
-import { queryRows } from "./data-groups";
+import { readModelTimeline } from "../db/model-timeline";
 import type { TimelineMarker, TimelineMarkerStore, TimelineMarkersResponse } from "../shared/codex-accounting";
 export type { TimelineMarker, TimelineMarkerStore, TimelineMarkersResponse } from "../shared/codex-accounting";
 import fs from "node:fs";
@@ -64,7 +64,10 @@ function validMarker(m: unknown): m is TimelineMarker {
     && typeof r.note === "string" && r.note.length <= 1000 && ["accent", "violet", "warn", "ok"].includes(r.color) && typeof r.visible === "boolean";
 }
 export async function handleCodexTimelineMarkers(sqlite: Database, req: Request, root = CONFIG_ROOT, card?: RateCard, provider = "codex"): Promise<Response> {
-  const response = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
+  let pending = false;
+  const response = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store",
+    "X-Data-Freshness": pending || status === 202 ? "pending;model-timeline" : "current",
+    ...(status === 202 ? { "X-Analysis": "preparing", "X-Analysis-Poll-Ms": "100" } : {}) } });
   if (req.method !== "GET" && req.method !== "POST") return response({ error: "Method not allowed" }, 405);
   let payload: { revision?: string; marker?: TimelineMarker; remove?: string } | undefined;
   if (req.method === "POST") {
@@ -74,6 +77,9 @@ export async function handleCodexTimelineMarkers(sqlite: Database, req: Request,
   try {
     const adapter = provider === "codex" ? null : subscriptionAccountingAdapter(provider);
     const markerFile = adapter ? `${adapter.id}-timeline-markers.json` : filename;
+    const timeline = readModelTimeline(sqlite, adapter?.id ?? "codex");
+    pending = timeline.pending;
+    if (!timeline.ready) return response({ status: "preparing" }, 202);
     let store = readStore(root, markerFile);
     if (payload) {
       if (payload.revision !== store.revision) return response({ error: "Punkty zmieniły się od ostatniego odczytu. Odśwież listę przed zapisem." }, 409);
@@ -87,10 +93,7 @@ export async function handleCodexTimelineMarkers(sqlite: Database, req: Request,
       store = { revision: crypto.randomUUID(), markers };
       atomicArchiveWrite(path.join(root, markerFile), JSON.stringify(store, null, 2) + "\n");
     }
-    const table = adapter?.table ?? "events";
-    const exists = sqlite.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table);
-    const modelWhere = adapter?.id === "glm" ? " AND lower(provider) IN ('zai-coding-plan','zhipuai-coding-plan','zai','zhipuai','z-ai')" : "";
-    const models = exists ? queryRows<{model:string;first_ts:string}>(sqlite, `SELECT model, MIN(ts) AS first_ts FROM ${table} WHERE model IS NOT NULL AND model != '' ${modelWhere} GROUP BY model ORDER BY first_ts`).sort((a,b)=>a.first_ts.localeCompare(b.first_ts)||a.model.localeCompare(b.model)) : [];
+    const models = timeline.models;
     const automatic: TimelineMarker[] = models.filter(m => isAccountingDay(m.first_ts.slice(0, 10))).map(m => ({
       id: `model:${m.model}`, observed_at: m.first_ts, day: m.first_ts.slice(0, 10), label: m.model.replace(/^gpt-/, ""),
       note: `Pierwsza obserwacja w całym zaindeksowanym archiwum ${adapter?.label ?? "Codex"}: ${m.first_ts}. Nie jest to potwierdzona data premiery.`,

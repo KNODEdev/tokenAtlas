@@ -4,6 +4,7 @@ import { isFactDayRevisionTrigger, recordFactDayRevisions } from "../db/fact-day
 import type { VendorSourceImpact } from "./contracts";
 import { unavailableSourceImpact } from "./source-impact";
 import { runInBatches } from "../db/batches";
+import { isModelTimelineTrigger, recordModelTimelineChanges } from "../db/model-timeline";
 
 const quote = (name: string) => `"${name.replaceAll('"', '""')}"`;
 export function tablesAreEmpty(db: Database, tables: readonly string[]): boolean {
@@ -29,6 +30,7 @@ function fillOnlyObjects(db: Database, tables: readonly string[]): FillOnlyObjec
     ? !(db.query(`PRAGMA index_list(${quote(item.tbl_name)})`).all() as Array<{name:string;unique:number}>).find(index => index.name === item.name)?.unique
     : isAnalysisRevisionTrackingTrigger(db,item.name,item.tbl_name,item.sql)
       || isFactDayRevisionTrigger(db,item.name,item.tbl_name,item.sql)
+      || isModelTimelineTrigger(item.name,item.tbl_name,item.sql)
       || item.name.startsWith("sync_accepted_facts_")));
 }
 const isRevision = (name: string) => name.startsWith("analysis_");
@@ -47,6 +49,7 @@ function recordTrackedChanges(db: Database, tables: readonly string[], objects: 
         ON CONFLICT(source,bucket) DO UPDATE SET revision=revision+excluded.revision`).run(table);
     }
     if (objects.some(item => item.tbl_name === table && item.name.startsWith("fact_day_revision_"))) recordFactDayRevisions(db, table);
+    if (objects.some(item => item.tbl_name === table && isModelTimelineTrigger(item.name,item.tbl_name,item.sql))) recordModelTimelineChanges(db, table);
   }
 }
 

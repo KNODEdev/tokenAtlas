@@ -105,7 +105,7 @@ export class ResponseCache {
     const probeSources = new Set(["probe_windows", "ratelimit", "sync_runs"]);
     const tracked = rows ? analysisHash(rows.filter(row => (includeReadings || !probeSources.has(row.source))
       // Timing projections have their own Speed version; other routes do not read them.
-      && row.source !== "response_time_hours" && row.source !== "model_speed_hours"
+      && row.source !== "response_time_hours" && row.source !== "model_speed_hours" && row.source !== "model_timeline_first"
       && (windowSums || !row.source.startsWith(WINDOW_USAGE_SOURCES)))) : "legacy";
     const schema = (sqlite.query("PRAGMA schema_version").get() as {schema_version:number}).schema_version;
     const stamp = `${schema}:${revisions}:${derived}:${rules}:${tracked}:${this.configuration?analysisHash(this.configuration(includeReadings)):""}`;

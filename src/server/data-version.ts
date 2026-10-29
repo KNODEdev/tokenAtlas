@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { contextProjectionStamp } from "./codex-context-preview";
+import { subscriptionAccountingAdapter } from "./subscription-accounting-adapters";
 
 /**
  * The version of the stored rows an analytical response is read from (plan U4.4, "data version
@@ -23,7 +24,7 @@ function timingState(db: Database, state: string, queue: string): unknown {
     FROM ${state} s ORDER BY s.provider`).all();
 }
 
-export function dataVersion(db: Database, scope: { windowSums?: boolean; capacityCycles?: boolean; contextPrices?: boolean | string; firstTokenTimes?: boolean } = {}): string {
+export function dataVersion(db: Database, scope: { windowSums?: boolean; capacityCycles?: boolean; contextPrices?: boolean | string; firstTokenTimes?: boolean; modelTimeline?: string } = {}): string {
   const parts = [
     // The Codex price ledger's state is the `codex` row.
     rows(db, "usage_ledger_state", "SELECT provider,version,status,covered,rules_digest,revision FROM usage_ledger_state ORDER BY provider"),
@@ -42,6 +43,11 @@ export function dataVersion(db: Database, scope: { windowSums?: boolean; capacit
     scope.capacityCycles === false ? null
       : rows(db, "analysis_source_revisions", "SELECT revision FROM analysis_source_revisions WHERE source='capacity_cycle_results' AND bucket='*'"),
   ];
+  if (scope.modelTimeline && exists(db, "model_timeline_state")) {
+    const provider = scope.modelTimeline === "codex" ? "codex" : subscriptionAccountingAdapter(scope.modelTimeline).id;
+    parts.push(db.query(`SELECT s.*,EXISTS(SELECT 1 FROM model_timeline_dirty d WHERE d.provider=s.provider) pending
+      FROM model_timeline_state s WHERE provider=?`).get(provider));
+  }
   if (scope.contextPrices) parts.push(contextProjectionStamp(db, typeof scope.contextPrices === "string" ? new URL(scope.contextPrices, "http://context") : undefined));
   return createHash("sha256").update(JSON.stringify(parts)).digest("hex").slice(0, 16);
 }

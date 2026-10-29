@@ -554,6 +554,8 @@ export function createFetchHandler(ctx: AppContext) {
       catch (error) { if (error instanceof SubscriptionFactsPending) return preparingDataResponse(); throw error; }
     }
     if (url.pathname === "/api/leverage" || url.pathname === "/api/account-history") return serve(req, url);
+    // Prepared marker rows are tiny; read their current pending state instead of caching a stale freshness label.
+    if (req.method === "GET" && DATA_VIEWS[url.pathname]?.sources.includes("model_timeline_first")) return serve(req, url);
     const clocked = DATA_VIEWS[url.pathname]?.clock === true || CLOCK_CACHEABLE_ROUTES.has(url.pathname) || url.pathname === "/api/project-cost";
     if (!ctx.sqlite || req.method !== "GET" || (!DATA_VIEWS[url.pathname] && !CACHEABLE_ROUTES.has(url.pathname) && !clocked)) {
       return serve(req, url);
