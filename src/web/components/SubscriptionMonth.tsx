@@ -154,6 +154,8 @@ function valueHead(first: string, t: T) {
     <Th columnId="paid" align="right" title={t("In USD at the NBP mid rate of the day before each payment; the price as written in the tooltip",
       "W USD po średnim kursie NBP z dnia przed każdą płatnością; cena jak zapisana w podpowiedzi")}>{t("Paid", "Zapłacono")}</Th>
     <Th columnId="capacity" align="right" title={t("Capacity with the counted early-reset bonuses", "Pojemność z liczonymi premiami z wczesnych resetów")}>{t("Capacity", "Pojemność")}</Th>
+    <Th columnId="per-reset" align="right" title={t("The capacity over the windows (resets) it spans: what one reset gives on average, comparable across cycles of any length",
+      "Pojemność podzielona przez okna (resety), które obejmuje: ile średnio daje jeden reset, porównywalne między cyklami dowolnej długości")}>{t("Per reset", "Na reset")}</Th>
     <Th columnId="base" align="right" defaultHidden title={t("Capacity without any early-reset bonus", "Pojemność bez premii z wczesnych resetów")}>{t("Without resets", "Bez resetów")}</Th>
     <Th columnId="resets" align="right" defaultHidden title={t("The bonuses of the counted early resets (their number in brackets)", "Premie z liczonych wczesnych resetów (ich liczba w nawiasie)")}>{t("From resets", "Z resetów")}</Th>
     <Th columnId="used" align="right">{t("Used", "Zużyto")}</Th><Th columnId="used-pct" align="right">{t("Used %", "Zużyto %")}</Th>
@@ -162,6 +164,26 @@ function valueHead(first: string, t: T) {
     <Th columnId="potential" align="right" title={potentialHelp(t)}>{t("Potential", "Potencjał")}</Th>
   </TableRow></thead>;
 }
+const plPlural = (n: number, one: string, few: string, many: string) =>
+  n === 1 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many;
+/** Windows may be fractional (a cut window counts by its share); Polish takes the genitive singular for fractions. */
+function windowsText(windows: number, locale: string, t: T) {
+  const n = windows.toLocaleString(locale, { maximumFractionDigits: 1 }), whole = Number.isInteger(Math.round(windows * 10) / 10);
+  return t(windows === 1 ? "{0} window" : "{0} windows", `${n} ${whole ? plPlural(Math.round(windows), "okno", "okna", "okien") : "okna"}`, [n]);
+}
+const resetsText = (count: number, t: T) => t(count === 1 ? "{0} reset" : "{0} resets", `${count} ${plPlural(count, "reset", "resety", "resetów")}`, [count]);
+
+/** One reset's worth of capacity, with the windows behind it and the counted early resets below. */
+function PerResetCell({ capacity, used, windows, resets, amount }: {
+  capacity: number | null; used: number | null; windows: number; resets: number; amount: (value: number | null) => string;
+}) {
+  const { t, locale } = useI18n();
+  const per = (value: number | null) => value === null || windows <= 0 ? null : value / windows;
+  const usedPer = per(used);
+  return <Td mono align="right" title={usedPer === null ? undefined : `${t("Used per reset", "Zużyto na reset")} ${amount(usedPer)}`}>{amount(per(capacity))}
+    {windows > 0 && <span className="subscription-month-sub">{windowsText(windows, locale, t)} · {resetsText(resets, t)}</span>}</Td>;
+}
+
 /** The plan with its vendor's ink, as in the subscription rail. */
 const PlanCell = ({ color, children }: { color: string; children: string }) =>
   <Td><span className="capacity-subject"><i className="capacity-swatch" style={{ background: color }} />{children}</span></Td>;
@@ -413,6 +435,9 @@ function CycleRow({ row, unit, vendor, enabled, selected, onSelect, amount, pct,
     <PlanCell color={providerColor(vendor)}>{planName(cycle.plan, vendor, cycle.start)}</PlanCell>
     <Td mono align="right" title={paid.title}>{paid.text}</Td>
     <Td mono align="right" title={missing}><strong>{amount(row.total)}</strong></Td>
+    {/* Like the summary's "Per reset": the whole capacity over all windows, whichever resets are counted. */}
+    <PerResetCell capacity={row.capacity.value} used={row.used.value} windows={cycle.windows.share + cycle.windows.idle}
+      resets={countedResets(row, enabled)} amount={amount} />
     <Td mono align="right" title={missing}>{amount(row.base)}</Td>
     <ResetsCell row={row} enabled={enabled} missing={missing} amount={amount} range={range} />
     <Td mono align="right" title={row.used.value === null && row.capacity.value !== null ? usageUnknownTitle(cycle.used_pp, t) : range(row.used)}>{amount(row.used.value)}</Td>
@@ -424,13 +449,16 @@ function CycleRow({ row, unit, vendor, enabled, selected, onSelect, amount, pct,
   </TableRow>;
 }
 
+const countedResets = (row: MonthRow, enabled: ReadonlySet<ResetKind>) =>
+  RESET_KINDS.filter(({ id }) => enabled.has(id)).reduce((sum, { id }) => sum + row.bonuses[id].count + row.bonuses[id].carried, 0);
+
 /** The counted early resets of a cycle in one cell; each kind, a kind not counted and carried resets in its tooltip. */
 function ResetsCell({ row, enabled, missing, amount, range }: {
   row: MonthRow; enabled: ReadonlySet<ResetKind>; missing?: string; amount: (value: number | null) => string;
   range: (value: { range?: { low: number; high: number } }) => string | undefined;
 }) {
   const { t } = useI18n();
-  const counted = RESET_KINDS.filter(({ id }) => enabled.has(id)).reduce((sum, { id }) => sum + row.bonuses[id].count + row.bonuses[id].carried, 0);
+  const counted = countedResets(row, enabled);
   const lines = RESET_KINDS.flatMap(({ id }) => {
     const bonus = row.bonuses[id], resets = bonus.count + bonus.carried;
     if (!resets) return [];
@@ -636,6 +664,9 @@ function AllSubscriptionsMonth({ cards, select, dataRevision }: { cards: RosterC
                     <Td mono align="right" title={row.summary.paid.some((entry) => entry.currency !== "USD") ? paidByCurrency(row.summary, locale, t) : undefined}>
                       {paidText(row.summary, locale, t)}</Td>
                     <Td mono align="right" title={marked}><strong>{cap(summary.capacity)}</strong></Td>
+                    {/* In window points one reset is one window by definition: no value, as in the summary. */}
+                    <PerResetCell capacity={points ? null : row.summary.allCapacity} used={points ? null : row.summary.used} windows={row.summary.capacityWindows}
+                      resets={RESET_KINDS.filter(({ id }) => enabled.has(id)).reduce((sum, { id }) => sum + kinds[id], 0)} amount={amount} />
                     <Td mono align="right" title={marked}>{cap(summary.base)}</Td>
                     <Td mono align="right" title={[marked, ...RESET_KINDS.filter(({ id }) => kinds[id]).map(({ id }) =>
                       `${kindLabel(id, t)}: ${kinds[id]}${enabled.has(id) ? "" : ` · ${t("not counted", "nie liczone")}`}`)].filter(Boolean).join("\n") || undefined}>

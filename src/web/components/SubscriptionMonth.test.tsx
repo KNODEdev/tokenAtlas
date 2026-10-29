@@ -84,9 +84,10 @@ test("the subscription month shows counts per kind, switches kinds and units, an
     expect(button(dom.host, "Banked").textContent).toBe("Banked 1");
     expect(button(dom.host, "Single").textContent).toBe("Single 1");
     const row = () => findByAttribute(dom.host, "data-cycle-row", current.start)!;
-    // The shared columns (user decision 21.10): paid in USD, capacity, used, used %, unused, return and potential per $1;
+    // The shared columns (user decision 21.10): paid in USD, capacity, per reset (with windows and counted resets), used, used %,
+    // unused, return and potential per $1;
     // the reset split starts hidden.
-    expect(row().textContent).toBe("09/24–10/24ongoingPro · ×20$200 cat.$4,000$2,00050%to date 67%$2,00010×20×");
+    expect(row().textContent).toBe("09/24–10/24ongoingPro · ×20$200 cat.$4,000$1,0004 windows · 3 resets$2,00050%to date 67%$2,00010×20×");
     expect(findAll(row(), node => node.getAttribute("data-resets") !== null)).toEqual([]);
     expect(titled(row(), "Used $2,000 ÷ paid $200")).toBe("Used $2,000 ÷ paid $200 · 1 cycle");
     // The value chart has the same row: used and capacity per $1 against the 1× line.
@@ -398,11 +399,11 @@ test("all subscriptions: sums per period, what resets added, credits over Codex 
     expect(codex.textContent).toContain("account_0006@example.test");
     expect(codex.textContent).toContain("OpenAI / Codex · ");
     expect(codex.textContent).not.toContain("codex1");
-    // The plan of the cycle in the vendor's ink, then the shared columns: paid, capacity, used, used %, unused, return, potential.
-    expect(codex.textContent).toContain("OpenAI / Codex · Pro · ×20$200 cat.$4,000$2,00050%$2,00010×20×");
+    // The plan of the cycle in the vendor's ink, then the shared columns: paid, capacity, per reset, used, used %, unused, return, potential.
+    expect(codex.textContent).toContain("OpenAI / Codex · Pro · ×20$200 cat.$4,000$1,0004 windows · 3 resets$2,00050%$2,00010×20×");
     // A payment without its NBP rate has no dollar value yet: no return, no bar.
     const claude = findByAttribute(dom.host, "data-subscription-row", "claude|claude-ea41")!;
-    expect(claude.textContent).toContain("90 €$4,000$2,00050%$2,000——");
+    expect(claude.textContent).toContain("90 €$4,000$1,0004 windows · 2 resets$2,00050%$2,000——");
     expect(findByAttribute(dom.host, "data-value-bar", "codex|codex1")!.textContent).toContain("10× / 20×");
     expect(findByAttribute(dom.host, "data-value-bar", "claude|claude-ea41")).toBeNull();
     expect(summaryText(dom.host)).toContain("Return10×");
@@ -438,7 +439,7 @@ test("one subscription: usage not stored reads — with its points; an ended sub
     await act(async () => root.render(<SubscriptionMonth vendor="codex" account="codex2" />));
     await flushUntil(() => dom.host.textContent.includes("Subscription capacity vs usage"));
     const row = findByAttribute(dom.host, "data-cycle-row", current.start)!;
-    const used = findAll(row, (node) => node.tagName === "TD")[4]!;
+    const used = findAll(row, (node) => node.tagName === "TD")[5]!;
     expect(used.textContent).toBe("—");
     expect(used.getAttribute("title")).toBe("Usage in this unit not stored for some windows; points used: 200");
     expect(summaryText(dom.host)).toContain("1 cycle without stored usage in this unit not included");
@@ -483,7 +484,9 @@ test("all subscriptions: a subscription whose usage in the unit is unknown shows
     const row = findByAttribute(dom.host, "data-subscription-row", "codex|codex2")!;
     const cells = findAll(row, (node) => node.tagName === "TD").map((node) => node.textContent);
     // Capacity, used, used %, unused in points; the return in API $ is unknown, the potential is not.
-    expect(cells.slice(3, 9)).toEqual(["4 windows", "200 pp", "50%", "2 windows", "—", "20×"]);
+    // Per reset has no value in window points (one reset is one window).
+    expect(cells[4]).toBe("—4 windows · 3 resets");
+    expect([cells[3], ...cells.slice(5, 10)]).toEqual(["4 windows", "200 pp", "50%", "2 windows", "—", "20×"]);
     expect(findAll(row, (node) => node.tagName === "TD")[3]!.getAttribute("title")).toContain("In window points");
     // The unit's sum holds codex1 only, with the note.
     const text = summaryText(dom.host);
