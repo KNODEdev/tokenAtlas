@@ -1,0 +1,30 @@
+/* Capacity → Before / after: one full 7-day allowance per cycle around chosen events (approved 2026-10-29). */
+.before-after-controls { gap: var(--s-4) var(--s-8); margin-bottom: var(--s-5); }
+.before-after-events { display: flex; margin: 0 0 var(--s-6); padding: var(--s-5) 0; border-top: var(--rule); border-bottom: var(--rule); }
+/* Inner room so the exported image does not start at its very edge. */
+.before-after-sheet { padding: var(--s-2) var(--s-4); }
+.before-after-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--s-6) var(--s-9); margin-bottom: var(--s-4); }
+.before-after-heading { display: grid; gap: var(--s-3); min-width: 0; flex: 1 1 420px; }
+.before-after-scope { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3) var(--s-6); color: var(--muted); font-size: var(--fs-4); font-weight: var(--fw-medium); }
+/* The window length is the point of the chart, so it is the only filled chip. */
+.before-after-window {
+  display: inline-flex; align-items: center; padding: var(--s-2) var(--s-5); border: 1px solid var(--accent); border-radius: var(--r-chip);
+  background: var(--accent-soft); color: var(--accent); font-size: var(--fs-5); font-weight: var(--fw-semibold); white-space: nowrap;
+}
+.capacity-report .before-after-title { font-family: var(--font-display); font-size: var(--fs-7); font-weight: var(--fw-display); white-space: normal; }
+.capacity-report .before-after-note { margin: 0; color: var(--muted); font-size: var(--fs-3); }
+.before-after-headline { display: grid; justify-items: end; gap: var(--s-2); text-align: right; cursor: help; }
+.before-after-figure { font-family: var(--font-figure); font-size: var(--fs-8); font-weight: var(--fw-semibold); letter-spacing: -0.02em; color: var(--text); white-space: nowrap; }
+.before-after-arrow { color: var(--faint); font-weight: var(--fw-regular); }
+.before-after-change { font-size: var(--fs-4); font-weight: var(--fw-medium); }
+.before-after-chart { display: block; overflow: visible; }
+.before-after-marker { cursor: help; outline: none; }
+.before-after-marker:focus-visible > line { stroke-width: 2; }
+.before-after-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-8); margin-top: var(--s-3); font-size: var(--fs-3); color: var(--muted); }
+.before-after-legend > span { display: inline-flex; align-items: center; gap: var(--s-3); white-space: nowrap; }
+.before-after-swatch {
+  display: inline-block; flex: none; width: 14px; height: 11px; border-radius: var(--r-bar);
+  background-image: repeating-linear-gradient(45deg, var(--hatch) 0 1.2px, transparent 1.2px 5px);
+}
+.before-after-swatch.is-projection { background: var(--crit-soft); border: 1.4px dashed var(--crit); }
+.before-after-faint { color: var(--faint); }

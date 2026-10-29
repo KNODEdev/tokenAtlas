@@ -18,12 +18,13 @@ import type { CycleAnalysisScope } from "../lib/capacity-cycle";
 import { CapacityTokenTypes } from "./CapacityTokenTypes";
 import { CapacityCycleList, capacityUnitLabel, deviationColor, signedDeviation } from "./CapacityCycleList";
 import { capacityMarkerType, readCapacityMarkerTypes, writeCapacityMarkerTypes, type CapacityMarkerType } from "../lib/capacity-marker-visibility";
+import { CapacityBeforeAfter } from "./CapacityBeforeAfter";
 
 const cycleStart = (w: Window) => Date.parse(w.cycle_start ?? w.start);
 const cycleEnd = (w: Window) => Date.parse(w.cycle_end ?? w.reset);
 const measuresStorageKey = "tokenatlas.capacity-measures.v1";
 /** The capacity result's views; they share the screen's one tab row with By model, Measurements and Methodology. */
-export const CAPACITY_REPORT_TABS = ["history", "cycles", "token-types", "compare"] as const;
+export const CAPACITY_REPORT_TABS = ["history", "cycles", "token-types", "compare", "before-after"] as const;
 export type CapacityReportTab = typeof CAPACITY_REPORT_TABS[number];
 const reportTabKey = "tokenatlas.capacity-report-tab.v1";
 export function readCapacityReportTab(): CapacityReportTab {
@@ -264,6 +265,9 @@ export function CodexCapacitySummary({ windows, allWindows, baseline, current, o
           })()}
         </> : <p className="capacity-note" role="status">{t("Choose two cycles of the same plan", "Wybierz dwa cykle tego samego planu")}</p>}
       </div>
+
+      <div hidden={tab !== "before-after"}><CapacityBeforeAfter windows={allRows} unit={activeUnit} basis={basis} markers={markers} range={range}
+        provider={analysisScope?.provider ?? "codex"} account={analysisScope?.options.account ?? allRows[0]?.account ?? ""} active={tab === "before-after"} /></div>
       </div>
     </>}
     {mode !== "overview" && <section className="capacity-section" aria-label={t("How capacity is estimated", "Jak szacujemy pojemność")}>

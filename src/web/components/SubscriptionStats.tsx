@@ -111,6 +111,7 @@ function SubscriptionStatsView({ account, project, openDataSettings, initialRang
   const capacityTabLabels: Record<CapacityReportTab, string> = {
     history: t("Over time", "W czasie"), cycles: t("Cycles", "Cykle"),
     "token-types": t("Token types", "Typy tokenów"), compare: t("Comparison", "Porównanie"),
+    "before-after": t("Before / after", "Przed i po"),
   };
   const isCapacityTab = (value: string): value is CapacityReportTab => (CAPACITY_REPORT_TABS as readonly string[]).includes(value);
   const tabValue: string = view === "capacity" ? capacityTab : view;

@@ -101,7 +101,7 @@ test("every non-Codex provider separates capacity from model views, diagnostics 
       expect(markers.mock.calls.at(-1)?.[0]).toBe(provider);
       const tabs: TestNode[] = [];
       const collect = (node: TestNode) => { if (node.attributes.role === "tab") tabs.push(node); for (const child of node.children) collect(child); }; collect(dom.host);
-      expect(tabs.map(node => node.textContent)).toEqual(["Over time", "Cycles", "Token types", "Comparison", ...(provider === "claude" ? ["By model"] : []), "Measurements", "Methodology"]);
+      expect(tabs.map(node => node.textContent)).toEqual(["Over time", "Cycles", "Token types", "Comparison", "Before / after", ...(provider === "claude" ? ["By model"] : []), "Measurements", "Methodology"]);
       expect(find(dom.host, node => node.attributes.role === "tab" && node.textContent === "Models & sources")).toBeUndefined();
       await act(async () => { root.render(<SubscriptionStats key={provider + "-models"} section="models" provider={provider} account={provider} initialRange={range} />); });
       await flushUntil(() => dom.host.textContent.includes("Daily details and rates"));
