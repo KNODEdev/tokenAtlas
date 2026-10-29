@@ -21,7 +21,7 @@ import { railWithContextPreview, rosterWithContextPreview, seriesWithContextPrev
 import { browserSafeDiagnostic } from "./lib/browserDiagnostic";
 import { railWindowsFromCycles, type RailWindow } from "./lib/windows";
 import { comparedCycles, toggleCompared } from "./lib/window-archive";
-import { ALL_ACCOUNT, buildAllCard, buildRoster, providerColor, subscriptionName, selectedAccountId } from "./lib/roster";
+import { ALL_ACCOUNT, buildAllCard, buildRoster, providerColor, subscriptionName, selectedAccountId, preferredAccountOrder } from "./lib/roster";
 import { subscriptionPlan } from "./lib/subscription-plan";
 import { usePlanCatalog } from "./lib/use-plan-catalog";
 import { cyclePlanDescription } from "./lib/codex-window-stats";
@@ -95,7 +95,7 @@ function readTheme(): "dark" | "light" {
     if (v === "light" || v === "dark") return v;
   } catch {
   }
-  return "dark";
+  return "light";
 }
 // Usage's other views read all subscriptions in calendar time, like Usage itself (IA-41).
 const ACCOUNT_FREE_SCREENS = new Set<ScreenId>(["projects", "sources", "data-problems", "data-operations", "events", "settings", "usage",
@@ -244,7 +244,7 @@ export function App() {
   }, [language, rosterState.data, contextPreview]);
   const activeRosterCards = useMemo(() => rosterCards.filter((c) => c.active), [rosterCards]);
   const accountsList = accountsState.data?.subscriptions ?? [];
-  const account = selectedAccountId(requestedAccount, accountsList.map(entry => entry.id));
+  const account = selectedAccountId(requestedAccount, preferredAccountOrder(accountsList));
   const isAll = account === ALL_ACCOUNT;
   const activeRosterAccount = rosterState.data?.accounts.find((entry) => entry.id === account) ?? null;
   const accountWindowMinutes = activeRosterAccount?.live?.window_minutes ?? Number(windowMinutes);
@@ -746,7 +746,7 @@ export function App() {
                       tag: a.plan === "self_serve_business_usage_based" ? "Business credits" : null,
                     })))
                   : [...new Map(accounts.map(a => [a.id, a])).values()].map((a) => ({
-                      value: a.id, title: a.declared_account || a.id, group: vendorGroupName(a.vendor ?? ""), groupColor: providerColor(a.vendor),
+                      value: a.id, title: a.declared_account || a.label || a.id, group: vendorGroupName(a.vendor ?? ""), groupColor: providerColor(a.vendor),
                       tag: a.has_gauge ? subscriptionPlan(a.vendor ?? "", a.plan) : `${a.plan ? `${subscriptionPlan(a.vendor ?? "", a.plan)} · ` : ""}${t("no gauge", "brak gauge")}`,
                     }))
               }
@@ -881,7 +881,7 @@ export function App() {
           )}
           {screenProps && screen === "overview" && !isAll && !isGemini && !isGrok && !isGlm && (
             isClaude ? <ClaudeOverview capabilities={screenProps.capabilities} account={account} bounds={vendorOverviewBounds}
-              windows={railWindows} selectedKey={selectedInsightKey} selectedEndIso={selectedInsightEndIso} onFullHistory={() => goto("history")} /> : <Overview {...screenProps} />
+              windows={railWindows} selectedKey={selectedInsightKey} selectedEndIso={selectedInsightEndIso} onFullHistory={() => goto("history")} onOpenUsage={() => goto("usage")} /> : <Overview {...screenProps} />
           )}
           {screenProps && (screen === "usage-history" || screen === "usage-pace" || screen === "structure" || screen === "structure-models") && (
             <AllAggregate screen={screen === "usage-history" ? "history" : screen === "usage-pace" ? "analytics" : screen === "structure" ? "compare" : "models"}

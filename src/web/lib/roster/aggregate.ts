@@ -7,6 +7,11 @@ export function selectedAccountId(requested: string, available: readonly string[
   return requested === ALL_ACCOUNT || available.includes(requested)
     ? requested : available[0] ?? requested;
 }
+/** Without a valid choice, open an account that can show something: a limit reading first, then imported usage. */
+export function preferredAccountOrder(accounts: readonly { id: string; has_gauge?: boolean; has_events?: boolean }[]): string[] {
+  const rank = (account: typeof accounts[number]) => account.has_gauge ? 0 : account.has_events ? 1 : 2;
+  return [...accounts].sort((a, b) => rank(a) - rank(b)).map(account => account.id);
+}
 function mean(xs: (number | null)[]): number | null {
   const v = xs.filter((n): n is number => n != null && Number.isFinite(n));
   return v.length > 0 ? v.reduce((a, b) => a + b, 0) / v.length : null;

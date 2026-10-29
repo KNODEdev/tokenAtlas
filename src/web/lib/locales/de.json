@@ -4649,5 +4649,12 @@
   "empty or new folder": "leerer oder neuer Ordner",
   "Moving…": "Wird verschoben…",
   "Move archive": "Archiv verschieben",
-  "Copies everything to the new folder and checks every file while you keep working, then restarts once. The old folder stays untouched as a copy; delete it yourself when you no longer need it. Several computers: choose a shared network folder.": "Kopiert alles in den neuen Ordner und prüft jede Datei, während Sie weiterarbeiten; danach ein Neustart. Der alte Ordner bleibt unverändert als Kopie; löschen Sie ihn selbst, wenn er nicht mehr gebraucht wird. Mehrere Computer: gemeinsamen Netzwerkordner wählen."
+  "Copies everything to the new folder and checks every file while you keep working, then restarts once. The old folder stays untouched as a copy; delete it yourself when you no longer need it. Several computers: choose a shared network folder.": "Kopiert alles in den neuen Ordner und prüft jede Datei, während Sie weiterarbeiten; danach ein Neustart. Der alte Ordner bleibt unverändert als Kopie; löschen Sie ihn selbst, wenn er nicht mehr gebraucht wird. Mehrere Computer: gemeinsamen Netzwerkordner wählen.",
+  "No Codex limit reading yet": "Noch kein Codex-Limitwert gelesen",
+  "Sign in with codex login on this computer and keep it online; the window appears after the first reading. Imported usage is already in Usage.": "Melden Sie sich auf diesem Computer mit codex login an und lassen Sie ihn online; das Fenster erscheint nach dem ersten Lesen. Importierte Nutzung steht bereits unter Nutzung.",
+  "No Claude limit reading yet": "Noch kein Claude-Limitwert gelesen",
+  "Sign in to Claude Code on this computer: run claude, then /login. The window appears after the first reading. Imported usage is already in Usage.": "Melden Sie sich auf diesem Computer bei Claude Code an: claude starten, dann /login. Das Fenster erscheint nach dem ersten Lesen. Importierte Nutzung steht bereits unter Nutzung.",
+  "no computer is reading this limit": "kein Computer liest dieses Limit",
+  "sign in to this provider's CLI on a computer to start readings": "melden Sie sich auf einem Computer in der CLI dieses Anbieters an, um Messungen zu starten",
+  "no limit reading in this window yet": "noch kein Limitwert in diesem Fenster"
 }

@@ -58,10 +58,10 @@ export function claudeSections({
 }): VendorOverviewSections {
   if (!data.configured) {
     return missingVendorSections(
-      translate("Claude has no declared cap", "Claude nie ma zadeklarowanego pułapu"),
+      translate("No Claude limit reading yet", "Brak odczytu limitu Claude"),
       translate(
-        "The vendor does not publish a gauge, so the weekly percentage comes from the reading entered in claude-gauge.json. Until the file exists, every section remains explicitly undefined.",
-        "Vendor nie publikuje gauge'a, więc procent tygodnia bierze się z odczytu wpisanego do claude-gauge.json. Dopóki pliku nie ma, każda sekcja pozostaje jawnie nieokreślona."
+        "Sign in to Claude Code on this computer: run claude, then /login. The window appears after the first reading. Imported usage is already in Usage.",
+        "Zaloguj się w Claude Code na tym komputerze: uruchom claude, potem /login. Okno pojawi się po pierwszym odczycie. Zaimportowane zużycie jest już w Zużyciu."
       )
     );
   }

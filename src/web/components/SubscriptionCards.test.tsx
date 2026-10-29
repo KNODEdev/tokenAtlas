@@ -502,7 +502,7 @@ describe("three probe states on the card", () => {
       },
     ]);
     expect(html).toContain('data-probe="none"');
-    expect(html).toContain("no machine is probing this subscription");
+    expect(html).toContain("no computer is reading this limit");
     expect(html).toContain("EXAMPLE-MAIN - probe error since 08/30 (auth.json missing)");
     expect(html).toContain("EXAMPLE-LAPTOP-A - probe error since 09/01");
     expect(html).not.toMatch(/>\s*\d+%\s*</);
@@ -527,7 +527,7 @@ describe("three probe states on the card", () => {
     ]);
     const trail = html.slice(html.indexOf("data-probe-trail"));
     expect(trail).toContain("EXAMPLE-MAIN - probe error since 08/30");
-    expect(html.indexOf("no machine is probing this subscription")).toBeLessThan(
+    expect(html.indexOf("no computer is reading this limit")).toBeLessThan(
       html.indexOf("TypeError")
     );
   });
@@ -619,7 +619,7 @@ describe("Grok card without a Billing reading", () => {
     expect(html).not.toContain("data-estimate");
     expect(html).not.toMatch(/>\s*[\d.]+%\s*</);
     expect(html).not.toContain("Inferred");
-    expect(html).toContain("no machine is probing this subscription");
+    expect(html).toContain("no computer is reading this limit");
   });
 });
 

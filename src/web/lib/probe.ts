@@ -154,11 +154,11 @@ export function probeCopy(probe: RosterProbe, nowMs = Date.now()): ProbeCopy {
   const trail = machinesTrail(probe.machines, nowMs, probe.provider);
   if (probe.state === "none") {
     const line = translate(
-      "no machine is probing this subscription",
-      "żadna maszyna nie sonduje tej subskrypcji",
+      "no computer is reading this limit",
+      "żaden komputer nie odczytuje tego limitu",
     );
     const body = trail === ""
-      ? translate("there are no samples for this subscription", "nie ma ani jednej próbki tej subskrypcji")
+      ? translate("sign in to this provider's CLI on a computer to start readings", "zaloguj się w CLI tego dostawcy na komputerze, aby zacząć odczyty")
       : trail;
     return { state: "none", status: line, line, trail: body, detail: `${line}: ${body}.` };
   }

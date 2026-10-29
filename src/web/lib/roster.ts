@@ -11,7 +11,7 @@ import type { CardActivity, CardCore, RosterCard } from "./roster/types";
 
 export { type RosterSecondWindow, type RosterCard, type RosterGroup } from "./roster/types";
 export { subscriptionName, subscriptionNameLookup, providerColor } from "./roster/presentation";
-export { ALL_ACCOUNT, selectedAccountId, buildAllCard, groupRoster } from "./roster/aggregate";
+export { ALL_ACCOUNT, selectedAccountId, preferredAccountOrder, buildAllCard, groupRoster } from "./roster/aggregate";
 
 function activityOf(a: RosterAccount): CardActivity {
   return {

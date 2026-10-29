@@ -11,8 +11,9 @@ export function StartupGate({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [disconnected, setDisconnected] = useState(false);
   useEffect(() => {
-    try { document.documentElement.dataset.theme = localStorage.getItem("tokenatlas.theme") === "light" ? "light" : "dark"; }
-    catch { document.documentElement.dataset.theme = "dark"; }
+    // Light until the user picks dark; matches App's readTheme default.
+    try { document.documentElement.dataset.theme = localStorage.getItem("tokenatlas.theme") === "dark" ? "dark" : "light"; }
+    catch { document.documentElement.dataset.theme = "light"; }
     let active = true;
     let pending = false;
     const controller = new AbortController();

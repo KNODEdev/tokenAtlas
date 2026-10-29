@@ -4649,5 +4649,12 @@
   "empty or new folder": "dossier vide ou nouveau",
   "Moving…": "Déplacement…",
   "Move archive": "Déplacer l’archive",
-  "Copies everything to the new folder and checks every file while you keep working, then restarts once. The old folder stays untouched as a copy; delete it yourself when you no longer need it. Several computers: choose a shared network folder.": "Copie tout dans le nouveau dossier et vérifie chaque fichier pendant que vous continuez à travailler, puis redémarre une fois. L’ancien dossier reste intact comme copie ; supprimez-le vous-même quand il n’est plus utile. Plusieurs ordinateurs : choisissez un dossier réseau partagé."
+  "Copies everything to the new folder and checks every file while you keep working, then restarts once. The old folder stays untouched as a copy; delete it yourself when you no longer need it. Several computers: choose a shared network folder.": "Copie tout dans le nouveau dossier et vérifie chaque fichier pendant que vous continuez à travailler, puis redémarre une fois. L’ancien dossier reste intact comme copie ; supprimez-le vous-même quand il n’est plus utile. Plusieurs ordinateurs : choisissez un dossier réseau partagé.",
+  "No Codex limit reading yet": "Aucune lecture de limite Codex pour l’instant",
+  "Sign in with codex login on this computer and keep it online; the window appears after the first reading. Imported usage is already in Usage.": "Connectez-vous avec codex login sur cet ordinateur et gardez-le en ligne ; la fenêtre apparaît après la première lecture. L’utilisation importée est déjà dans Utilisation.",
+  "No Claude limit reading yet": "Aucune lecture de limite Claude pour l’instant",
+  "Sign in to Claude Code on this computer: run claude, then /login. The window appears after the first reading. Imported usage is already in Usage.": "Connectez-vous à Claude Code sur cet ordinateur : lancez claude, puis /login. La fenêtre apparaît après la première lecture. L’utilisation importée est déjà dans Utilisation.",
+  "no computer is reading this limit": "aucun ordinateur ne lit cette limite",
+  "sign in to this provider's CLI on a computer to start readings": "connectez-vous à la CLI de ce fournisseur sur un ordinateur pour lancer les lectures",
+  "no limit reading in this window yet": "aucune lecture de limite dans cette fenêtre pour l’instant"
 }

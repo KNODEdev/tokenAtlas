@@ -12,7 +12,7 @@ import type { RailWindow } from "../lib/windows";
 import { WindowProjects } from "../components/WindowProjects";
 import { OverviewProjectSelector } from "../components/OverviewProjectSelector";
 
-export function ClaudeOverview({ capabilities, account, bounds = null, windows = [], selectedKey = null, selectedEndIso = null, onFullHistory }: {
+export function ClaudeOverview({ capabilities, account, bounds = null, windows = [], selectedKey = null, selectedEndIso = null, onFullHistory, onOpenUsage }: {
   capabilities: AccountCapabilities | null;
   account?: string;
   /** Bounds of a closed window or counter segment picked in the rail; null reports the live window. */
@@ -23,6 +23,8 @@ export function ClaudeOverview({ capabilities, account, bounds = null, windows =
   selectedEndIso?: string | null;
   /** Opens History; the Overview's window table links to it. */
   onFullHistory?: () => void;
+  /** Imported usage, shown when there is no limit window to report. */
+  onOpenUsage?: () => void;
 }) {
   const { t } = useI18n();
   const [project, setProject] = useState("");
@@ -49,5 +51,5 @@ export function ClaudeOverview({ capabilities, account, bounds = null, windows =
       usedPercent={selected ? selected.scope == null ? selected.usedPercent : null : state.data.current?.percent_all_measured} /> : undefined,
   });
   const projects = account && from && until ? <WindowProjects key={JSON.stringify([account, from, until])} account={account} from={from} until={until} /> : undefined;
-  return <>{sections.lead == null && counters}<VendorOverview sections={{ ...sections, openWindows: onFullHistory, projects }} /></>;
+  return <>{sections.lead == null && counters}<VendorOverview sections={{ ...sections, openWindows: onFullHistory, openUsage: onOpenUsage, projects }} /></>;
 }

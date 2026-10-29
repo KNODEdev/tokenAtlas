@@ -5,11 +5,14 @@ import type { RosterCard } from "./types";
 
 export function localizedEmptyReason(reason: string | null | undefined): string | null {
   if (reason == null) return null;
+  // The server names the missing series; the card only needs to say that no reading exists yet.
+  if (/^no samples for window=\d+ limit_id=\S+ in the selected range$/.test(reason))
+    return translate("no limit reading in this window yet", "brak odczytu limitu w tym oknie");
+  if (reason === "brak odczytu tygodniowego w claude-gauge.json") return translate("No Claude limit reading yet", "Brak odczytu limitu Claude");
   const known: Record<string, string> = {
     "brak odczytu /quota — pula Gemini nie jest dostępna na tej maszynie": "No /quota reading: the Gemini pool is unavailable on this machine",
     "brak odczytu /quota — poller jeszcze nie przemiótł puli": "No /quota reading: the poller has not checked the pool yet",
     "brak próbek gauge w indeksie": "No gauge samples in the index",
-    "brak odczytu tygodniowego w claude-gauge.json": "No weekly reading in claude-gauge.json",
     "brak tur i odczytu Billing w tym oknie": "No turns or Billing reading in this window",
   };
   return known[reason] ? translate(known[reason]!, reason) : reason;

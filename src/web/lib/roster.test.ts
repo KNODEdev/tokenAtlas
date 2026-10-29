@@ -405,11 +405,11 @@ describe("three probe states of the percent", () => {
     expect(card!.usedPercent).toBeNull();
     expect(card!.percentMeasured).toBe(false);
     expect(card!.paceRatio).toBeNull();
-    expect(card!.probe?.line).toBe("no machine is probing this subscription");
+    expect(card!.probe?.line).toBe("no computer is reading this limit");
     expect(card!.probe?.trail).toBe(
       "EXAMPLE-MAIN - probe error since 08/30 (auth.json missing); EXAMPLE-LAPTOP-A - probe error since 09/01 (pula Gemini nie jest dostępna na tej maszynie)",
     );
-    expect(card!.emptyReason).toBe("no machine is probing this subscription");
+    expect(card!.emptyReason).toBe("no computer is reading this limit");
   });
 
   it("keeps a percent that the index carries on its own, even with every probe dead", () => {
@@ -521,7 +521,7 @@ describe("Grok percent without a Billing reading", () => {
     expect(card!.usedPercent).toBeNull();
     expect(card!.estimatePercent).toBeNull();
     expect(card!.note).toBe("no Billing reading or turns");
-    expect(card!.probe?.line).toBe("no machine is probing this subscription");
+    expect(card!.probe?.line).toBe("no computer is reading this limit");
     expect(card!.probe?.trail).toContain("EXAMPLE-LAPTOP-A - probe error since 09/01");
   });
 });

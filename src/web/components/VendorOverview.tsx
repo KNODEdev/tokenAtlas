@@ -19,6 +19,10 @@ export interface VendorOverviewSections {
   provenance: ReactNode;
   calibration: ReactNode;
   subs?: Partial<Record<VendorSectionKey, ReactNode>>;
+  /** No window to report: one notice replaces five identical empty sections. */
+  missing?: { title: string; detail: string };
+  /** Imported usage does not need a limit window, so the notice can point there. */
+  openUsage?: () => void;
 }
 export const VENDOR_SECTION_TITLES = [
   "Okna planu",
@@ -98,7 +102,7 @@ export function MissingSection({ title, detail }: { title: string; detail: strin
 }
 export function missingVendorSections(title: string, detail: string): VendorOverviewSections {
   const content = <MissingSection title={title} detail={detail} />;
-  return { planWindows: content, models: content, traffic: content, provenance: content, calibration: content };
+  return { planWindows: content, models: content, traffic: content, provenance: content, calibration: content, missing: { title, detail } };
 }
 const VENDOR_SECTION_KEYS: VendorSectionKey[] = ["planWindows", "models", "traffic", "provenance", "calibration"];
 // The window history has its owner in Limits → Limit windows; Overview links there instead of a copy (01 OV).
@@ -149,7 +153,15 @@ function TabbedOverview({ sections }: { sections: VendorOverviewSections }) {
   );
 }
 export function VendorOverview({ sections }: { sections: VendorOverviewSections }) {
-  useI18n();
+  const { t } = useI18n();
+  if (sections.missing) return (
+    <>
+      {sections.lead}
+      <EmptyState title={sections.missing.title} detail={sections.missing.detail}
+        action={sections.openUsage && <GhostButton onClick={sections.openUsage}>{`${t("Usage", "Zużycie")} →`}</GhostButton>} />
+      {sections.projects}
+    </>
+  );
   if (sections.history != null || sections.projects != null) return <TabbedOverview sections={sections} />;
   return (
     <>

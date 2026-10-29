@@ -171,10 +171,15 @@ export function useCodexSections(props: ScreenProps): VendorOverviewSections {
       "Porównanie obserwacji z maksymalnie 10 wcześniejszych okien tego samego konta, planu i licznika, ze zużyciem co najmniej 10%. Nieznane promocje nie potwierdzają równej pojemności umownej. Do capów kosztowych wchodzą tylko obserwacje z pełną wyceną.");
   if (!selectedCycle) {
     const idle = card?.live != null && card.live.used_percent === 0;
+    // Windows come only from account limit readings; imported usage alone never opens one.
+    const unread = !idle && model.cycles.length === 0;
     const missing = missingVendorSections(
-      idle ? t("Account is idle - the window has not started yet", "Konto jest bezczynne — okno jeszcze się nie zaczęło") : t("No active cycle", "Brak aktywnego cyklu"),
+      idle ? t("Account is idle - the window has not started yet", "Konto jest bezczynne — okno jeszcze się nie zaczęło")
+        : unread ? t("No Codex limit reading yet", "Brak odczytu limitu Codex") : t("No active cycle", "Brak aktywnego cyklu"),
       idle
         ? t("The account reports 0% usage, and the weekly window starts with the first call. There is no reset anchor or section data yet.", "Konto raportuje 0% zużycia, a okno tygodniowe liczy się dopiero od pierwszego wywołania — nie ma jeszcze kotwicy resetu ani danych sekcji.")
+        : unread ? t("Sign in with codex login on this computer and keep it online; the window appears after the first reading. Imported usage is already in Usage.",
+          "Zaloguj się poleceniem codex login na tym komputerze i zostaw go online; okno pojawi się po pierwszym odczycie. Zaimportowane zużycie jest już w Zużyciu.")
         : t("There is no active period between resets for the selected window and account. Change the account or window length, or sync the index.", "W wybranym oknie i koncie nie ma trwającego okresu między resetami. Zmień konto, długość okna albo zsynchronizuj indeks.")
     );
     if (!ownershipGap) return missing;
