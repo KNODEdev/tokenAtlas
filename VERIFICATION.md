@@ -1,5 +1,44 @@
 # Initial source snapshot — 25 October 2026
 
+## Test repair follow-up — 28 October 2026
+
+The 18 failures recorded in the 27 October audit were mapped back to their 14 test
+files and rechecked on `6fd24ce` with the local follow-up changes. Most of the old
+migration, private-history, transaction, journal, activity and cost failures had
+already been repaired in that commit. The remaining architecture failure was two
+missing declarations for the timing projection producer and its prepared reader;
+their reads and ownership-boundary sums were inspected before adding exact counts.
+
+Additional checks found stale TTFT version-1 expectations in the native parser
+goldens and account-filter fixtures that had not prepared the new timing register.
+Those fixtures now use the current adapter contract and run the background producer
+before reads; their value and ownership assertions remain intact. Native parsing
+and import checks pass 14/14, account-filter checks pass 11/11, architecture and
+transaction checks pass 6/6, and TypeScript checking passes.
+
+The documented 14-file scope ran 201 tests: 197 passed and four snapshot cases hit
+the old deadline. After the file-local timeout correction, all 28 snapshot tests
+passed in 69.38 seconds, closing that scope across the two runs (173 other tests
+plus 28 snapshot tests). This is a combined scoped result, not a new full-suite run.
+Concurrent startup/snapshot implementation edits appeared in the shared working
+tree during verification; they were preserved and are not attributed to this repair.
+
+Snapshot integration tests now have a file-local 30-second budget, the 90,000-row
+bulk/reference comparison has 60 seconds, and the two-order compressed-source
+import test has 30 seconds. The former five-second deadlines killed working
+backup/decoder processes under suite load. No data assertion or performance-work
+bound was removed. Verification uses synthetic databases and workspace-local
+temporary storage; Windows sandbox restrictions on hardlinks and junctions require
+these filesystem integration checks to run outside that sandbox.
+
+The attempted full `bun test ./src ./scripts --only-failures` run was interrupted
+to finish the documented regression scope; it is not a full-suite pass. A separate
+release blocker remains: `src/ingest/native-parser-release.test.ts` correctly
+rejects the published parser manifest because its source hash differs from the
+current Rust sources. This test and the manifest were deliberately preserved.
+Publishing a matching binary requires a separately authorized parser tag/release.
+No live database, server, installed frontend or release was changed by this repair.
+
 ## Follow-up source audit — 27 October 2026
 
 The application repository is public and has independent history; the landing source
