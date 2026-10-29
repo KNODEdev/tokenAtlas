@@ -46,6 +46,16 @@ test("the small Claude card preserves the full report outside its independent ob
   } finally { f.teardown(); }
 });
 
+test("a detected Claude account with no window or reading has no observations instead of preparing forever", () => {
+  const f = createClaudeCodeAcceptanceFixture();
+  try {
+    f.db.exec(CLAUDE_CARD_METADATA_SCHEMA);
+    expect(preparedClaudeCardMetadata(f.db, "claude-detected-only")).toEqual({ observationCount: 0, probeSampleCount: 0 });
+    // A stored reading may still become a window, so that account waits for the producer.
+    expect(() => preparedClaudeCardMetadata(f.db, ACCOUNTS.a)).toThrow();
+  } finally { f.teardown(); }
+});
+
 test("connected reset chains, deletion and the rolling legacy cutoff retain exact metadata without full replay", () => {
   const f=createClaudeCodeAcceptanceFixture();
   try {

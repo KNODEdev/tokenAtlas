@@ -27,6 +27,15 @@ export function markClaudeCardRangeDirty(db: Database, account: string, from: nu
     .run(account.toLowerCase(),Math.floor(from),until === null ? null : Math.ceil(until));
 }
 export function preparedClaudeCardMetadata(db: Database, account: string): { observationCount: number; probeSampleCount: number } {
+  // The producer only visits accounts with a limit window or a state row. A detected account with neither,
+  // and no probe reading that could still become a window, has nothing to prepare: it reads as no
+  // observations instead of waiting forever.
+  const table = (name: string) => !!db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);
+  if (hasClaudeCardMetadata(db) && table("limit_windows") && table("probe_windows")
+    && !db.query("SELECT 1 FROM claude_card_state WHERE account=?").get(account)
+    && !db.query("SELECT 1 FROM limit_windows WHERE provider='claude' AND account=? LIMIT 1").get(account)
+    && !db.query("SELECT 1 FROM probe_windows WHERE provider='claude' AND subject IN (?1, lower(?1)) LIMIT 1").get(account))
+    return { observationCount: 0, probeSampleCount: 0 };
   if (!hasClaudeCardMetadata(db) || !db.query("SELECT 1 FROM claude_card_state WHERE account=? AND version=1").get(account)
     || db.query("SELECT 1 FROM claude_card_dirty_probes WHERE account=? LIMIT 1").get(account)
     || db.query("SELECT 1 FROM claude_card_component_work WHERE account=? LIMIT 1").get(account)
