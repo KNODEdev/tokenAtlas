@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { CodexAccountingReport } from "../../shared/codex-accounting";
 import { useI18n } from "../lib/i18n";
 import { compact, full, usageModelLabel, usd } from "../lib/format";
@@ -10,6 +10,7 @@ import { AccountPeriodDrawer } from "./AccountPeriodDrawer";
 import { ChartExport } from "./ChartExport";
 import { GhostButton, HelpBlock, HelpDot, Table, TableColGroup, TableRow, Td, Th } from "./ui";
 import { Kpi, KpiRow, unit, useWidth } from "./WindowStatusCard";
+import { barPath, niceStep, textWidth } from "../lib/bar-chart";
 import "../screens/History.css";
 import "../screens/Speed.css";
 import "./SubscriptionChoice.css";
@@ -131,6 +132,13 @@ export function ModelUnitCost({ data, codex, vendor }: { data: CodexAccountingRe
           <button type="button" className="ui-legend-all" onClick={openDrawer}>{t("Pick models", "Wybierz modele")}</button></div>
         : <PriceLadder rows={shown} colors={colors} average={summary.perMillion} label={modelName} highlight={hover} />}
     </section></ChartExport>
+    {shown.length > 0 && <ChartExport title={t("Average cost per 1M tokens", "Średni koszt 1M tokenów")}><section className="models-chart" aria-label={t("Average cost per 1M tokens", "Średni koszt 1M tokenów")}>
+      <div className="archive-head">
+        <div><b>{t("Average cost per 1M tokens", "Średni koszt 1M tokenów")}</b> <span className="archive-sub">· {t("the models above, dearest first · linear scale", "modele z wykresu wyżej, od najdroższego · skala liniowa")}</span>{" "}
+          <span data-capture-exclude=""><HelpDot label={t("Average cost per 1M tokens", "Średni koszt 1M tokenów")}>{t("Each bar is the model's actual cost per 1M over the selected dates, the same figure as the dot above and Actual /1M in the table. Under the name: its priced tokens. The dashed line is the average of all models.", "Każdy słupek to rzeczywisty koszt 1M modelu w wybranych datach, ta sama liczba co kropka wyżej i Rzecz. /1M w tabeli. Pod nazwą: jego wycenione tokeny. Przerywana linia to średnia wszystkich modeli.")}</HelpDot></span></div>
+      </div>
+      <CostBars rows={shown} colors={colors} average={summary.perMillion} label={modelName} highlight={hover} />
+    </section></ChartExport>}
     {drawer && <AccountPeriodDrawer busy={false} onClose={() => { setDrawer(false); setHover(null); }} returnFocus={opener.current} className="speed-series-drawer"
       closeLabel={t("Close the model choice", "Zamknij wybór modeli")} title={t("Models on the chart", "Modele na wykresie")}
       subtitle={t("{0} of {1} picked · the average line counts every model", `wybrane: ${shown.length} z ${positive.length} · linia średniej liczy wszystkie modele`,
@@ -222,6 +230,61 @@ function PriceLadder({ rows, colors, average, label, highlight }: {
           <text className="muc-value" x={width - RIGHT + 12} y={y + 4}>{perMillionText(row.perMillion, locale)}</text>
         </g>;
       })}
+    </svg>
+  </div>;
+}
+
+/**
+ * The same averages as hatched bars, dearest first: each model's actual cost per 1M over the selected dates, with the
+ * all-model average as a dashed line. Linear, so the gap between a dear and a cheap model reads at a glance.
+ */
+function CostBars({ rows, colors, average, label, highlight }: {
+  rows: UnitCostRow[]; colors: Map<string | null, string>; average: number | null; label: (model: string | null) => string; highlight: string | null;
+}) {
+  const { t, locale } = useI18n();
+  const [ref, width] = useWidth(900);
+  const hatchId = `muc-hatch-${useId().replace(/:/g, "")}`;
+  const LEFT = 52, RIGHT = 8, TOP = 26, PLOT = 260, AXIS = 40;
+  const bottom = TOP + PLOT, height = bottom + AXIS;
+  const peak = Math.max(...rows.map(row => row.perMillion!), average ?? 0) || 1;
+  const step = niceStep(peak * 1.12), max = Math.ceil(peak * 1.12 / step) * step;
+  const y = (value: number) => bottom - value / max * PLOT;
+  // One number of decimals for the whole axis: $0.50 and $1.00, not $0.5 and $1.00.
+  const decimals = step < 0.01 ? 3 : step < 1 ? 2 : 0;
+  const tick = (value: number) => "$" + value.toLocaleString(locale, { minimumFractionDigits: value ? decimals : 0, maximumFractionDigits: decimals });
+  const slot = (width - LEFT - RIGHT - 8) / rows.length, bar = Math.min(44, slot * 0.62);
+  // Names keep to their slot; the full name is in the tooltip.
+  const nameSize = slot >= textWidth("gpt-5.6-terra", 12) + 8 ? 12 : 11;
+  const fit = (text: string) => shortLabel(text, Math.max(4, Math.floor((slot - 6) / (nameSize * 0.56))));
+  return <div ref={ref}>
+    <svg className="muc-svg" viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label={t("Average cost per 1M tokens by model", "Średni koszt 1M tokenów według modeli")}>
+      <defs>
+        <pattern id={hatchId} width={7} height={7} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1={0} y1={0} x2={0} y2={7} stroke="var(--hatch)" strokeWidth={1.2} />
+        </pattern>
+      </defs>
+      {Array.from({ length: Math.round(max / step) + 1 }, (_, index) => index * step).map(value => <g key={value}>
+        {value > 0 && <line className="muc-grid" x1={LEFT} x2={width - RIGHT} y1={y(value)} y2={y(value)} />}
+        <text className="muc-tick" x={LEFT - 10} y={y(value) + 4} textAnchor="end">{tick(value)}</text>
+      </g>)}
+      <line x1={LEFT} x2={width - RIGHT} y1={bottom + 0.5} y2={bottom + 0.5} stroke="var(--line2)" />
+      {rows.map((row, index) => {
+        const color = colors.get(row.model) ?? "var(--muted)", center = LEFT + 8 + slot * (index + 0.5), top = y(row.perMillion!);
+        const path = barPath(center - bar / 2, top, bar, bottom);
+        return <g key={row.model ?? ""} className={`muc-row${highlight !== null && highlight !== row.model ? " is-dim" : ""}`}>
+          <title>{`${label(row.model)} · ${perMillionText(row.perMillion, locale)} / 1M\n${full(row.pricedTokens)} ${t("priced tokens", "wycenionych tokenów")} · ${usd(row.apiUsd)}`}</title>
+          <path d={path} style={{ fill: color }} />
+          <path d={path} fill={`url(#${hatchId})`} />
+          <text className="muc-value" x={center} y={top - 7} textAnchor="middle">{perMillionText(row.perMillion, locale)}</text>
+          <text className="muc-label" x={center} y={bottom + 17} textAnchor="middle" style={{ fontSize: nameSize }}>{fit(label(row.model))}</text>
+          <text className="muc-tick" x={center} y={bottom + 32} textAnchor="middle">{compact(row.pricedTokens)}</text>
+        </g>;
+      })}
+      {/* Drawn last so the bars do not hide it. */}
+      {average !== null && average > 0 && <g>
+        <line className="muc-average" x1={LEFT} x2={width - RIGHT} y1={y(average)} y2={y(average)} />
+        <text className="muc-note" x={width - RIGHT} y={y(average) - 5} textAnchor="end">{t("average", "średnia")} {perMillionText(average, locale)}</text>
+      </g>}
     </svg>
   </div>;
 }

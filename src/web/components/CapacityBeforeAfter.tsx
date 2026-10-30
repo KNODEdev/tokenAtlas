@@ -15,6 +15,7 @@ import { markerDisplayLabel } from "./CapacityAnnotations";
 import { ChartExport } from "./ChartExport";
 import { Disclosure, Field, HelpBlock, HelpDot, Selector } from "./ui";
 import { useWidth } from "./WindowStatusCard";
+import { barPath, niceStep, textWidth } from "../lib/bar-chart";
 import "./CapacityBeforeAfter.css";
 
 const STORAGE_KEY = "tokenatlas.capacity-before-after.v1";
@@ -38,21 +39,9 @@ function writeChoice(scope: string, choice: Choice) {
 // Chart geometry in CSS pixels; bars and gaps shrink together when the sheet is narrow.
 const BAR = 38, INNER = 12, MARKER_GAP = 34, GROUP_GAP = 40;
 const LEFT = 52, RIGHT = 8, PLOT = 300, AXIS = 44, LANE = 52, LABEL_BASE = 30;
-const textWidth = (text: string, size: number, figure = false) => text.length * size * (figure ? 0.62 : 0.56);
 const clip = (text: string, max = 28) => text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 const dayTime = (day: string) => Date.parse(`${day}T00:00:00Z`);
 const utc = (time: number) => Number.isFinite(time) ? new Date(time).toISOString().slice(0, 16).replace("T", " ") + " UTC" : "?";
-
-function niceStep(max: number) {
-  const raw = max / 4, power = 10 ** Math.floor(Math.log10(raw || 1));
-  return ([1, 2, 2.5, 5, 10].map(factor => factor * power).find(step => raw <= step) ?? 10 * power);
-}
-
-/** Bar with rounded top corners, standing on the axis. */
-function barPath(x: number, y: number, width: number, bottom: number) {
-  const r = Math.min(3, width / 2, Math.max(0, bottom - y));
-  return `M${x} ${bottom}V${y + r}Q${x} ${y} ${x + r} ${y}H${x + width - r}Q${x + width} ${y} ${x + width} ${y + r}V${bottom}Z`;
-}
 
 interface CompareOption { value: string; provider: string; label: string; plan: string; median: number | null; count: number; lowerBound: boolean; price: number | null }
 

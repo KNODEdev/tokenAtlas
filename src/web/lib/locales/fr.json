@@ -4698,5 +4698,9 @@
   "per 100% of the 7-day limit": "pour 100 % de la limite de 7 jours",
   "projection": "projection",
   "running, estimate so far": "en cours, estimation provisoire",
-  "{0} since {1}": "{0} depuis le {1}"
+  "{0} since {1}": "{0} depuis le {1}",
+  "Average cost per 1M tokens": "Coût moyen pour 1 M de tokens",
+  "Average cost per 1M tokens by model": "Coût moyen pour 1 M de tokens par modèle",
+  "the models above, dearest first · linear scale": "les modèles ci-dessus, du plus cher au moins cher · échelle linéaire",
+  "Each bar is the model's actual cost per 1M over the selected dates, the same figure as the dot above and Actual /1M in the table. Under the name: its priced tokens. The dashed line is the average of all models.": "Chaque barre est le coût réel pour 1 M du modèle sur les dates choisies, le même chiffre que le point ci-dessus et Réel /1M dans le tableau. Sous le nom : ses tokens tarifés. La ligne pointillée est la moyenne de tous les modèles."
 }
