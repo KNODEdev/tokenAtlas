@@ -6,7 +6,7 @@ import path from "node:path";
 import { relocateDatabase, validateDatabaseDestination } from "./relocate";
 import { databaseEnvironmentContents, selectedDatabasePath } from "./location";
 import { superviseServer } from "../server/supervisor";
-import { resolveDbPath } from ".";
+import { defaultDatabasePath, resolveDbPath } from ".";
 
 const directories: string[] = [];
 afterEach(() => { for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true }); });
@@ -103,7 +103,7 @@ else { const {Database}=await import('bun:sqlite'); const db=new Database(proces
 
   test("a process started without the .env variable still opens the database chosen in Settings", () => {
     const saved = selectedDatabasePath();
-    expect(resolveDbPath(undefined, {})).toBe(path.resolve(saved ?? path.join(os.homedir(), ".tokenatlas", "atlas.sqlite")));
+    expect(resolveDbPath(undefined, {})).toBe(path.resolve(saved ?? defaultDatabasePath({})));
     expect(resolveDbPath(undefined, { TOKENATLAS_DB: "/explicit/atlas.sqlite" })).toBe(path.resolve("/explicit/atlas.sqlite"));
   });
 

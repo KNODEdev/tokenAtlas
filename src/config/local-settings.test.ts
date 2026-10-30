@@ -42,3 +42,15 @@ test("a missing former directory does not fabricate an identity; an existing des
     expect(fs.existsSync(envFile)).toBe(false);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test("a database inside the former state folder is not copied into its own local state", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-nested-state-"));
+  try {
+    const legacy = path.join(root, "tokenAtlas"), destination = path.join(legacy, "data", "local-state");
+    fs.mkdirSync(path.join(legacy, "data"), { recursive: true });
+    fs.writeFileSync(path.join(legacy, "data", "atlas.sqlite"), "db");
+    fs.writeFileSync(path.join(legacy, "archive-location.json"), "{}");
+    expect(copyLocalState(legacy, destination)).toBe(true);
+    expect(fs.readdirSync(destination).sort()).toEqual(["archive-location.json"]);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});

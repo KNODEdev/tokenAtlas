@@ -14,11 +14,21 @@ export function activeDatabasePath(envFile?: string): string {
 export function resolveDbPath(customPath?: string, env: Record<string, string | undefined> = process.env): string {
   let p = customPath || (env === process.env ? selectedDatabasePath() : undefined) || env.TOKENATLAS_DB || selectedDatabasePath();
   if (!p) {
-    p = path.join(os.homedir(), ".tokenatlas", "atlas.sqlite");
+    p = defaultDatabasePath(env);
   } else if (p.startsWith("~")) {
     p = path.join(os.homedir(), p.slice(1));
   }
   return path.resolve(p);
+}
+/**
+ * A new Windows installation keeps its machine-only files together under %LOCALAPPDATA%\tokenAtlas; `data\` keeps
+ * the database and its local state apart from the pre-selection state in that folder. An existing default
+ * database stays where it is.
+ */
+export function defaultDatabasePath(env: Record<string, string | undefined> = process.env, platform: string = process.platform): string {
+  const legacy = path.join(os.homedir(), ".tokenatlas", "atlas.sqlite");
+  if (platform !== "win32" || fs.existsSync(legacy)) return legacy;
+  return path.join(env.LOCALAPPDATA?.trim() || path.join(os.homedir(), "AppData", "Local"), "tokenAtlas", "data", "atlas.sqlite");
 }
 /** Writer settings shared by every connection that imports or publishes rows. */
 export function applyConnectionSettings(sqlite: Database): void {

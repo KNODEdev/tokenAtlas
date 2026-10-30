@@ -11,8 +11,12 @@ export function copyLocalState(source: string, destination: string): boolean {
   const staged = `${path.resolve(destination)}.stage-${randomUUID()}`;
   fs.mkdirSync(staged, { recursive: true, mode: 0o700 });
   try {
+    const target = path.resolve(destination).toLowerCase();
     for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
       if (entry.name === "temp") continue;
+      // The database may live inside the old state folder (%LOCALAPPDATA%\tokenAtlas\data): never copy its folder into itself.
+      const child = path.resolve(source, entry.name).toLowerCase();
+      if (target === child || target.startsWith(child + path.sep)) continue;
       fs.cpSync(path.join(source, entry.name), path.join(staged, entry.name), { recursive: true, errorOnExist: true, force: false });
     }
     fs.renameSync(staged, destination);
