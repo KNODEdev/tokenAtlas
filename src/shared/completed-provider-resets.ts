@@ -42,8 +42,19 @@ export const COMPLETED_PROVIDER_RESETS: readonly ProviderReset[] = [
     ["2026-10-15T06:28:13.924Z", "2110618732666257557"],
     ["2026-10-17T21:12:21.411Z", "2111566005684289735"],
     ["2026-10-20T06:33:48.848Z", "2112432076767289678"],
+    ["2026-10-25T06:06:16.000Z", "2114237083652882932"],
+    ["2026-10-28T06:29:38.000Z", "2115330127886463244"],
   ].map(([at, post]) => ({
     id: `codex-${post}-completed`, provider: "codex" as const, at: at!, kind: "reset" as const, approximate: false,
     source: `https://x.com/thsottiaux/status/${post} https://codex-resets.com/`,
+  })),
+  // Without an X completion post the public tracker's record is the completion time (checked 2026-10-29).
+  ...[
+    ["2026-10-22T17:09:00.000Z", "1792688940000"],
+    ["2026-10-23T17:41:26.000Z", "1792777286000"],
+    ["2026-10-26T06:10:00.000Z", "1792995000000"],
+  ].map(([at, page]) => ({
+    id: `codex-tracker-${page}-completed`, provider: "codex" as const, at: at!, kind: "reset" as const, approximate: false,
+    source: `https://didcodexreset.com/history/${page}.html https://codex-resets.com/`,
   })),
 ];
