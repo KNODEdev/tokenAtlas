@@ -435,7 +435,11 @@ export function createDataRead(workerFactory = createDataReadWorker, options: { 
     const version = versionOf(ctx, url), answer = answers.get(key);
     if (answer?.version === version.key && !("body" in answer && answer.expiresAt !== null && Date.now() >= answer.expiresAt)) {
       answers.remember(key, answer);
-      return "body" in answer ? respond(url, answer, version.rows, "memory") : preparingRows();
+      if ("body" in answer) return respond(url, answer, version.rows, "memory");
+      // A preparation receipt is not an answer: a producer can finish without changing the rows' version,
+      // so ask again, spaced like any refresh, instead of answering "preparing" until a restart.
+      if (!running.has(key) && refreshAllowed(key)) compute(ctx, request, version.key, version.rows, key, false);
+      return preparingRows();
     }
     if (!running.has(key)) compute(ctx, request, version.key, version.rows, key, !!answer && "body" in answer);
     // A completed reply may exceed the budget or have been evicted before polling. Deliver

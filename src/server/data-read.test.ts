@@ -255,6 +255,25 @@ test("a view that answers the preparation receipt is waited for, not kept as its
   } finally { read.close(); close(); }
 });
 
+test("a preparation receipt is asked again after the refresh spacing even when the rows did not change", async () => {
+  const { ctx, close } = fixture(), worker = new FakeWorker(), read = reader(worker);
+  const clock = spyOn(Date, "now").mockReturnValue(Date.parse("2026-09-18T12:00:00.000Z"));
+  try {
+    await read(ctx, new Request(url)); await settle();
+    worker.reply({ error: "Probe account index is preparing", pending: true }); await read.whenIdle();
+    expect((await read(ctx, new Request(url))).status).toBe(202);
+    await settle();
+    expect(worker.work).toHaveLength(1);
+    // A producer finished without a new row version: the next read after the spacing computes again.
+    clock.mockReturnValue(Date.parse("2026-09-18T12:00:16.000Z"));
+    expect((await read(ctx, new Request(url))).status).toBe(202);
+    await settle();
+    expect(worker.work).toHaveLength(2);
+    worker.reply({ report: envelope({ tokens: 3 }) }); await read.whenIdle();
+    expect(await (await read(ctx, new Request(url))).json()).toEqual({ tokens: 3 });
+  } finally { clock.mockRestore(); read.close(); close(); }
+});
+
 /** Stored window views (db/window-answers.ts): the fake worker answers with the snapshot its rows were read from. */
 const W1 = "2026-09-01T00:00:00.000Z", W2 = "2026-09-08T00:00:00.000Z", W3 = "2026-09-15T00:00:00.000Z";
 const breakdown = (account: string, since: string, until: string) =>
