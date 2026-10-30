@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { CodexAccountingReport } from "../../shared/codex-accounting";
 import type { SubscriptionModelDetail } from "../../shared/subscription-accounting";
-import { costPresets, ladderRows, modelUnitCosts, type ModelUnitCost } from "./model-unit-cost";
+import { costLines, costPresets, ladderRows, modelLine, modelUnitCosts, modelVersion, type ModelUnitCost } from "./model-unit-cost";
 import { modelColorsByTokens, vendorShade } from "./model-colors";
 
 type Row = CodexAccountingReport["breakdown"][number];
@@ -67,5 +67,28 @@ describe("costPresets", () => {
     expect([...presets.busiest]).toEqual(["b", "i", "g", "h", "c", "f", "e", "d"]);
     expect([...presets.dearest]).toEqual(["a", "b", "c", "d", "e"]);
     expect([...presets.cheapest]).toEqual(["e", "f", "g", "h", "i"]);
+  });
+});
+
+describe("costLines", () => {
+  const row = (model: string, perMillion: number, tokens: number): ModelUnitCost =>
+    ({ model, tokens, pricedTokens: tokens, apiUsd: perMillion * tokens / 1e6, perMillion, partial: false, rates: null });
+  test("a line drops version numbers, dated snapshots and the context suffix", () => {
+    expect(["gpt-5.6-terra", "gpt-6.1-terra", "claude-opus-4-7", "claude-3-5-sonnet-20241022", "claude-sonnet-4-5[1m]", "gpt-5.1-codex-mini", "glm-4.6"].map(modelLine))
+      .toEqual(["gpt-terra", "gpt-terra", "claude-opus", "claude-sonnet", "claude-sonnet", "gpt-codex-mini", "glm"]);
+    expect(["gpt-5.6-terra", "claude-opus-4-7", "claude-haiku-4-5-20251001", "glm-4.6", "codex-auto-review"].map(modelVersion))
+      .toEqual(["5.6", "4.7", "4.5", "4.6", "codex-auto-review"]);
+  });
+  test("versions stand oldest first against the oldest sample big enough; lone models close the chart", () => {
+    const lines = costLines([row("claude-opus-4-7", 2, 1_000_000), row("gpt-6-astra", 1.3, 5_000_000), row("claude-haiku-4-5", 1, 2_000),
+      row("gpt-6.1-terra", 0.075, 2_000_000), row("gpt-5.6-terra", 0.3, 5_000_000), row("claude-opus-5-5", 0.4, 9_000_000), row("claude-haiku-5-5", 0.02, 300_000)]);
+    expect(lines.map(line => [line.label, line.bars.map(bar => bar.row.model)])).toEqual([
+      ["opus", ["claude-opus-4-7", "claude-opus-5-5"]], ["haiku", ["claude-haiku-4-5", "claude-haiku-5-5"]],
+      ["terra", ["gpt-5.6-terra", "gpt-6.1-terra"]], ["astra", ["gpt-6-astra"]]]);
+    expect(lines[0]!.bars.map(bar => [bar.base, bar.change])).toEqual([[true, null], [false, -0.8]]);
+    // The thin old version is no base: the next one becomes it and nothing is left to compare.
+    expect(lines[1]!.bars.map(bar => [bar.thin, bar.base, bar.change])).toEqual([[true, false, null], [false, true, null]]);
+    expect(lines[2]!.bars[1]!.change).toBeCloseTo(-0.75);
+    expect(lines[3]!.bars[0]).toMatchObject({ base: false, thin: false, change: null });
   });
 });

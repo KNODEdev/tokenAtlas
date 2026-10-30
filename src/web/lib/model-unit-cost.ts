@@ -1,4 +1,5 @@
 import type { CodexAccountingReport } from "../../shared/codex-accounting";
+import { modelVersionSortValue } from "./table-sort";
 
 /** List API prices of one model in USD per 1M tokens; null where the card names no rate. */
 export interface ListRates {
@@ -124,4 +125,60 @@ export function costPresets(rows: readonly ModelUnitCost[]): { busiest: Set<stri
   const byCost = [...ladder].sort((a, b) => b.perMillion! - a.perMillion!);
   return { busiest: keys([...ladder].sort((a, b) => b.tokens - a.tokens).slice(0, COST_BUSIEST)),
     dearest: keys(byCost.slice(0, COST_PRESET_SIZE)), cheapest: keys(byCost.slice(-COST_PRESET_SIZE)) };
+}
+
+/* ---- Lines of one model across versions (the bar chart's family order, approved 2026-10-30) ---- */
+
+export const COST_ORDER_KEY = "tokenatlas.cost.order.v1";
+/** Below this many priced tokens a model's mix is too thin to measure a price change by. */
+export const THIN_SAMPLE_TOKENS = 100_000;
+
+/** A model without its version numbers and dated snapshot: gpt-5.6-terra and gpt-6.1-terra are both gpt-terra. */
+export function modelLine(model: string): string {
+  const name = model.toLowerCase().replace(/\[[^\]]*\]$/, "");
+  return name.split("-").filter(part => !/^\d+(?:\.\d+)*$/.test(part)).join("-") || name;
+}
+
+/** The version a line's bracket leaves to say: 4.7 for claude-opus-4-7, 6.1 for gpt-6.1-sol; dated snapshots drop the date. */
+export function modelVersion(model: string): string {
+  const parts = model.toLowerCase().replace(/\[[^\]]*\]$/, "").split("-").filter(part => /^\d+(?:\.\d+)*$/.test(part) && part.length < 8);
+  return parts.join(".") || model;
+}
+
+export interface LineBar {
+  row: ModelUnitCost;
+  /** The oldest version with enough tokens; the others in its line are measured against it. */
+  base: boolean;
+  /** Too few priced tokens for a change to mean anything; only marked in a line of several versions. */
+  thin: boolean;
+  /** perMillion against the base minus 1 (−0.77 is 77% cheaper); null for the base, a thin sample or a lone model. */
+  change: number | null;
+}
+export interface CostLine { key: string; label: string; bars: LineBar[] }
+
+/**
+ * Ladder rows grouped by model line, oldest version first. Lines with several versions come first, dearest
+ * first; lone models close the chart, also dearest first.
+ */
+export function costLines(rows: readonly ModelUnitCost[]): CostLine[] {
+  const groups = new Map<string, ModelUnitCost[]>();
+  for (const row of ladderRows(rows)) {
+    const key = modelLine(row.model!);
+    groups.set(key, [...groups.get(key) ?? [], row]);
+  }
+  const lines = [...groups].map(([key, members]): CostLine => {
+    members.sort((a, b) => modelVersionSortValue(a.model)!.localeCompare(modelVersionSortValue(b.model)!));
+    const several = members.length > 1;
+    const base = several ? members.find(row => row.pricedTokens >= THIN_SAMPLE_TOKENS) : undefined;
+    const from = base ? members.indexOf(base) : members.length;
+    const bars = members.map((row, index) => {
+      const thin = several && row.pricedTokens < THIN_SAMPLE_TOKENS;
+      return { row, base: row === base, thin, change: base && index > from && !thin ? row.perMillion! / base.perMillion! - 1 : null };
+    });
+    // The vendor prefix is the same for every version and the hue already says it.
+    const parts = key.split("-");
+    return { key, label: parts.length > 1 ? parts.slice(1).join("-") : key, bars };
+  });
+  const peak = (line: CostLine) => Math.max(...line.bars.map(bar => bar.row.perMillion!));
+  return lines.sort((a, b) => Number(b.bars.length > 1) - Number(a.bars.length > 1) || peak(b) - peak(a));
 }

@@ -24,5 +24,10 @@
 .muc-picker-bar .speed-chips { flex: 1; min-width: 0; margin: 0; }
 .muc-picker-bar > :last-child { flex-shrink: 0; }
 .speed-chip .muc-swatch { margin-right: 0; }
+/* Average cost by line: a bracket names each line, the change against its base sits under the tokens. */
+.muc-bracket { fill: none; stroke: var(--line2); }
+.muc-line-name { font-family: var(--font-figure); font-size: var(--fs-2); fill: var(--muted); }
+.muc-change { font-family: var(--font-figure); font-size: var(--fs-2); font-weight: var(--fw-semibold); fill: var(--text); }
+.muc-tick.is-thin { font-style: italic; }
 .muc-row { transition: opacity 120ms ease; }
 .muc-row.is-dim { opacity: 0.28; }

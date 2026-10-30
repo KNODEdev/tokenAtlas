@@ -2,13 +2,13 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { CodexAccountingReport } from "../../shared/codex-accounting";
 import { useI18n } from "../lib/i18n";
 import { compact, full, usageModelLabel, usd } from "../lib/format";
-import { COST_BUSIEST, COST_PICKED_KEY, COST_PRESET_SIZE, costPresets, ladderRows, modelUnitCosts, type ListRates,
-  type ModelUnitCost as UnitCostRow } from "../lib/model-unit-cost";
+import { COST_BUSIEST, COST_ORDER_KEY, COST_PICKED_KEY, COST_PRESET_SIZE, THIN_SAMPLE_TOKENS, costLines, costPresets, ladderRows, modelUnitCosts, modelVersion,
+  type CostLine, type ListRates, type ModelUnitCost as UnitCostRow } from "../lib/model-unit-cost";
 import { storedPicks, writePicks } from "../lib/model-speed";
 import { modelColorsByTokens } from "../lib/model-colors";
 import { AccountPeriodDrawer } from "./AccountPeriodDrawer";
 import { ChartExport } from "./ChartExport";
-import { GhostButton, HelpBlock, HelpDot, Table, TableColGroup, TableRow, Td, Th } from "./ui";
+import { GhostButton, HelpBlock, HelpDot, Table, TableColGroup, TableRow, Tabs, Td, Th } from "./ui";
 import { Kpi, KpiRow, unit, useWidth } from "./WindowStatusCard";
 import { barPath, niceStep, textWidth } from "../lib/bar-chart";
 import "../screens/History.css";
@@ -37,6 +37,16 @@ export function perMillionText(value: number | null | undefined, locale: string)
 const ratioText = (value: number | null, locale: string) => value === null || !Number.isFinite(value) ? "—"
   : `${value.toLocaleString(locale, value >= 10 ? { maximumFractionDigits: 0 } : value >= 1 ? { maximumFractionDigits: 1 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×`;
 const shortLabel = (text: string, max = 28) => text.length > max ? `${text.slice(0, max - 1)}…` : text;
+
+type BarOrder = "cost" | "line";
+function storedOrder(): BarOrder {
+  try { return localStorage.getItem(COST_ORDER_KEY) === "line" ? "line" : "cost"; } catch { return "cost"; }
+}
+/** −77%, +12%; one decimal below 10% so a small move does not read as none. */
+function changeText(change: number, locale: string): string {
+  const percent = Math.abs(change) * 100;
+  return `${change < 0 ? "−" : "+"}${percent.toLocaleString(locale, { maximumFractionDigits: percent < 10 ? 1 : 0 })}%`;
+}
 
 /** One glyph per list price, the same in the chart and its legend. */
 function Glyph({ part, x, y }: { part: Part; x: number; y: number }) {
@@ -82,6 +92,12 @@ export function ModelUnitCost({ data, codex, vendor }: { data: CodexAccountingRe
   const opener = useRef<HTMLElement | null>(null);
   const openDrawer = () => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; setDrawer(true); };
   const presets = useMemo(() => costPresets(summary.rows), [summary]);
+  const [order, setOrder] = useState<BarOrder>(storedOrder);
+  const pickOrder = (next: BarOrder) => {
+    setOrder(next);
+    try { localStorage.setItem(COST_ORDER_KEY, next); } catch { /* The order still applies for this visit. */ }
+  };
+  const lines = order === "line" ? costLines(shown) : undefined;
   // The same priced tokens as if every one were fresh input: what cache reads save and output adds.
   const withInput = summary.rows.filter(row => row.perMillion !== null && (row.rates?.input ?? 0) > 0);
   const inputTokens = withInput.reduce((sum, row) => sum + row.pricedTokens, 0);
@@ -134,10 +150,19 @@ export function ModelUnitCost({ data, codex, vendor }: { data: CodexAccountingRe
     </section></ChartExport>
     {shown.length > 0 && <ChartExport title={t("Average cost per 1M tokens", "Średni koszt 1M tokenów")}><section className="models-chart" aria-label={t("Average cost per 1M tokens", "Średni koszt 1M tokenów")}>
       <div className="archive-head">
-        <div><b>{t("Average cost per 1M tokens", "Średni koszt 1M tokenów")}</b> <span className="archive-sub">· {t("the models above, dearest first · linear scale", "modele z wykresu wyżej, od najdroższego · skala liniowa")}</span>{" "}
-          <span data-capture-exclude=""><HelpDot label={t("Average cost per 1M tokens", "Średni koszt 1M tokenów")}>{t("Each bar is the model's actual cost per 1M over the selected dates, the same figure as the dot above and Actual /1M in the table. Under the name: its priced tokens. The dashed line is the average of all models.", "Każdy słupek to rzeczywisty koszt 1M modelu w wybranych datach, ta sama liczba co kropka wyżej i Rzecz. /1M w tabeli. Pod nazwą: jego wycenione tokeny. Przerywana linia to średnia wszystkich modeli.")}</HelpDot></span></div>
+        <div><b>{t("Average cost per 1M tokens", "Średni koszt 1M tokenów")}</b> <span className="archive-sub">· {lines
+          ? t("the models above, by line, oldest version first · linear scale", "modele z wykresu wyżej, według linii, od najstarszej wersji · skala liniowa")
+          : t("the models above, dearest first · linear scale", "modele z wykresu wyżej, od najdroższego · skala liniowa")}</span>{" "}
+          <span data-capture-exclude=""><HelpDot label={t("Average cost per 1M tokens", "Średni koszt 1M tokenów")}>
+            <HelpBlock>{t("Each bar is the model's actual cost per 1M over the selected dates, the same figure as the dot above and Actual /1M in the table. Under the name: its priced tokens. The dashed line is the average of all models.", "Każdy słupek to rzeczywisty koszt 1M modelu w wybranych datach, ta sama liczba co kropka wyżej i Rzecz. /1M w tabeli. Pod nazwą: jego wycenione tokeny. Przerywana linia to średnia wszystkich modeli.")}</HelpBlock>
+            <HelpBlock>{t("By line puts the versions of one model side by side, oldest first; lone models close the chart. The percentage compares each version with the oldest one that has at least {0} priced tokens. It is the actual cost, so a different share of cache reads moves it as much as a price change.", `Według linii stawia wersje jednego modelu obok siebie, od najstarszej; pojedyncze modele zamykają wykres. Procent porównuje każdą wersję z najstarszą, która ma co najmniej ${compact(THIN_SAMPLE_TOKENS)} wycenionych tokenów. To rzeczywisty koszt, więc inny udział odczytów z cache zmienia go tak samo jak zmiana cennika.`, [compact(THIN_SAMPLE_TOKENS)])}</HelpBlock>
+          </HelpDot></span></div>
+        <span data-capture-exclude=""><Tabs value={order} onChange={pickOrder} options={[
+          { value: "cost", label: t("Cost", "Koszt"), title: t("Dearest first", "Od najdroższego") },
+          { value: "line", label: t("Line", "Linia"), title: t("Versions of one model side by side", "Wersje jednego modelu obok siebie") },
+        ]} /></span>
       </div>
-      <CostBars rows={shown} colors={colors} average={summary.perMillion} label={modelName} highlight={hover} />
+      <CostBars rows={shown} lines={lines} colors={colors} average={summary.perMillion} label={modelName} highlight={hover} />
     </section></ChartExport>}
     {drawer && <AccountPeriodDrawer busy={false} onClose={() => { setDrawer(false); setHover(null); }} returnFocus={opener.current} className="speed-series-drawer"
       closeLabel={t("Close the model choice", "Zamknij wybór modeli")} title={t("Models on the chart", "Modele na wykresie")}
@@ -237,22 +262,39 @@ function PriceLadder({ rows, colors, average, label, highlight }: {
 /**
  * The same averages as hatched bars, dearest first: each model's actual cost per 1M over the selected dates, with the
  * all-model average as a dashed line. Linear, so the gap between a dear and a cheap model reads at a glance.
+ * With `lines` the bars stand by model line instead, each version marked against the line's base.
  */
-function CostBars({ rows, colors, average, label, highlight }: {
-  rows: UnitCostRow[]; colors: Map<string | null, string>; average: number | null; label: (model: string | null) => string; highlight: string | null;
+function CostBars({ rows, lines, colors, average, label, highlight }: {
+  rows: UnitCostRow[]; lines?: CostLine[]; colors: Map<string | null, string>; average: number | null; label: (model: string | null) => string;
+  highlight: string | null;
 }) {
   const { t, locale } = useI18n();
   const [ref, width] = useWidth(900);
   const hatchId = `muc-hatch-${useId().replace(/:/g, "")}`;
-  const LEFT = 52, RIGHT = 8, TOP = 26, PLOT = 260, AXIS = 40;
+  // By line: room above for the line names and below for the change against the base.
+  const LEFT = 52, RIGHT = 8, TOP = lines ? 46 : 26, PLOT = 260, AXIS = lines ? 56 : 40;
   const bottom = TOP + PLOT, height = bottom + AXIS;
+  // A gap of GAP slots between lines; one slot per bar either way.
+  const GAP = 0.6;
+  const bars = lines ? lines.flatMap((line, group) => line.bars.map(bar => ({ ...bar, line, group })))
+    : rows.map(row => ({ row, base: false, thin: false, change: null, line: null, group: 0 }));
+  const groups = lines?.length ?? 1;
   const peak = Math.max(...rows.map(row => row.perMillion!), average ?? 0) || 1;
   const step = niceStep(peak * 1.12), max = Math.ceil(peak * 1.12 / step) * step;
   const y = (value: number) => bottom - value / max * PLOT;
   // One number of decimals for the whole axis: $0.50 and $1.00, not $0.5 and $1.00.
   const decimals = step < 0.01 ? 3 : step < 1 ? 2 : 0;
   const tick = (value: number) => "$" + value.toLocaleString(locale, { minimumFractionDigits: value ? decimals : 0, maximumFractionDigits: decimals });
-  const slot = (width - LEFT - RIGHT - 8) / rows.length, bar = Math.min(44, slot * 0.62);
+  const averageText = average !== null && average > 0 ? `${t("average", "średnia")} ${perMillionText(average, locale)}` : null;
+  // Lone models close the line order and sit near the average, so its label gets room of its own past the bars.
+  const reserve = lines && averageText ? textWidth(averageText, 12) + 12 : 0;
+  const slot = (width - LEFT - RIGHT - 8 - reserve) / (bars.length + (groups - 1) * GAP), bar = Math.min(44, slot * 0.62);
+  const centerOf = (index: number, group: number) => LEFT + 8 + slot * (index + group * GAP + 0.5);
+  // Under a bracket the version is enough; a lone model has none, so it keeps its line: "astra 6".
+  const shortName = (line: CostLine, model: string) => {
+    const version = modelVersion(model);
+    return line.bars.length > 1 ? version : version === model ? label(model) : `${line.label} ${version}`;
+  };
   // Names keep to their slot; the full name is in the tooltip.
   const nameSize = slot >= textWidth("gpt-5.6-terra", 12) + 8 ? 12 : 11;
   const fit = (text: string) => shortLabel(text, Math.max(4, Math.floor((slot - 6) / (nameSize * 0.56))));
@@ -268,22 +310,44 @@ function CostBars({ rows, colors, average, label, highlight }: {
         <text className="muc-tick" x={LEFT - 10} y={y(value) + 4} textAnchor="end">{tick(value)}</text>
       </g>)}
       <line x1={LEFT} x2={width - RIGHT} y1={bottom + 0.5} y2={bottom + 0.5} stroke="var(--line2)" />
-      {rows.map((row, index) => {
-        const color = colors.get(row.model) ?? "var(--muted)", center = LEFT + 8 + slot * (index + 0.5), top = y(row.perMillion!);
+      {/* A bracket and name over each line of several versions; lone models need none. */}
+      {lines && (() => {
+        let start = 0;
+        return lines.map((line, group) => {
+          const first = start;
+          start += line.bars.length;
+          if (line.bars.length < 2) return null;
+          const left = centerOf(first, group) - bar / 2, right = centerOf(first + line.bars.length - 1, group) + bar / 2;
+          return <g key={line.key} className="muc-line">
+            <path className="muc-bracket" d={`M${left} 28 V22 H${right} V28`} />
+            <text className="muc-line-name" x={(left + right) / 2} y={15} textAnchor="middle">{shortLabel(line.label, Math.max(4, Math.floor((right - left + slot * 0.3) / 7)))}</text>
+          </g>;
+        });
+      })()}
+      {bars.map(({ row, base, thin, change, line, group }, index) => {
+        const color = colors.get(row.model) ?? "var(--muted)", center = centerOf(index, group), top = y(row.perMillion!);
         const path = barPath(center - bar / 2, top, bar, bottom);
+        const baseModel = line?.bars.find(item => item.base)?.row.model;
+        const note = base ? t("base of its line", "baza swojej linii")
+          : thin ? t("under {0} priced tokens: too few to compare", `poniżej ${compact(THIN_SAMPLE_TOKENS)} wycenionych tokenów: za mało do porównania`, [compact(THIN_SAMPLE_TOKENS)])
+          : change !== null && baseModel ? t("{0} against {1}", `${changeText(change, locale)} wobec ${label(baseModel)}`, [changeText(change, locale), label(baseModel)]) : null;
         return <g key={row.model ?? ""} className={`muc-row${highlight !== null && highlight !== row.model ? " is-dim" : ""}`}>
-          <title>{`${label(row.model)} · ${perMillionText(row.perMillion, locale)} / 1M\n${full(row.pricedTokens)} ${t("priced tokens", "wycenionych tokenów")} · ${usd(row.apiUsd)}`}</title>
+          <title>{`${label(row.model)} · ${perMillionText(row.perMillion, locale)} / 1M\n${full(row.pricedTokens)} ${t("priced tokens", "wycenionych tokenów")} · ${usd(row.apiUsd)}${note ? `\n${note}` : ""}`}</title>
           <path d={path} style={{ fill: color }} />
           <path d={path} fill={`url(#${hatchId})`} />
           <text className="muc-value" x={center} y={top - 7} textAnchor="middle">{perMillionText(row.perMillion, locale)}</text>
-          <text className="muc-label" x={center} y={bottom + 17} textAnchor="middle" style={{ fontSize: nameSize }}>{fit(label(row.model))}</text>
+          <text className="muc-label" x={center} y={bottom + 17} textAnchor="middle" style={{ fontSize: nameSize }}>
+            {fit(line ? shortName(line, row.model!) : label(row.model))}</text>
           <text className="muc-tick" x={center} y={bottom + 32} textAnchor="middle">{compact(row.pricedTokens)}</text>
+          {change !== null ? <text className="muc-change" x={center} y={bottom + 48} textAnchor="middle">{changeText(change, locale)}</text>
+            : base ? <text className="muc-tick" x={center} y={bottom + 48} textAnchor="middle">{t("base", "baza")}</text>
+            : thin && <text className="muc-tick is-thin" x={center} y={bottom + 48} textAnchor="middle">{t("few tokens", "mało tokenów")}</text>}
         </g>;
       })}
       {/* Drawn last so the bars do not hide it. */}
-      {average !== null && average > 0 && <g>
+      {average !== null && averageText && <g>
         <line className="muc-average" x1={LEFT} x2={width - RIGHT} y1={y(average)} y2={y(average)} />
-        <text className="muc-note" x={width - RIGHT} y={y(average) - 5} textAnchor="end">{t("average", "średnia")} {perMillionText(average, locale)}</text>
+        <text className="muc-note" x={width - RIGHT} y={y(average) - 5} textAnchor="end">{averageText}</text>
       </g>}
     </svg>
   </div>;
