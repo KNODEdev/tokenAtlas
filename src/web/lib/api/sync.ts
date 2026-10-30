@@ -171,6 +171,8 @@ export interface SyncStatus {
     derived: number | null;
   };
   read_changes?: ReadRefreshCheck;
+  /** The first import of an empty database, while this server process runs it. */
+  first_import?: { started_at: string; source_files: number | null } | null;
   watch?: {
     active: boolean;
     running: boolean;

@@ -4656,5 +4656,14 @@
   "Sign in to Claude Code on this computer: run claude, then /login. The window appears after the first reading. Imported usage is already in Usage.": "Melden Sie sich auf diesem Computer bei Claude Code an: claude starten, dann /login. Das Fenster erscheint nach dem ersten Lesen. Importierte Nutzung steht bereits unter Nutzung.",
   "no computer is reading this limit": "kein Computer liest dieses Limit",
   "sign in to this provider's CLI on a computer to start readings": "melden Sie sich auf einem Computer in der CLI dieses Anbieters an, um Messungen zu starten",
-  "no limit reading in this window yet": "noch kein Limitwert in diesem Fenster"
+  "no limit reading in this window yet": "noch kein Limitwert in diesem Fenster",
+  "first import took {0} min": "erster Import dauerte {0} Min.",
+  "First history import": "Erster Import des Verlaufs",
+  "preparing views": "bereite Ansichten vor",
+  "measuring the time…": "messe die Zeit…",
+  "about {0} min left": "noch etwa {0} Min.",
+  "Copying originals, then indexing, then preparing views; the estimate follows this computer's measured pace.": "Originale kopieren, dann indexieren, dann Ansichten vorbereiten; die Schätzung folgt dem gemessenen Tempo dieses Computers.",
+  "Counting this computer's history": "Verlauf dieses Computers wird gezählt",
+  "The numbers appear by themselves; you can close this tab.": "Die Zahlen erscheinen von selbst; Sie können diesen Tab schließen.",
+  "About {0} min. The numbers appear by themselves; you can close this tab.": "Etwa {0} Min. Die Zahlen erscheinen von selbst; Sie können diesen Tab schließen."
 }

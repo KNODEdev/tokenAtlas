@@ -8,6 +8,7 @@ import { assertExistingAtlasSchemaCurrent, pendingAtlasBootstrapRecovery, pendin
 import { mainThreadStallCheck } from "./main-thread-stall";
 import { startArchiveRelocationVerification } from "../sync/archive-relocation-startup";
 import { createArchiveMove } from "./archive-move";
+import { countSourceFiles, type FirstImport } from "./first-import";
 import { scanCodexProfiles } from "../providers/codex-identity";
 import { scanVendorProfiles } from "../providers/vendor-identity";
 import type { VendorProfile } from "../providers/vendor-identity";
@@ -321,6 +322,10 @@ export function startServer(
       .run(LOCATIONS_CONFIRMED_KEY, new Date().toISOString());
     setAwaitingLocations(false);
     console.log("[tokenAtlas API] Folders confirmed - starting the first import.");
+    const firstImport: FirstImport = { started_at: new Date().toISOString(), source_files: null };
+    ctx.firstImport = firstImport;
+    void countSourceFiles(syncFileRoots().filter(root => root.kind === "source"))
+      .then(files => { firstImport.source_files = files; }, () => {});
     reconcileAfterWriter = true;
     runQueuedReconciliation();
   };

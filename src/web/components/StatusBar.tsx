@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { firstImportMemory, firstImportProgress, publishFirstImport, remainingMinutes, type FirstImportProgress } from "../lib/first-import";
 import type { AppActivity as ActivitySnapshot } from "../../shared/app-activity";
 import type { AnalysisRebuildJob, SyncStatus } from "../lib/api";
 import { browserSafeDiagnostic } from "../lib/browserDiagnostic";
@@ -231,7 +232,23 @@ export function StatusBar(props: StatusBarProps) {
   const overall = background.length ? overallFraction(background, seen) : null;
   const tasks = background.length ? backgroundTasks(background, seen, names) : [];
   const now = Date.now();
-  const line = statusLine({ ...props, activity, staleAt, missingRates, probeNotices, creditNotices: credit.notices, cloudSessions, cloudSessionsError: cloudRead.error, overall, tasks, now, t });
+  const baseLine = statusLine({ ...props, activity, staleAt, missingRates, probeNotices, creditNotices: credit.notices, cloudSessions, cloudSessionsError: cloudRead.error, overall, tasks, now, t });
+  // The first import of an empty database reads as one stretch of work with one bar and an estimate.
+  const importMemory = useRef(firstImportMemory()).current;
+  const importDone = useRef<number | null>(null);
+  const first = sync?.first_import ? firstImportProgress({ firstImport: sync.first_import, syncRunning: sync.running,
+    syncFinishedAt: sync.finished_at ?? sync.run?.finishedAt ?? null,
+    steps: sync.run?.progress && sync.run.progress.total > 0 ? { completed: sync.run.progress.completed, total: sync.run.progress.total } : null,
+    entries: (sync.progress ?? []).filter(isSyncScope), background: overall, backgroundBusy: !!activity.data?.busy || background.length > 0, now }, importMemory) : null;
+  if (first?.done && importDone.current === null) importDone.current = now;
+  const importing = first !== null && !first.done;
+  const remaining = first?.remainingMs != null ? remainingMinutes(first.remainingMs) : null;
+  useEffect(() => { publishFirstImport({ active: importing, remainingMs: remaining === null ? null : remaining * 60_000 }); }, [importing, remaining]);
+  // For an hour after it ends, "Data up to date" also says how long the first import took.
+  const took = first?.done && importDone.current !== null && now - importDone.current < 3_600_000
+    ? remainingMinutes(importDone.current - Date.parse(sync!.first_import!.started_at)) : null;
+  const line = took !== null && baseLine.tone === "ok"
+    ? { ...baseLine, detail: `${t("first import took {0} min", `pierwszy import trwał ${took} min`, [took])} · ${baseLine.detail}` } : baseLine;
   const alert = missingRateAlert(missingRates);
   const notices = probeNoticeLines(probeNotices);
   // The details panel closes when its button leaves for Settings, so it does not cover the opened tab.
@@ -293,8 +310,12 @@ export function StatusBar(props: StatusBarProps) {
     const job = rebuild.job;
     const context = job && (job.state === "running" || job.state === "queued") && sync.run?.rebuildGeneration === job.generation
       ? `${t("Data rebuild", "Przebudowa danych")} · 1/${REBUILD_PHASES} ${t("Source files", "Pliki źródłowe")}` : undefined;
-    return <SyncStatusBar sync={sync} context={context} compact={compact} stickyTop={stickyTop} state={state} events={events} />;
+    return <SyncStatusBar sync={sync} context={context} compact={compact} stickyTop={stickyTop} state={state} events={events}
+      firstImport={importing ? { progress: first!, startedAt: sync.first_import!.started_at } : undefined} />;
   }
+  if (importing) return <StatusShell label={t("First history import", "Pierwszy import historii")} expand={t("Expand details", "Rozwiń szczegóły")}
+    stickyTop={stickyTop} state={state} events={events}
+    summary={<FirstImportSummary progress={first!} startedAt={sync!.first_import!.started_at} current={t("preparing views", "przygotowuję widoki")} />} />;
   const measured = line.progress && line.progress !== "indeterminate" ? line.progress : null;
   return (
     <StatusShell label={t("Application status", "Stan aplikacji")} expand={t("Expand details", "Rozwiń szczegóły")} stickyTop={stickyTop}
@@ -326,13 +347,43 @@ export function StatusBar(props: StatusBarProps) {
 }
 
 /** A running synchronization keeps the same bar and details; its sources lead the state column. */
-function SyncStatusBar({ sync, context, compact, stickyTop, state, events }: { sync: SyncStatus; context?: string; compact: boolean;
-  stickyTop: number; state: ReactNode; events: ReactNode }) {
+function SyncStatusBar({ sync, context, compact, stickyTop, state, events, firstImport }: { sync: SyncStatus; context?: string; compact: boolean;
+  stickyTop: number; state: ReactNode; events: ReactNode; firstImport?: { progress: FirstImportProgress; startedAt: string } }) {
   const { t } = useI18n();
   const view = useSyncView(sync, context);
   return <StatusShell label={t("Synchronization progress", "Postęp synchronizacji")}
     expand={t("Expand provider synchronization details", "Rozwiń szczegóły synchronizacji dostawców")} stickyTop={stickyTop}
-    summary={<SyncSummaryContent view={view} compact={compact} />} state={<><SyncSources view={view} />{state}</>} events={events} />;
+    summary={firstImport ? <FirstImportSummary progress={firstImport.progress} startedAt={firstImport.startedAt} current={view.current} />
+      : <SyncSummaryContent view={view} compact={compact} />} state={<><SyncSources view={view} />{state}</>} events={events} />;
+}
+
+/** One line and one bar for the whole first import; the bar never moves back. */
+function FirstImportSummary({ progress, startedAt, current }: { progress: FirstImportProgress; startedAt: string; current: string }) {
+  const { t } = useI18n();
+  const elapsed = useElapsed(startedAt, true);
+  const minutes = progress.remainingMs === null ? null : remainingMinutes(progress.remainingMs);
+  const left = minutes === null ? t("measuring the time…", "mierzę czas…") : t("about {0} min left", `ok. ${minutes} min do końca`, [minutes]);
+  const percent = Math.floor(progress.fraction * 100);
+  return <>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+      <LiveMark />
+      <div style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: 9, flex: 1 }}>
+        <strong style={{ minWidth: 0, fontSize: "var(--fs-4)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {t("First history import", "Pierwszy import historii")}
+        </strong>
+        <span className="mono" style={{ minWidth: 0, color: "var(--muted)", fontSize: "var(--fs-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {left} · {current} · {elapsed}
+        </span>
+      </div>
+      <DetailsChevron />
+    </div>
+    <div role="progressbar" aria-label={t("First history import", "Pierwszy import historii")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}
+      title={t("Copying originals, then indexing, then preparing views; the estimate follows this computer's measured pace.",
+        "Kopiowanie oryginałów, potem indeksowanie i przygotowanie widoków; czas wynika ze zmierzonego tempa tego komputera.")}
+      style={{ height: 6, borderRadius: "var(--r-bar)", background: "var(--sunk)", border: "1px solid var(--line)", overflow: "hidden" }}>
+      <div style={{ height: "100%", width: `${percent}%`, background: "var(--accent)" }} />
+    </div>
+  </>;
 }
 
 /** The permanent strip under the header and its details: state on the left, events on the right. */

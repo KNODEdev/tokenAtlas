@@ -326,6 +326,7 @@ export function createFetchHandler(ctx: AppContext) {
         identity_revision: ctx.identityRevision ?? 0,
         readings_revision: readingsRevision(ctx.sqlite),
         read_changes: readRefreshCheck(ctx, url),
+        first_import: ctx.firstImport ?? null,
         remap: getRemapState(),
         watch: ctx.syncWatcher?.status() ?? null,
         bootstrap: getAtlasBootstrapState(),

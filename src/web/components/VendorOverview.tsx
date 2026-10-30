@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from "react";
 import { translate, useI18n } from "../lib/i18n";
 import { EmptyState, GhostButton, Tabs, type KpiSpec } from "./ui";
+import { remainingMinutes, useFirstImport } from "../lib/first-import";
 export type VendorSectionKey = "planWindows" | "models" | "traffic" | "provenance" | "calibration";
 export interface VendorOverviewSections {
   /** Shown above the first section: the selected window's status. */
@@ -154,10 +155,17 @@ function TabbedOverview({ sections }: { sections: VendorOverviewSections }) {
 }
 export function VendorOverview({ sections }: { sections: VendorOverviewSections }) {
   const { t } = useI18n();
-  if (sections.missing) return (
+  const importing = useFirstImport();
+  // During the first import the empty window is history still being counted, not a missing reading.
+  const minutes = importing.remainingMs === null ? null : remainingMinutes(importing.remainingMs);
+  const notice = sections.missing && importing.active ? { title: t("Counting this computer's history", "Liczę historię z tego komputera"),
+    detail: minutes === null ? t("The numbers appear by themselves; you can close this tab.", "Liczby pojawią się same; możesz zamknąć tę kartę.")
+      : t("About {0} min. The numbers appear by themselves; you can close this tab.", `Ok. ${minutes} min. Liczby pojawią się same; możesz zamknąć tę kartę.`, [minutes]) }
+    : sections.missing;
+  if (notice) return (
     <>
       {sections.lead}
-      <EmptyState title={sections.missing.title} detail={sections.missing.detail}
+      <EmptyState title={notice.title} detail={notice.detail}
         action={sections.openUsage && <GhostButton onClick={sections.openUsage}>{`${t("Usage", "Zużycie")} →`}</GhostButton>} />
       {sections.projects}
     </>
