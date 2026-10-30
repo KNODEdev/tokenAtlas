@@ -1,8 +1,8 @@
 /** Shared geometry of the hatched bar charts (Capacity → Before / after, Models → Cost per 1M). */
 
-/** A step for about four grid lines: 1, 2, 2.5 or 5 times a power of ten. */
-export function niceStep(max: number): number {
-  const raw = max / 4, power = 10 ** Math.floor(Math.log10(raw || 1));
+/** A step for about `lines` grid lines: 1, 2, 2.5 or 5 times a power of ten. */
+export function niceStep(max: number, lines = 4): number {
+  const raw = max / lines, power = 10 ** Math.floor(Math.log10(raw || 1));
   return [1, 2, 2.5, 5, 10].map(factor => factor * power).find(step => raw <= step) ?? 10 * power;
 }
 

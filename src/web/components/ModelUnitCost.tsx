@@ -157,10 +157,14 @@ export function ModelUnitCost({ data, codex, vendor }: { data: CodexAccountingRe
             <HelpBlock>{t("Each bar is the model's actual cost per 1M over the selected dates, the same figure as the dot above and Actual /1M in the table. Under the name: its priced tokens. The dashed line is the average of all models.", "Każdy słupek to rzeczywisty koszt 1M modelu w wybranych datach, ta sama liczba co kropka wyżej i Rzecz. /1M w tabeli. Pod nazwą: jego wycenione tokeny. Przerywana linia to średnia wszystkich modeli.")}</HelpBlock>
             <HelpBlock>{t("By line puts the versions of one model side by side, oldest first; lone models close the chart. The percentage compares each version with the oldest one that has at least {0} priced tokens. It is the actual cost, so a different share of cache reads moves it as much as a price change.", `Według linii stawia wersje jednego modelu obok siebie, od najstarszej; pojedyncze modele zamykają wykres. Procent porównuje każdą wersję z najstarszą, która ma co najmniej ${compact(THIN_SAMPLE_TOKENS)} wycenionych tokenów. To rzeczywisty koszt, więc inny udział odczytów z cache zmienia go tak samo jak zmiana cennika.`, [compact(THIN_SAMPLE_TOKENS)])}</HelpBlock>
           </HelpDot></span></div>
-        <span data-capture-exclude=""><Tabs value={order} onChange={pickOrder} options={[
-          { value: "cost", label: t("Cost", "Koszt"), title: t("Dearest first", "Od najdroższego") },
-          { value: "line", label: t("Line", "Linia"), title: t("Versions of one model side by side", "Wersje jednego modelu obok siebie") },
-        ]} /></span>
+        {/* The same model choice as the ladder above, so this chart can be set while it alone is in view. */}
+        <span className="muc-bars-tools" data-capture-exclude="">
+          <GhostButton onClick={openDrawer}>{t("Models · {0}/{1}", `Modele · ${shown.length}/${positive.length}`, [shown.length, positive.length])}</GhostButton>
+          <Tabs value={order} onChange={pickOrder} options={[
+            { value: "cost", label: t("Cost", "Koszt"), title: t("Dearest first", "Od najdroższego") },
+            { value: "line", label: t("Line", "Linia"), title: t("Versions of one model side by side", "Wersje jednego modelu obok siebie") },
+          ]} />
+        </span>
       </div>
       <CostBars rows={shown} lines={lines} colors={colors} average={summary.perMillion} label={modelName} highlight={hover} />
     </section></ChartExport>}
@@ -272,7 +276,7 @@ function CostBars({ rows, lines, colors, average, label, highlight }: {
   const [ref, width] = useWidth(900);
   const hatchId = `muc-hatch-${useId().replace(/:/g, "")}`;
   // By line: room above for the line names and below for the change against the base.
-  const LEFT = 52, RIGHT = 8, TOP = lines ? 46 : 26, PLOT = 260, AXIS = lines ? 56 : 40;
+  const LEFT = 52, RIGHT = 8, TOP = lines ? 46 : 26, PLOT = 320, AXIS = lines ? 56 : 40;
   const bottom = TOP + PLOT, height = bottom + AXIS;
   // A gap of GAP slots between lines; one slot per bar either way.
   const GAP = 0.6;
@@ -280,7 +284,8 @@ function CostBars({ rows, lines, colors, average, label, highlight }: {
     : rows.map(row => ({ row, base: false, thin: false, change: null, line: null, group: 0 }));
   const groups = lines?.length ?? 1;
   const peak = Math.max(...rows.map(row => row.perMillion!), average ?? 0) || 1;
-  const step = niceStep(peak * 1.12), max = Math.ceil(peak * 1.12 / step) * step;
+  // Five grid lines keep the top close to the dearest bar: $2.16 ends at $2.50, not $3.
+  const step = niceStep(peak * 1.12, 5), max = Math.ceil(peak * 1.12 / step) * step;
   const y = (value: number) => bottom - value / max * PLOT;
   // One number of decimals for the whole axis: $0.50 and $1.00, not $0.5 and $1.00.
   const decimals = step < 0.01 ? 3 : step < 1 ? 2 : 0;
