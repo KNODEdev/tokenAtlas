@@ -244,7 +244,8 @@ export function App() {
   }, [language, rosterState.data, contextPreview]);
   const activeRosterCards = useMemo(() => rosterCards.filter((c) => c.active), [rosterCards]);
   const accountsList = accountsState.data?.subscriptions ?? [];
-  const account = selectedAccountId(requestedAccount, preferredAccountOrder(accountsList));
+  const rosterIds = useMemo(() => new Set(rosterState.data?.accounts.map(entry => entry.id) ?? []), [rosterState.data]);
+  const account = selectedAccountId(requestedAccount, preferredAccountOrder(accountsList, rosterIds));
   const isAll = account === ALL_ACCOUNT;
   const activeRosterAccount = rosterState.data?.accounts.find((entry) => entry.id === account) ?? null;
   const accountWindowMinutes = activeRosterAccount?.live?.window_minutes ?? Number(windowMinutes);
