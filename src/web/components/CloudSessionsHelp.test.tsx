@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CloudSessionsHelpContent } from "./CloudSessionsHelp";
-import { cloudSessionProblems } from "../lib/cloud-sessions";
+import { cloudSessionProblems, cloudSessionSignIns } from "../lib/cloud-sessions";
 import type { CloudSessionsResponse } from "../../shared/cloud-sessions";
 import { statusLine } from "./StatusBar";
 import { translateForLanguage } from "../lib/i18n";
@@ -26,6 +26,12 @@ test("import errors retain their profile and stop the global all-current claim",
   expect(line(recovered).title).toBe("Data up to date");
   expect(line(recovered, "HTTP 503")).toMatchObject({ tone: "warn", title: "Cloud import status unavailable" });
   expect(cloudSessionProblems({ ...failed, setting: { minutes: 0, source: "settings" } })).toEqual([]);
+  // A profile never signed in has no cloud history to miss: it asks for a sign-in instead of a warning.
+  const unsigned = { ...failed, status: { ...failed.status!, last: { ...failed.status!.last!, profiles: [{ ...failed.status!.last!.profiles[0]!,
+    errors: ["[login-missing] Claude Code is not signed in in this profile (no .credentials.json); sign in to read the limits."] }] } } };
+  expect(cloudSessionProblems(unsigned)).toEqual([]);
+  expect(cloudSessionSignIns(unsigned)).toEqual(["PC-profile-cloud"]);
+  expect(line(unsigned).title).toBe("Data up to date");
 });
 
 test("drawer explains recovery and missing coverage without claiming missing usage is zero", () => {

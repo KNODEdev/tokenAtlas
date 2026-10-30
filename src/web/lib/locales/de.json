@@ -4665,5 +4665,7 @@
   "Copying originals, then indexing, then preparing views; the estimate follows this computer's measured pace.": "Originale kopieren, dann indexieren, dann Ansichten vorbereiten; die Schätzung folgt dem gemessenen Tempo dieses Computers.",
   "Counting this computer's history": "Verlauf dieses Computers wird gezählt",
   "The numbers appear by themselves; you can close this tab.": "Die Zahlen erscheinen von selbst; Sie können diesen Tab schließen.",
-  "About {0} min. The numbers appear by themselves; you can close this tab.": "Etwa {0} Min. Die Zahlen erscheinen von selbst; Sie können diesen Tab schließen."
+  "About {0} min. The numbers appear by themselves; you can close this tab.": "Etwa {0} Min. Die Zahlen erscheinen von selbst; Sie können diesen Tab schließen.",
+  "Sign in to Claude Code to include its cloud history": "Melden Sie sich bei Claude Code an, um den Cloud-Verlauf einzubeziehen",
+  "run claude, then /login": "claude starten, dann /login"
 }

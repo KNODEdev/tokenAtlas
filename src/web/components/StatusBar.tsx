@@ -20,7 +20,7 @@ import { AppActivityDetails, viewName } from "./AppActivity";
 import "./StatusBar.css";
 import { ClaudeConnect } from "./ClaudeConnect";
 import { CloudSessionsHelp } from "./CloudSessionsHelp";
-import { cloudSessionProblems, useCloudSessions } from "../lib/cloud-sessions";
+import { cloudSessionProblems, cloudSessionSignIns, useCloudSessions } from "../lib/cloud-sessions";
 import type { CloudSessionsResponse } from "../../shared/cloud-sessions";
 import { GhostButton } from "./ui";
 import { BOOTSTRAP_STAGES, bootstrapStageIndex, bootstrapStageLabel, DetailsChevron, LiveMark, RemapActivity,
@@ -224,6 +224,7 @@ export function StatusBar(props: StatusBarProps) {
   const cloudRead = useCloudSessions();
   const cloudSessions = cloudRead.data;
   const cloudProblems = [...(cloudRead.error ? [cloudRead.error] : []), ...cloudSessionProblems(cloudSessions)];
+  const cloudSignIns = cloudSessionSignIns(cloudSessions);
   // Scopes of the current stretch of background work; it ends when no producer reports any.
   const seen = useRef(new Map<string, number>()).current;
   const names = useRef(new Map<string, string>()).current;
@@ -262,8 +263,14 @@ export function StatusBar(props: StatusBarProps) {
   const events = (
     <div className="status-details-events" data-status-events>
       <h3>{t("Events", "Zdarzenia")}</h3>
-      {!notices.length && !alert && !credit.notices?.length && !cloudProblems.length && rebuild.job?.state !== "error"
+      {!notices.length && !alert && !credit.notices?.length && !cloudProblems.length && !cloudSignIns.length && rebuild.job?.state !== "error"
         && <p className="status-details-empty">{t("No new events", "Brak nowych zdarzeń")}</p>}
+      {cloudSignIns.length > 0 && !cloudProblems.length && <div className="status-event" data-cloud-sign-in>
+        <div className="status-event-head">
+          <strong>{t("Sign in to Claude Code to include its cloud history", "Zaloguj się w Claude Code, aby dołączyć historię z chmury")}</strong>
+        </div>
+        <span className="status-event-meta mono" title={cloudSignIns.join(", ")}>{t("run claude, then /login", "uruchom claude, potem /login")}</span>
+      </div>}
       {rebuild.job?.state === "error" && <div className="status-event">
         <div className="status-event-head">
           <strong className="is-warn">{t("Rebuild stopped with an error", "Przebudowa zatrzymana z błędem")}</strong>
