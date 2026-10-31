@@ -2,14 +2,13 @@ import type { CodexComparisonWindow as Window, TimelineMarker } from "../../shar
 import { CODEX_PROMOTIONS, type CapacityBasis } from "../../shared/codex-promotions";
 import { capacityMarkerType } from "./capacity-marker-visibility";
 import { capacityFull, capacityIsLowerBound, type CapacityUnit } from "./codex-capacity";
+import { BEFORE_AFTER_MIN_PP, WEEKLY_MINUTES, median } from "../../shared/capacity-value";
+export { BEFORE_AFTER_MIN_PP, WEEKLY_MINUTES, median };
 
 /**
  * Before / after: what one full 7-day allowance buys in the cycles around chosen events. The values are the Cycles
  * table's own `capacityFull`; this module only picks cycles and places markers, it computes no new capacity.
  */
-export const WEEKLY_MINUTES = 10080;
-/** Samples below this meter increase extrapolate too far to compare one week with another. */
-export const BEFORE_AFTER_MIN_PP = 40;
 export const BEFORE_AFTER_MAX_EVENTS = 4;
 /** Cycles drawn on each side of an event, and in the closing "now" run. */
 export const BEFORE_AFTER_SIDE = 2;
@@ -85,12 +84,6 @@ export function defaultEventIds(markers: readonly TimelineMarker[], cycles: read
   return chosen;
 }
 
-export function median(values: readonly number[]): number | null {
-  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
-  if (!sorted.length) return null;
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
-}
 
 export const relativeChange = (before: number | null, after: number | null) =>
   before === null || after === null || before <= 0 ? null : (after / before - 1) * 100;

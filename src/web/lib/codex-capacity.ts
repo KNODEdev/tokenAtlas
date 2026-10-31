@@ -1,7 +1,10 @@
 import type { CodexComparisonWindow as Window, WindowUsage } from "../../shared/codex-accounting";
 import { claudeShareNeverReported } from "../../shared/claude-code-capacity";
-import { claudeCodeCapacityForWindow, claudeCapacityPerPoint } from "../../shared/claude-capacity-result";
+import { claudeCodeCapacityForWindow } from "../../shared/claude-capacity-result";
 export { claudeCodeCapacityForWindow } from "../../shared/claude-capacity-result";
+import { capacityFull, capacityIsLowerBound, capacityPerPoint, metricTotal, observedCapacityPerPoint, type CapacityMetric } from "../../shared/capacity-value";
+export { capacityFull, capacityIsLowerBound, capacityPerPoint, creditsUnavailable, type CapacityMetric, type CapacityUnit } from "../../shared/capacity-value";
+import { creditsUnavailable, type CapacityUnit } from "../../shared/capacity-value";
 import type { CapacityBasis } from "../../shared/codex-promotions";
 import { assessWindowQuality, type WindowQuality } from "../../shared/subscription-quality";
 import type { MedianConfidence, MedianSample } from "./canonical-median";
@@ -100,42 +103,6 @@ export function capacityLocalLowerBound(window: Window, unit: CapacityUnit): num
   return perPoint === null || perPoint <= 0 ? null : perPoint * 100;
 }
 
-export type CapacityMetric = "api_standard" | "credits_low" | "credits_high" | "tokens" | "fresh" | "cached" | "output";
-
-function estimateValue(value: unknown): number | null {
-  if (!value || typeof value !== "object") return null;
-  const estimate = value as { value?: unknown; absent?: unknown };
-  return estimate.absent === null && typeof estimate.value === "number"
-    && Number.isFinite(estimate.value) && estimate.value > 0 ? estimate.value : null;
-}
-
-/**
- * Return the shared Claude result only when its source is demonstrably this
- * automatic weekly cycle. An explicit null marker is intentional: it prevents
- * consumers from silently falling back to the old local-traffic calibration.
- */
-function metricTotal(window: Window, metric: CapacityMetric): number | null {
-  const priced = metric === "api_standard" || metric === "credits_low" || metric === "credits_high";
-  if (priced && window.usage.events <= window.usage.unpriced_events) return null;
-  if (metric !== "api_standard" && priced && creditsUnavailable(window.usage)) return null;
-  const total = metric === "fresh" ? window.usage.input - window.usage.cached
-    - (window.usage.cache_write_5m ?? 0) - (window.usage.cache_write_1h ?? 0) - (window.usage.cache_write_unknown ?? 0)
-    : metric === "api_standard" ? window.usage.api_normalized ?? window.usage.api_standard : window.usage[metric];
-  return Number.isFinite(total) && total >= 0 ? total : null;
-}
-
-function observedCapacityPerPoint(window: Window, metric: CapacityMetric): number | null {
-  if (!Number.isFinite(window.observed_pp) || window.observed_pp <= 0 || window.usage.events <= 0) return null;
-  const total = metricTotal(window, metric);
-  return total === null ? null : total / window.observed_pp;
-}
-
-function promotionFactor(window: Window, basis: CapacityBasis): number | null {
-  if (basis === "observed") return 1;
-  const factor = window.promotion?.status === "configured" ? window.promotion.factor : null;
-  return factor !== null && Number.isFinite(factor) && factor > 0 ? factor : null;
-}
-
 export function promotionImpact(window: Window) {
   const factor = window.promotion?.status === "configured" ? window.promotion.factor : null;
   if (factor === null || !Number.isFinite(factor) || factor <= 0 || !Number.isFinite(window.end_percent) || window.end_percent < 0) return null;
@@ -181,53 +148,6 @@ export function capacityPeriodLabel(window: Window, locale: string): string {
   if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return "?";
   return format.formatRange(start, end);
 }
-export function capacityPerPoint(window: Window, metric: CapacityMetric, basis: CapacityBasis = "observed"): number | null {
-  if (window.claude_capacity !== undefined) {
-    const result = window.claude_capacity, factor = promotionFactor(window, basis);
-    if (result.account !== window.account.toLowerCase() || result.window_id !== window.id
-      || result.window_minutes !== (window.window_minutes ?? 10080) || factor === null) return null;
-    if (metric === "fresh" || metric === "cached" || metric === "output") {
-      const full = result.token_parts?.[metric];
-      return full == null ? null : full / 100 / factor;
-    }
-    if (metric !== "tokens" && metric !== "api_standard") return null;
-    const point = claudeCapacityPerPoint(result, metric);
-    return point === null ? null : point / factor;
-  }
-  const shared = claudeCodeCapacityForWindow(window);
-  // A window the vendor never sent a share for falls through to local traffic ÷ meter increase.
-  if (shared !== undefined && !claudeShareNeverReported(window)) {
-    if (!shared || (metric !== "tokens" && metric !== "api_standard")) return null;
-    // The shared figure is already a full weekly allowance, so it supplies a
-    // per-point rate without dividing the local usage by this window's pp.
-    const full = metric === "tokens" ? estimateValue(shared.weekly_capacity_tokens) : estimateValue(shared.weekly_capacity_api_usd);
-    const factor = promotionFactor(window, basis);
-    return full === null || factor === null ? null : full / 100 / factor;
-  }
-  const observed = observedCapacityPerPoint(window, metric);
-  const factor = promotionFactor(window, basis);
-  return observed === null || factor === null ? null : observed / factor;
-}
-/** The unit of the Capacity screen's switch. */
-export type CapacityUnit = "api_standard" | "credits_low" | "tokens";
-
-/** One price-completeness contract for charts and comparisons; tokens do not depend on prices. */
-export function capacityIsLowerBound(window: Window, metric: CapacityMetric): boolean {
-  if (metric !== "api_standard" && metric !== "credits_low" && metric !== "credits_high") return false;
-  if (window.claude_capacity) return window.claude_capacity.capacity_api_usd.relation === "≥";
-  const shared = claudeCodeCapacityForWindow(window);
-  return shared?.sample_meter
-    ? metric === "api_standard" && shared.weekly_capacity_api_usd.relation === "≥"
-    : window.usage.unpriced_events > 0;
-}
-
-/** Estimated capacity at 100% in one unit; samples of 1 pp or less give no estimate. */
-export function capacityFull(window: Window, unit: CapacityUnit, basis: CapacityBasis = "observed"): number | null {
-  if (!(window.observed_pp > 1)) return null;
-  const perPoint = capacityPerPoint(window, unit, basis);
-  return perPoint === null ? null : perPoint * 100;
-}
-
 /** Usage recorded across the whole cycle in one unit; null when it is unknown or not applicable. */
 export function capacityUsed(window: Window, unit: CapacityUnit): number | null {
   const usage = window.cycle_usage ?? window.usage;
@@ -340,10 +260,6 @@ export function compareCapacity(baseline: Window, current: Window, basis: Capaci
   const high = compatible && before && after ? relativeChange(after.max, before.min) : null;
   return { compatible, change, low, high,
     scenario: low === null || high === null ? "unavailable" as const : high < 0 ? "lower" as const : low > 0 ? "higher" as const : "overlap" as const };
-}
-/** Every recorded event predates credit billing, so a credit figure would be an invention. */
-export function creditsUnavailable(usage: Pick<WindowUsage, "events" | "credits_unavailable_events">): boolean {
-  return usage.events > 0 && (usage.credits_unavailable_events ?? 0) >= usage.events;
 }
 export interface UsageTokenTypes { fresh: number; cached: number; cache_write: number | null; output: number }
 /**
