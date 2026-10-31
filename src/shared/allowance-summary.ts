@@ -48,11 +48,12 @@ export interface AllowanceModelGroup {
   tokens: AllowanceStats;
   /** Σ sample API Standard ÷ Σ sample priced tokens × 1e6 over the group's cycles; null without priced tokens. */
   usd_per_million: number | null;
+  /** A dollar value is a lower bound, or a cycle's model mix was told from its priced part only. */
   lower_bound: boolean;
   thin: boolean;
 }
 export type CapacityExclusion = "not_weekly" | "below_min_pp" | "mixed_plan" | "plan_meter_mismatch" | "no_value";
-export type DominanceExclusion = "below_threshold" | "unpriced" | "share_sample" | "no_api_value";
+export type DominanceExclusion = "below_threshold" | "share_sample" | "no_api_value";
 export interface AllowanceSummary {
   months: AllowanceMonth[];
   partial: AllowancePartial | null;
@@ -67,7 +68,11 @@ export interface AllowanceSummary {
   /** Eligible cycles that stay counted but deserve a disclosure. */
   notes: { uncertain_end: number; manual: number };
 }
-export interface AllowanceRatio { month: string; ratio: number | null; min_n: number; approximate: boolean; a: number | null; b: number | null }
+/**
+ * B ÷ A of one month. A lower bound on one side bounds the ratio (owner decision 2026-10-31): A at least its value makes
+ * the ratio at most the shown one ("≤"), B at least its value makes it at least the shown one ("≥"); both is "≈".
+ */
+export interface AllowanceRatio { month: string; ratio: number | null; min_n: number; relation: "≤" | "≥" | null; approximate: boolean; a: number | null; b: number | null }
 
 const DAY_MS = 86_400_000;
 const startOf = (window: Window) => window.cycle_start ?? window.start;
@@ -160,8 +165,8 @@ export function summarizeAllowance(windows: readonly Window[], options: { asOf: 
   for (const cycle of eligible) {
     const sample = sampleOf(cycle.window);
     if (typeof sample === "string") { count(dominanceExcluded, sample); continue; }
+    // With unpriced parts the mix is told from the priced value and the group is a lower bound (owner, 2026-10-31).
     if (!(sample.api > 0)) { count(dominanceExcluded, "no_api_value"); continue; }
-    if (sample.unpriced) { count(dominanceExcluded, "unpriced"); continue; }
     const top = sample.models.reduce<Sample["models"][number] | null>((best, model) => !best || model.api > best.api ? model : best, null);
     if (!top || top.api / sample.api < DOMINANT_SHARE) { count(dominanceExcluded, "below_threshold"); continue; }
     groups.set(top.name, [...groups.get(top.name) ?? [], { ...cycle, sample }]);
@@ -171,7 +176,8 @@ export function summarizeAllowance(windows: readonly Window[], options: { asOf: 
     const api = cycles.reduce((sum, cycle) => sum + cycle.sample.api, 0);
     const usd = statsOf(cycles, "api_standard");
     return { model, n: cycles.length, cycles: cycles.map(cycle => cycle.window.id), api_standard: usd, tokens: statsOf(cycles, "tokens"),
-      usd_per_million: priced > 0 ? api / priced * 1e6 : null, lower_bound: usd.lower_bound, thin: cycles.length < 2 };
+      usd_per_million: priced > 0 ? api / priced * 1e6 : null, lower_bound: usd.lower_bound || cycles.some(cycle => cycle.sample.unpriced),
+      thin: cycles.length < 2 };
   }).sort((a, b) => (b.tokens.median ?? -1) - (a.tokens.median ?? -1) || a.model.localeCompare(b.model));
 
   return { months, partial, models, closed, eligible: eligible.length, excluded, dominance_excluded: dominanceExcluded, notes };
@@ -185,14 +191,18 @@ export function allowanceRatios(a: AllowanceSummary, b: AllowanceSummary, unit: 
     if (!right) return [];
     const ratio = left.median !== null && right.median !== null && left.median > 0 ? right.median / left.median : null;
     // A quotient of two lower bounds has no bound direction, so it is only approximate.
-    return [{ month: month.month, ratio, min_n: Math.min(left.n, right.n), approximate: left.lower_bound || right.lower_bound,
-      a: left.median, b: right.median }];
+    const approximate = left.lower_bound && right.lower_bound;
+    const relation = approximate ? null : left.lower_bound ? "≤" as const : right.lower_bound ? "≥" as const : null;
+    return [{ month: month.month, ratio, min_n: Math.min(left.n, right.n), relation, approximate, a: left.median, b: right.median }];
   });
 }
 
-/** The latest month whose ratio rests on at least two cycles on each side and no lower bound. */
+/**
+ * The latest month whose ratio rests on at least two cycles on each side. It keeps its marking (exact, "≤", "≥" or
+ * approximate): an older exact month would read as the current answer when it is not (owner decision 2026-10-31).
+ */
 export function allowanceHeadline(ratios: readonly AllowanceRatio[]): AllowanceRatio | null {
-  return [...ratios].reverse().find(ratio => ratio.ratio !== null && ratio.min_n >= 2 && !ratio.approximate) ?? null;
+  return [...ratios].reverse().find(ratio => ratio.ratio !== null && ratio.min_n >= 2) ?? null;
 }
 
 /* ---- The read contract (`GET /api/allowance-summary`, REQ-060) ---- */

@@ -99,14 +99,21 @@ describe("ratios and headline", () => {
     expect(ratios[2]!.min_n).toBe(1);
     expect(allowanceHeadline(ratios)?.month).toBe("2026-09");
   });
-  it("calls a ratio over a lower bound approximate and keeps it out of the headline", () => {
-    const unpriced = { usage: { ...cycle("2026-01-01T00:00:00Z", 1).usage, unpriced_events: 3 } };
-    const a = summarizeAllowance(months([["2026-10", [1000, 1000]]], unpriced), { asOf: AS_OF });
-    const b = summarizeAllowance(months([["2026-10", [2000, 2000]]]), { asOf: AS_OF });
-    const ratios = allowanceRatios(a, b, "api_standard");
-    expect(ratios[0]).toMatchObject({ approximate: true, min_n: 2 });
-    expect(allowanceHeadline(ratios)).toBeNull();
-    expect(allowanceRatios(a, b, "tokens")[0]!.approximate).toBe(false);
+  it("bounds a ratio over one lower bound, calls two approximate, and the headline keeps that marking", () => {
+    const unpriced = months([["2026-10", [1000, 1000]]]).map(window => ({ ...window, usage: { ...window.usage, unpriced_events: 3 } }));
+    const bounded = summarizeAllowance(unpriced, { asOf: AS_OF });
+    const exact = summarizeAllowance(months([["2026-10", [2000, 2000]]]), { asOf: AS_OF });
+    // A is at least its value, so B ÷ A is at most the shown ratio; the other way round it is at least it.
+    expect(allowanceRatios(bounded, exact, "api_standard")[0]).toMatchObject({ ratio: 2, relation: "≤", approximate: false, min_n: 2 });
+    expect(allowanceRatios(exact, bounded, "api_standard")[0]).toMatchObject({ ratio: 0.5, relation: "≥", approximate: false });
+    expect(allowanceHeadline(allowanceRatios(bounded, exact, "api_standard"))?.relation).toBe("≤");
+    const both = allowanceRatios(bounded, bounded, "api_standard");
+    expect(both[0]).toMatchObject({ relation: null, approximate: true });
+    // The latest well-sampled month wins even when only approximate: an older exact one is not today's answer.
+    const older = summarizeAllowance(months([["2026-09", [1000, 1000]]]), { asOf: AS_OF });
+    const mixed = allowanceRatios({ ...older, months: [...older.months, ...bounded.months] }, { ...older, months: [...older.months, ...bounded.months] }, "api_standard");
+    expect(allowanceHeadline(mixed)).toMatchObject({ month: "2026-10", approximate: true });
+    expect(allowanceRatios(bounded, exact, "tokens")[0]).toMatchObject({ relation: null, approximate: false });
   });
 });
 
@@ -133,8 +140,8 @@ describe("dominant model groups", () => {
     expect(summarizeAllowance([window], { asOf: AS_OF }).dominance_excluded).toEqual({ below_threshold: 1 });
   });
 
-  it("leaves out cycles with unpriced parts or a legacy Claude Code share sample", () => {
-    const unpriced = cycle("2026-10-01T08:00:00Z", 1000);
+  it("tells an unpriced cycle's model from its priced value as a lower bound, and leaves out a legacy share sample", () => {
+    const unpriced = cycle("2026-10-01T08:00:00Z", 1000, { models: [{ name: "gpt-6.1-sol", api: 1000 }, { name: "codex-auto-review", api: 0, tokens: 3e8 }] });
     unpriced.usage = { ...unpriced.usage, unpriced_events: 2 };
     const shared = cycle("2026-10-08T08:00:00Z", 1000, { over: { account: "claude1", claude_code_capacity: {
       account: "claude1", window_id: "2026-10-08T08:00:00Z", api_value_basis: "standard", conditional: true, share_percent: 80, utilization_percent: 60,
@@ -142,7 +149,8 @@ describe("dominant model groups", () => {
     } as unknown as Window["claude_code_capacity"] } });
     const summary = summarizeAllowance([unpriced, shared], { asOf: AS_OF });
     expect(summary.eligible).toBe(2);
-    expect(summary.dominance_excluded).toEqual({ unpriced: 1, share_sample: 1 });
+    expect(summary.dominance_excluded).toEqual({ share_sample: 1 });
+    expect(summary.models).toMatchObject([{ model: "gpt-6.1-sol", n: 1, lower_bound: true }]);
   });
 
   it("takes a Claude window's model mix from its prepared capacity sample, not the window's traffic", () => {
