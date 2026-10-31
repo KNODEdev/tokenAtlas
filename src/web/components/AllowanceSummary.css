@@ -1,0 +1,8 @@
+/* Value → Summary: the unit chip with its help, month names and ratios over the bars, the open cycle as an outline. */
+.allowance-head { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-6) var(--s-9) 0; }
+.allowance-summary .ui-kpi-strip { margin: var(--s-4) var(--s-9) 0; }
+.allowance-swatch { display: inline-block; width: 10px; height: 10px; border-radius: var(--r-dot); }
+.allowance-month { font-family: var(--font-sans); font-size: var(--fs-4); font-weight: var(--fw-semibold); fill: var(--text); }
+.allowance-ratio { font-family: var(--font-figure); font-size: var(--fs-3); font-weight: var(--fw-semibold); }
+.allowance-partial { stroke-width: 1.6; stroke-dasharray: 5 4; }
+.muc-tick.allowance-thin { fill: var(--faint); }

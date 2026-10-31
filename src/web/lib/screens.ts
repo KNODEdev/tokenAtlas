@@ -21,6 +21,7 @@ export type ScreenId =
   | "sources"
   | "settings"
   // IA-2026-10-19 v1.1: views that existed only inside other screens or for all accounts.
+  | "value-summary"
   | "periods"
   | "plans"
   | "shares"
@@ -102,6 +103,7 @@ export const SCREEN_TITLES: Record<ScreenId, string> = {
   projects: "Projects",
   sources: "Data sources",
   settings: "Settings",
+  "value-summary": "What one allowance buys",
   periods: "Billing periods",
   plans: "Plan comparison",
   shares: "Saved comparisons",
@@ -129,6 +131,7 @@ export const SCREEN_TITLES_PL: Record<ScreenId, string> = {
   projects: "Projekty",
   sources: "Źródła danych",
   settings: "Ustawienia",
+  "value-summary": "Co kupuje jeden limit",
   periods: "Okresy rozliczeniowe",
   plans: "Porównanie planów",
   shares: "Zapisane porównania",
@@ -163,6 +166,8 @@ export const NAVIGATION: readonly NavSection[] = [
     ]),
   ] },
   { id: "value", label: { en: "Value", pl: "Opłacalność" }, icon: "$", tabs: [
+    // UR-014 D1: the Summary opens the section; the other tabs keep their views.
+    tab("summary", "Summary", "Podsumowanie", [view("value-summary", "Summary", "Podsumowanie")]),
     tab("periods", "Billing periods", "Okresy rozliczeniowe", [view("periods", "Billing periods", "Okresy rozliczeniowe")]),
     tab("plans", "Plan comparison", "Porównanie planów", [view("plans", "Comparison", "Porównanie"), view("shares", "Saved comparisons", "Zapisane porównania")]),
   ] },

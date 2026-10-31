@@ -3,14 +3,15 @@ import { ALL_ACCOUNT, type RosterCard } from "../lib/roster";
 import { useI18n } from "../lib/i18n";
 import { SubscriptionMonth } from "../components/SubscriptionMonth";
 import { CapacityBattle } from "../components/CapacityBattle";
+import { AllowanceSummary } from "../components/AllowanceSummary";
 import { EmptyState } from "../components/ui";
 import { SavedComparisons } from "./SavedComparisons";
 import "./SubscriptionMonthAnalysis.css";
 
-export type ValueView = "periods" | "plans" | "shares";
+export type ValueView = "value-summary" | "periods" | "plans" | "shares";
 
 /**
- * Billing periods, plan comparison and saved comparisons read independently of the shell's history.
+ * The allowance summary, billing periods, plan comparison and saved comparisons read independently of the shell's history.
  */
 export function Value(props: ScreenProps & { view: ValueView; cards: RosterCard[] }) {
   const { t } = useI18n();
@@ -19,7 +20,8 @@ export function Value(props: ScreenProps & { view: ValueView; cards: RosterCard[
   const business = (vendor === "codex" || vendor === "openai") && props.account.endsWith("::business");
   const dataRevision = props.sync?.revisions?.data ?? undefined;
   return <div className="ui-tab-page">
-    {props.view === "plans" ? <CapacityBattle accounts={props.accounts} cards={props.cards} dataRevision={dataRevision} />
+    {props.view === "value-summary" ? <AllowanceSummary dataRevision={dataRevision} />
+      : props.view === "plans" ? <CapacityBattle accounts={props.accounts} cards={props.cards} dataRevision={dataRevision} />
       : props.view === "periods" ? business
         ? <EmptyState title={t("Business uses credits", "Business korzysta z kredytów")} />
         : all
