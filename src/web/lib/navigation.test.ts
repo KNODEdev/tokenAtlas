@@ -13,8 +13,10 @@ test("every screen has exactly one place in the menu and old names stay searchab
   expect([...views].sort()).toEqual((Object.keys(SCREEN_TITLES) as ScreenId[]).sort());
   expect(navLocation("capacity").section.id).toBe("limits");
   expect(navLocation("periods").section.id).toBe("value");
+  // Value opens on the Summary (UR-014 D1, owner-approved 2026-10-31).
   expect(NAVIGATION.find(section => section.id === "value")!.tabs.map(tab => tab.label.en))
-    .toEqual(["Billing periods", "Plan comparison"]);
+    .toEqual(["Summary", "Billing periods", "Plan comparison"]);
+  expect(navScreen("periods")).toBe("value-summary");
   expect(navLocation("events").section.id).toBe("usage");
   // Limits opens on Capacity, its first page tab.
   expect(navScreen("compare")).toBe("capacity");
