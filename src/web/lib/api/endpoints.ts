@@ -74,6 +74,10 @@ export const api = {
     get<import("../../../shared/codex-capacity").CodexCapacityReport>("/api/codex-capacity", p, signal),
   codexCapacityRange: (p: { account: string; window_minutes?: 300 | 10080 | 43200 }, signal?: AbortSignal) =>
     get<import("../../../shared/codex-capacity").CodexCapacityRange>("/api/codex-capacity-range", p, signal),
+  allowanceSummary: (p: { a: string; a_counter?: string; b?: string; b_counter?: string; since: string; until: string; unit: "api_standard" | "tokens" }, signal?: AbortSignal) =>
+    get<import("../../../shared/allowance-summary").AllowanceSummaryResponse>("/api/allowance-summary", p, signal),
+  allowanceCandidates: (signal?: AbortSignal) =>
+    get<import("../../../shared/allowance-summary").AllowanceCandidatesResponse>("/api/allowance-summary", { candidates: "1" }, signal),
   modelCapacity: (p: { provider: string; account: string; counter?: string; since: string; until: string }, signal?: AbortSignal) =>
     get<import("../../../shared/model-capacity").ModelCapacityResponse>("/api/model-capacity", p, signal),
   modelUsageShare: (p: { provider: string; account: string; counter?: string; since: string; until: string; window?: string }, signal?: AbortSignal) =>

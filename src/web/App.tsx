@@ -101,7 +101,7 @@ function readTheme(): "dark" | "light" {
 const ACCOUNT_FREE_SCREENS = new Set<ScreenId>(["projects", "sources", "data-problems", "data-operations", "events", "settings", "usage",
   "usage-history", "usage-pace", "structure", "structure-models", "activity"]);
 /** Views read independently of the shell's cycle history and do not wait for it. */
-const INDEPENDENT_SCREENS = new Set<ScreenId>(["capacity", "sources", "data-problems", "data-operations", "speed", "models", "model-traffic", "model-cost", "periods", "plans", "shares"]);
+const INDEPENDENT_SCREENS = new Set<ScreenId>(["capacity", "sources", "data-problems", "data-operations", "speed", "models", "model-traffic", "model-cost", "value-summary", "periods", "plans", "shares"]);
 /** Account-scoped views whose scope line shows the shell's counter (IA-42). Models pages name it in their own Counter control. */
 const COUNTER_SCREENS = new Set<ScreenId>(["overview", "history", "compare", "analytics", "patterns"]);
 function RailSkeleton({ width, rows, rowHeight }: { width: number; rows: number; rowHeight: number }) {
@@ -555,7 +555,7 @@ export function App() {
   const limitsForAll = isAll && navLocation(screen).tab.id === "windows";
   const counterName = windowOptions.find(option => option.value === String(accountWindowMinutes))?.label.split(" · ")[0];
   // The capacity battle and the saved comparisons span several subscriptions, so they name no single one.
-  const scopeParts = accountFree || section === "data" || section === "settings" || screen === "plans" || screen === "shares" ? [] : [
+  const scopeParts = accountFree || section === "data" || section === "settings" || screen === "value-summary" || screen === "plans" || screen === "shares" ? [] : [
     ...(isAll ? [t("All subscriptions", "Wszystkie subskrypcje")] : []),
     ...(COUNTER_SCREENS.has(screen) && !isAll && counterName ? [counterName] : []),
     ...(screen === "overview" && !isAll && (chosen ?? current) ? [`${(chosen ?? current)!.label} · ${(chosen ?? current)!.isActive ? t("current", "bieżące") : t("closed", "zamknięte")}`] : []),
@@ -572,6 +572,7 @@ export function App() {
     if (screen === "settings") return t("Accounts, computers and data, price lists", "Konta, komputery i dane, cenniki");
     if (screen === "usage") return t("All sources · historical subscriptions, accounts and models · UTC dates", "Wszystkie źródła · historyczne subskrypcje, konta i modele · daty UTC");
     if (screen === "capacity") return t("Per-1% conversions, estimated full allowance and deviation from comparable cycles", "Przeliczniki 1%, szacowana pełna pojemność i odchylenie od porównywalnych cykli");
+    if (screen === "value-summary") return t("What one weekly allowance buys, month by month", "Co kupuje jeden limit tygodniowy, miesiąc po miesiącu");
     if (screen === "periods") return t("Actual billing cycles, their prices and use", "Rzeczywiste okresy rozliczeniowe, ich ceny i wykorzystanie");
     if (screen === "plans" || screen === "shares") return t("Measured and converted plan variants", "Zmierzone i przeliczone warianty planów");
     if (screen === "usage-history" || screen === "usage-pace" || screen === "structure" || screen === "structure-models" || screen === "activity")
@@ -951,7 +952,7 @@ export function App() {
           {screenProps && screen === "model-cost" && <Models {...screenProps} view="cost" />}
           {screenProps && screen === "speed" && <Speed {...screenProps} cards={rosterCards} />}
           {screenProps && screen === "capacity" && <Capacity {...screenProps} cards={rosterCards} />}
-          {screenProps && (screen === "periods" || screen === "plans" || screen === "shares") && <Value {...screenProps} view={screen} cards={rosterCards} />}
+          {screenProps && (screen === "value-summary" || screen === "periods" || screen === "plans" || screen === "shares") && <Value {...screenProps} view={screen} cards={rosterCards} />}
           {screenProps && screen === "events" && <Events {...screenProps} />}
           {screenProps && screen === "usage" && <Usage />}
           {screenProps && screen === "projects" && <Projects {...screenProps} cards={rosterCards} />}

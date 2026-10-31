@@ -22,6 +22,7 @@ import { handleHistoryCoverage } from "./history-coverage";
 import { handleCodexAccounting } from "./codex-accounting";
 import { handleCapacityCycles } from "./capacity-cycles";
 import { handleCodexCapacity, handleCodexCapacityRange } from "./codex-capacity";
+import { handleAllowanceSummary } from "./allowance-summary";
 import { CAPACITY_CYCLE_RESULTS_CLOCK } from "./capacity-cycle-producer";
 import { handleModelCapacity } from "./model-capacity";
 import { handleModelUsageShare } from "./model-usage-share";
@@ -102,6 +103,8 @@ export const DATA_VIEWS:Readonly<Record<string,DataView>> = {
   "/api/capacity-cycles":rows({build:handleCapacityCycles,sources:[CAPACITY_CYCLE_RESULTS_CLOCK,...identity],clock:false}),
   "/api/codex-capacity":rows({build:handleCodexCapacity,sources:[CAPACITY_CYCLE_RESULTS_CLOCK,...identity],clock:false}),
   "/api/codex-capacity-range":rows({build:handleCodexCapacityRange,sources:[CAPACITY_CYCLE_RESULTS_CLOCK,...identity],clock:false}),
+  // What one allowance buys per month and by model, from the same stored register (allowance-summary.ts, UR-014).
+  "/api/allowance-summary":rows({build:handleAllowanceSummary,sources:[CAPACITY_CYCLE_RESULTS_CLOCK,...identity],clock:false}),
   "/api/model-capacity":rows({...withWindowSums(current(handleModelCapacity)),clock:false}),
   // Estimated limit share by model from the same stored window sums and meter readings (model-usage-share.ts).
   "/api/model-usage-share":rows({...withWindowSums(current((ctx,url)=>handleModelUsageShare(ctx,url))),clock:false}),

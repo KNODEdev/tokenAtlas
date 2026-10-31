@@ -15,7 +15,7 @@ import { setLanguage } from "../lib/i18n";
 import { chooseOption, dropdowns, findByAttribute, findByText, flushUntil, installTestDom, invoke } from "../lib/test-dom-harness";
 import { Value, type ValueView } from "./Value";
 import { ProjectPlanPanel } from "./ProjectPlanPanel";
-import type { ScreenProps } from "../lib/screens";
+import { NAVIGATION, sectionScreen, type ScreenProps } from "../lib/screens";
 
 const first = { ...shareFixture, account: "claude-a", plan: "Max", id: "a-week" };
 const second = { ...first, account: "claude-b", id: "b-week", rate: 14.5 };
@@ -169,4 +169,150 @@ test("a Codex Business account keeps the independent value tools and the plan si
     expect(cycles).not.toHaveBeenCalled();
     expect(project).toHaveBeenCalledTimes(1);
   } finally { await act(async () => root.unmount()); cycles.mockRestore(); rate.mockRestore(); project.mockRestore(); dom.restore(); }
+});
+
+/* ---- Value → Summary (UR-014 REQ-061) ---- */
+
+const stats = (median: number | null, n: number, lower = false) => ({ n, median, min: median, max: median, lower_bound: lower });
+const month = (key: string, usd: number, n: number, lower = false, plans = ["pro"]) =>
+  ({ month: key, api_standard: stats(usd, n, lower), tokens: stats(usd * 4e6, n), plans, cycles: [] });
+const summary = (months: ReturnType<typeof month>[], partial: number | null = null) => ({ months, models: [], closed: 9, eligible: 9, excluded: {},
+  dominance_excluded: {}, notes: { uncertain_end: 0, manual: 0 },
+  partial: partial === null ? null : { id: "now", cycle_start: "2026-10-29T10:00:00Z", observed_pp: 17, api_standard: partial, tokens: partial * 4e6, lower_bound: false } });
+const candidates = { read_at: "2026-10-30T12:00:00Z", candidates: [
+  { provider: "codex", account: "codex1", counter: "weekly", counter_label: "Weekly", state: "current", plan: "pro", plan_label: "Pro", usd_per_month: 200, recent_cycles: 5 },
+  { provider: "claude", account: "claude1", counter: "weekly_all", counter_label: "Weekly", state: "current", plan: "max", plan_label: "Max 20×", usd_per_month: 200, recent_cycles: 4 },
+] };
+type SummaryBody = Awaited<ReturnType<typeof api.allowanceSummary>>;
+const twoSides = (claude: Partial<SummaryBody["sides"][number]> = {}): SummaryBody => ({ since: "2026-08-01", until: "2026-10-30", unit: "api_standard", read_at: "2026-10-30T12:00:00Z",
+  sides: [
+    { provider: "codex", account: "codex1", counter: "weekly", counter_label: "Weekly", state: "current", summary: summary([month("2026-09", 1432, 6), month("2026-10", 1114, 11, true)], 1253) },
+    { provider: "claude", account: "claude1", counter: "weekly_all", counter_label: "Weekly", state: "current", summary: summary([month("2026-09", 2245, 1, false, ["max", "pro"]), month("2026-10", 2648, 4, true)]), ...claude },
+  ],
+  ratios: [{ month: "2026-09", ratio: 2245 / 1432, min_n: 1, relation: null, approximate: false, a: 1432, b: 2245 },
+    { month: "2026-10", ratio: 2648 / 1114, min_n: 4, relation: null, approximate: true, a: 1114, b: 2648 }],
+  headline: { month: "2026-10", ratio: 2648 / 1114, min_n: 4, relation: null, approximate: true, a: 1114, b: 2648 } });
+
+test("Value opens on the Summary, ahead of billing periods and plan comparison", () => {
+  setLanguage("en");
+  const value = NAVIGATION.find(section => section.id === "value")!;
+  expect(sectionScreen(value)).toBe("value-summary");
+  expect(value.tabs.map(tab => tab.views.map(view => view.screen))).toEqual([["value-summary"], ["periods"], ["plans", "shares"]]);
+  const tabs = renderToStaticMarkup(<PageTabs screen="value-summary" open={() => {}} />);
+  expect(tabs.indexOf("Summary")).toBeLessThan(tabs.indexOf("Billing periods"));
+});
+
+test("the summary compares two plans by month on one scale, keeps the open cycle apart and marks estimates", async () => {
+  const dom = installMonthDom(), root = createRoot(dom.host as unknown as Element);
+  const listed = spyOn(api, "allowanceCandidates").mockResolvedValue(candidates as never);
+  const read = spyOn(api, "allowanceSummary").mockResolvedValue(twoSides());
+  setLanguage("en");
+  try {
+    await act(async () => root.render(valueView("value-summary", "codex1", "codex")));
+    await flushUntil(() => dom.host.textContent.includes("What one allowance buys"));
+    // Defaults: the dearest active plan and another provider's at the same price.
+    expect(read.mock.calls.at(-1)?.[0]).toMatchObject({ a: "codex1", b: "claude1", unit: "api_standard" });
+    const text = dom.host.textContent;
+    expect(text).toContain("Weekly limit · reset to reset");
+    expect(text).toContain("≈ 2.38×");
+    expect(text).toContain("≥ $1,114");
+    expect(text).toContain("~$1,253");
+    expect(text).toContain("first 17%");
+    expect(text).toContain("1 cycle");
+    expect(text).toContain("plan changed");
+    // One chart holds both sides on its single axis.
+    expect(findByAttribute(dom.host, "aria-label", "What one allowance buys by month")).not.toBeNull();
+  } finally { await act(async () => root.unmount()); listed.mockRestore(); read.mockRestore(); dom.restore(); }
+});
+
+test("a preparing side is named as missing while the other stays, and an update keeps the last cycles", async () => {
+  const dom = installMonthDom(), root = createRoot(dom.host as unknown as Element);
+  const listed = spyOn(api, "allowanceCandidates").mockResolvedValue(candidates as never);
+  const body = twoSides({ state: "preparing", summary: null });
+  const read = spyOn(api, "allowanceSummary").mockResolvedValue({ ...body, sides: [{ ...body.sides[0]!, state: "updating" }, body.sides[1]!], ratios: [], headline: null });
+  setLanguage("en");
+  try {
+    await act(async () => root.render(valueView("value-summary", "codex1", "codex")));
+    await flushUntil(() => dom.host.textContent.includes("What one allowance buys"));
+    const text = dom.host.textContent;
+    expect(text).toContain("preparing");
+    expect(text).toContain("≥ $1,114");
+    expect(text).toContain("Updating: the last published cycles are shown.");
+    expect(text).not.toContain("Claude Max 20× ÷ Codex Pro");
+  } finally { await act(async () => root.unmount()); listed.mockRestore(); read.mockRestore(); dom.restore(); }
+});
+
+test("without a weekly-limit subscription the summary says so instead of drawing an empty chart", async () => {
+  const dom = installMonthDom(), root = createRoot(dom.host as unknown as Element);
+  const listed = spyOn(api, "allowanceCandidates").mockResolvedValue({ read_at: "2026-10-30T12:00:00Z", candidates: [] });
+  const read = spyOn(api, "allowanceSummary");
+  setLanguage("en");
+  try {
+    await act(async () => root.render(valueView("value-summary", "codex1", "codex")));
+    await flushUntil(() => dom.host.textContent.includes("No subscription with a weekly limit"));
+    expect(read).not.toHaveBeenCalled();
+  } finally { await act(async () => root.unmount()); listed.mockRestore(); read.mockRestore(); dom.restore(); }
+});
+
+/* ---- Value → Summary, tokens by model (UR-014 REQ-062) ---- */
+
+const group = (model: string, n: number, tokens: number, usd: number | null, perM: number | null, lower = false) => ({ model, n, cycles: [],
+  api_standard: { ...stats(usd, n, lower) }, tokens: stats(tokens, n), usd_per_million: perM, lower_bound: lower, thin: n < 2 });
+function withModels(codex: ReturnType<typeof group>[], claude: ReturnType<typeof group>[], excluded: Record<string, number> = {}): SummaryBody {
+  const body = twoSides();
+  return { ...body, sides: [{ ...body.sides[0]!, summary: { ...body.sides[0]!.summary!, models: codex, dominance_excluded: excluded } },
+    { ...body.sides[1]!, summary: { ...body.sides[1]!.summary!, models: claude } }] };
+}
+async function renderModels(body: SummaryBody, check: (text: string) => void) {
+  const dom = installMonthDom(), root = createRoot(dom.host as unknown as Element);
+  const listed = spyOn(api, "allowanceCandidates").mockResolvedValue(candidates as never);
+  const read = spyOn(api, "allowanceSummary").mockResolvedValue(body);
+  setLanguage("en");
+  try {
+    await act(async () => root.render(valueView("value-summary", "codex1", "codex")));
+    await flushUntil(() => dom.host.textContent.includes("One allowance in tokens"));
+    check(dom.host.textContent);
+  } finally { await act(async () => root.unmount()); listed.mockRestore(); read.mockRestore(); dom.restore(); }
+}
+
+test("the model card shows tokens and dollars per allowance by dominant model, bounds and gaps included", async () => {
+  await renderModels(withModels([group("gpt-6.1-sol", 5, 6.32e9, 1085, 0.192, true), group("gpt-6-astra", 9, 1.65e9, 1298, 0.813, true), group("gpt-5.4", 1, 2e7, 13, 0.5)],
+    [group("claude-opus-5-5", 6, 6.57e9, null, null)], { below_threshold: 3 }), text => {
+    expect(text).toContain("mostly gpt-6.1-sol · 5 cycles");
+    expect(text).toContain("6.32B");
+    expect(text).toContain("≥ $1,085 · $0.192");
+    expect(text).toContain("mostly claude-opus-5-5 · 6 cycles");
+    expect(text).toContain("no price");
+    expect(text).not.toContain("$0 ·");
+    // A single-cycle group is left out of the rows and counted in the card's help instead.
+    expect(text).not.toContain("mostly gpt-5.4");
+    expect(text).toContain("1 groups with one cycle left out");
+    expect(text).toContain("3 weeks without one model at 70%");
+  });
+});
+
+test("the model card says why it is empty instead of drawing nothing", async () => {
+  await renderModels(withModels([group("gpt-5.4", 1, 2e7, 13, 0.5)], []), text => expect(text).toContain("Only single-cycle groups"));
+  await renderModels(withModels([], []), text => expect(text).toContain("No week with one model at 70% of its value"));
+});
+
+test("an open cycle that is a lower bound keeps its ≥, and a tokens-only range says it has no priced week", async () => {
+  const body = twoSides();
+  const codex = body.sides[0]!.summary!;
+  await renderModels({ ...body, sides: [{ ...body.sides[0]!, summary: { ...codex, partial: { ...codex.partial!, lower_bound: true } } }, body.sides[1]!] },
+    text => expect(text).toContain("~≥ $1,253"));
+  const unpriced = { ...month("2026-10", 0, 3), api_standard: stats(null, 0) };
+  const tokensOnly = { ...body, sides: [{ ...body.sides[0]!, summary: { ...summary([unpriced]), models: [] } }], ratios: [], headline: null };
+  const dom = installMonthDom(), root = createRoot(dom.host as unknown as Element);
+  const listed = spyOn(api, "allowanceCandidates").mockResolvedValue(candidates as never);
+  const read = spyOn(api, "allowanceSummary").mockResolvedValue(tokensOnly);
+  setLanguage("en");
+  try {
+    await act(async () => root.render(valueView("value-summary", "codex1", "codex")));
+    await flushUntil(() => dom.host.textContent.includes("No priced week in this range"));
+    expect(findByAttribute(dom.host, "aria-label", "What one allowance buys by month")).toBeNull();
+    await invoke(findByText(dom.host, "BUTTON", "Tokens")!, "onClick");
+    await flushUntil(() => findByAttribute(dom.host, "aria-label", "What one allowance buys by month") !== null);
+    expect(dom.host.textContent).not.toContain("No priced week in this range");
+  } finally { await act(async () => root.unmount()); listed.mockRestore(); read.mockRestore(); dom.restore(); }
 });

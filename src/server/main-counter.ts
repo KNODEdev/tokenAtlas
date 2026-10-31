@@ -41,8 +41,11 @@ export function mainCounterOf(counters: readonly Counter[]): Counter | null {
  * Without a fitting counter, the account's main counter.
  */
 export function mainCounterFor(counters: readonly Counter[], free: boolean): Counter | null {
-  const fits = (c: Counter) => !c.plans || (!c.plans.free && !c.plans.paid) || (free ? c.plans.free : c.plans.paid);
-  return mainCounterOf(counters.filter(fits)) ?? mainCounterOf(counters);
+  return mainCounterOf(counters.filter(c => counterFitsPlan(c, free))) ?? mainCounterOf(counters);
+}
+/** Whether a counter's windows could belong to a Free (or a paid) cycle; one without known plans fits both. */
+export function counterFitsPlan(c: Counter, free: boolean): boolean {
+  return !c.plans || (!c.plans.free && !c.plans.paid) || (free ? c.plans.free : c.plans.paid);
 }
 
 /** The distinct main counters of an account's Free and paid cycles. */

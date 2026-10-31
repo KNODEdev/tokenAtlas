@@ -1,0 +1,20 @@
+/* Value → Summary: the unit chip with its help, month names and ratios over the bars, the open cycle as an outline. */
+.allowance-head { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-6) var(--s-9) 0; }
+.allowance-summary .ui-kpi-strip { margin: var(--s-4) var(--s-9) 0; }
+.allowance-swatch { display: inline-block; width: 10px; height: 10px; border-radius: var(--r-dot); }
+.allowance-month { font-family: var(--font-sans); font-size: var(--fs-4); font-weight: var(--fw-semibold); fill: var(--text); }
+.allowance-ratio { font-family: var(--font-figure); font-size: var(--fs-3); font-weight: var(--fw-semibold); }
+.allowance-partial { stroke-width: 1.6; stroke-dasharray: 5 4; }
+.muc-tick.allowance-thin { fill: var(--faint); }
+/* Card C: one row per subscription and dominant model; the token bar is hatched like the month chart's bars. */
+.allowance-models { margin-top: var(--s-8); }
+.allowance-model-rows { display: grid; gap: var(--s-5); margin-top: var(--s-4); }
+.allowance-model-row { display: grid; grid-template-columns: minmax(180px, 26%) 1fr minmax(170px, auto); align-items: center; gap: var(--s-6); }
+.allowance-model-row.is-head { color: var(--faint); font-size: var(--fs-2); }
+.allowance-model-row.is-head > :last-child { text-align: right; }
+.allowance-model-name { display: grid; gap: var(--s-1); min-width: 0; }
+.allowance-model-name span { color: var(--muted); font-size: var(--fs-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.allowance-model-bar { display: flex; align-items: center; gap: var(--s-4); min-width: 0; }
+.allowance-model-bar i { display: block; height: 24px; min-width: 2px; border-radius: 0 var(--r-bar) var(--r-bar) 0; background-image: var(--hatch-fill); }
+.allowance-model-bar b { flex-shrink: 0; font-size: var(--fs-4); }
+.allowance-model-dollars { text-align: right; font-size: var(--fs-3); }
