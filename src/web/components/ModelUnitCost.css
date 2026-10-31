@@ -32,3 +32,11 @@
 .muc-tick.is-thin { font-style: italic; }
 .muc-row { transition: opacity 120ms ease; }
 .muc-row.is-dim { opacity: 0.28; }
+/* The price table: a two-line model cell, our average as a bar on one scale, the dearest model on a brick wash. */
+.muc-model { display: flex; align-items: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.muc-meta { margin-left: calc(8px + var(--s-3)); color: var(--faint); font-size: var(--fs-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.muc-average-cell { display: flex; align-items: center; gap: var(--s-4); }
+.muc-average-cell .ui-bar { flex: 1; min-width: 0; }
+.muc-average-value { flex-shrink: 0; min-width: 56px; text-align: right; font-weight: var(--fw-semibold); }
+.muc-average-value.is-busy { color: var(--accent); }
+tr.muc-row-dearest > td { background: var(--crit-soft); }

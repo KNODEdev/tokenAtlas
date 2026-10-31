@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { CodexAccountingReport } from "../../shared/codex-accounting";
 import type { SubscriptionModelDetail } from "../../shared/subscription-accounting";
-import { costLines, costPresets, ladderRows, modelLine, modelUnitCosts, modelVersion, type ModelUnitCost } from "./model-unit-cost";
-import { modelColorsByTokens, vendorShade } from "./model-colors";
+import { costLines, costPresets, costTableEmphasis, ladderRows, modelLine, modelProvider, modelUnitCosts, modelVersion, tokensPerThousandUsd, type ModelUnitCost } from "./model-unit-cost";
+import { modelColorsByTokens, modelVendor, vendorShade } from "./model-colors";
 
 type Row = CodexAccountingReport["breakdown"][number];
 type Coverage = Row["normalization"]["standard_api_usd"];
@@ -90,5 +90,29 @@ describe("costLines", () => {
     expect(lines[1]!.bars.map(bar => [bar.thin, bar.base, bar.change])).toEqual([[true, false, null], [false, true, null]]);
     expect(lines[2]!.bars[1]!.change).toBeCloseTo(-0.75);
     expect(lines[3]!.bars[0]).toMatchObject({ base: false, thin: false, change: null });
+  });
+});
+
+describe("price table", () => {
+  const row = (model: string | null, perMillion: number | null, tokens: number): ModelUnitCost =>
+    ({ model, tokens, pricedTokens: tokens, apiUsd: perMillion === null ? null : perMillion * tokens / 1e6, perMillion, partial: false, rates: null });
+  test("tokens per $1k is 1e9 ÷ cost per 1M, and nothing without a positive cost", () => {
+    // $1.31 per 1M buys 763M tokens per $1,000; $0.178 buys 5.6B (the reference table).
+    expect(Math.round(tokensPerThousandUsd(1.31)! / 1e6)).toBe(763);
+    expect(tokensPerThousandUsd(0.178)! / 1e9).toBeCloseTo(5.618, 3);
+    expect(tokensPerThousandUsd(null)).toBeNull();
+    expect(tokensPerThousandUsd(0)).toBeNull();
+  });
+  test("the dearest priced model and the two busiest priced ones are picked out", () => {
+    const emphasis = costTableEmphasis([row("gpt-6-astra", 1.31, 7e9), row("gpt-6.1-sol", 0.178, 71e9), row("claude-opus-5-5", 0.36, 34e9),
+      row("free-model", 0, 90e9), row(null, null, 200e9), row("codex-auto-review", null, 150e9)]);
+    expect(emphasis.dearest).toBe("gpt-6-astra");
+    // Unnamed and unpriced rows never count; a $0 model can still be among the busiest.
+    expect([...emphasis.busiest]).toEqual(["free-model", "gpt-6.1-sol"]);
+    expect(costTableEmphasis([row(null, 2, 1), row("x", 0, 1)]).dearest).toBeNull();
+  });
+  test("a model's provider follows its name", () => {
+    expect(["gpt-6-astra", "claude-opus-5-5", "gemini-3-pro", "unknown"].map(model => modelProvider(modelVendor(model))))
+      .toEqual(["codex", "claude", "gemini", null]);
   });
 });

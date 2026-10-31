@@ -182,3 +182,24 @@ export function costLines(rows: readonly ModelUnitCost[]): CostLine[] {
   const peak = (line: CostLine) => Math.max(...line.bars.map(bar => bar.row.perMillion!));
   return lines.sort((a, b) => Number(b.bars.length > 1) - Number(a.bars.length > 1) || peak(b) - peak(a));
 }
+
+/* ---- The price table: list prices beside our average (UR-014 REQ-058) ---- */
+
+/** Tokens one $1,000 of API value buys at this cost per 1M; null without a positive cost (no rate, or free). */
+export function tokensPerThousandUsd(perMillion: number | null): number | null {
+  return perMillion !== null && Number.isFinite(perMillion) && perMillion > 0 ? 1e9 / perMillion : null;
+}
+
+/** Rows the table picks out: the dearest priced model on our mix, and the two priced models with the most tokens. */
+export function costTableEmphasis(rows: readonly ModelUnitCost[]): { dearest: string | null; busiest: Set<string> } {
+  // An unpriced model has no average to colour, so it never takes a busiest place.
+  const named = rows.filter(row => row.model !== null && row.perMillion !== null);
+  const dearest = ladderRows(named).reduce<ModelUnitCost | null>((top, row) => !top || row.perMillion! > top.perMillion! ? row : top, null);
+  return { dearest: dearest?.model ?? null, busiest: new Set([...named].sort((a, b) => b.tokens - a.tokens).slice(0, 2).map(row => row.model!)) };
+}
+
+const FAMILY_PROVIDER: Readonly<Record<string, string>> = { anthropic: "claude", openai: "codex", google: "gemini", xai: "grok", zai: "glm" };
+/** The provider a model's name belongs to (claude, codex, …), as the capacity screens name them; null when unknown. */
+export function modelProvider(family: string | null): string | null {
+  return family ? FAMILY_PROVIDER[family] ?? null : null;
+}

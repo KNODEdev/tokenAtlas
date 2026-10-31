@@ -2,13 +2,15 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { CodexAccountingReport } from "../../shared/codex-accounting";
 import { useI18n } from "../lib/i18n";
 import { compact, full, usageModelLabel, usd } from "../lib/format";
-import { COST_BUSIEST, COST_ORDER_KEY, COST_PICKED_KEY, COST_PRESET_SIZE, THIN_SAMPLE_TOKENS, costLines, costPresets, ladderRows, modelUnitCosts, modelVersion,
+import { COST_BUSIEST, COST_ORDER_KEY, COST_PICKED_KEY, COST_PRESET_SIZE, THIN_SAMPLE_TOKENS, costLines, costPresets, costTableEmphasis, ladderRows, modelProvider, modelUnitCosts, modelVersion,
+  tokensPerThousandUsd,
   type CostLine, type ListRates, type ModelUnitCost as UnitCostRow } from "../lib/model-unit-cost";
 import { storedPicks, writePicks } from "../lib/model-speed";
-import { modelColorsByTokens } from "../lib/model-colors";
+import { modelColorsByTokens, modelVendor } from "../lib/model-colors";
+import { providerName } from "../lib/capacity-compare";
 import { AccountPeriodDrawer } from "./AccountPeriodDrawer";
 import { ChartExport } from "./ChartExport";
-import { GhostButton, HelpBlock, HelpDot, Table, TableColGroup, TableRow, Tabs, Td, Th } from "./ui";
+import { Bar, GhostButton, HelpBlock, HelpDot, Table, TableColGroup, TableRow, Tabs, Td, Th } from "./ui";
 import { Kpi, KpiRow, unit, useWidth } from "./WindowStatusCard";
 import { barPath, niceStep, textWidth } from "../lib/bar-chart";
 import "../screens/History.css";
@@ -358,36 +360,69 @@ function CostBars({ rows, lines, colors, average, label, highlight }: {
   </div>;
 }
 
-function UnitCostTable({ rows, colors, label }: { rows: UnitCostRow[]; colors: Map<string | null, string>; label: (model: string | null) => string }) {
+/**
+ * Each model's list prices beside what it cost on our traffic, with how many tokens $1,000 of allowance buys at that
+ * cost. A named export so a summary card can reuse it without the charts above.
+ */
+export function UnitCostTable({ rows, colors, label }: { rows: UnitCostRow[]; colors: Map<string | null, string>; label: (model: string | null) => string }) {
   const { t, locale } = useI18n();
   const rate = (row: UnitCostRow, part: Part) => row.rates?.[part] ?? null;
+  const peak = Math.max(0, ...rows.map(row => row.perMillion ?? 0));
+  const { dearest, busiest } = costTableEmphasis(rows);
+  const missing = (text: string) => <span className="ui-missing">{text}</span>;
   return <section aria-label={t("Cost per 1M and list prices", "Koszt 1M i cennik")}>
-    <Table tableId="ModelUnitCost:0" defaultSort={{ column: "c3", direction: "desc" }} fixed><TableColGroup>
-      <col /><col style={{ width: 76 }} /><col style={{ width: 92 }} /><col style={{ width: 84 }} /><col style={{ width: 72 }} />
-      {PARTS.map(part => <col key={part} style={{ width: 84 }} />)}
+    <div className="archive-head">
+      <div><b>{t("Cost per 1M and list prices", "Koszt 1M i cennik")}</b> <span className="archive-sub">· {t("list price per 1M · our average on our mix", "cena katalogowa za 1M · nasza średnia na naszym miksie")}</span>{" "}
+        <HelpDot label={t("Cost per 1M and list prices", "Koszt 1M i cennik")}>
+          <HelpBlock>{t("List prices are the latest Standard API rates in the range, in USD per 1M. Cache read is in bold: most agent tokens are cache reads, so it sets the cost.", "Ceny katalogowe to najnowsze stawki Standard API z zakresu, w USD za 1M. Odczyt cache jest pogrubiony: większość tokenów agenta to odczyty cache, więc to on ustala koszt.")}</HelpBlock>
+          <HelpBlock>{t("Our average is the Standard API value of the model's priced tokens divided by them: cache, input and output in our own mix. Tokens per $1k is how many of them $1,000 of allowance buys at that average.", "Nasza średnia to wartość Standard API wycenionych tokenów modelu podzielona przez nie: cache, input i output w naszym miksie. Tokeny za $1k to liczba tokenów, jaką $1000 limitu kupuje przy tej średniej.")}</HelpBlock>
+          <HelpBlock>{t("The dearest model on our mix is shaded; the two models with the most tokens have their average in colour.", "Najdroższy model na naszym miksie jest wyróżniony tłem; dwa modele z największą liczbą tokenów mają średnią w kolorze.")}</HelpBlock>
+        </HelpDot></div>
+    </div>
+    <Table tableId="ModelUnitCost:1" defaultSort={{ column: "c5", direction: "desc" }} fixed><TableColGroup>
+      <col />{PARTS.map(part => <col key={part} style={{ width: 66 }} />)}
+      <col style={{ width: 156 }} /><col style={{ width: 100 }} /><col style={{ width: 70 }} /><col style={{ width: 84 }} />
     </TableColGroup><thead><TableRow header>
       <Th columnId="c0">{t("Model", "Model")}</Th>
-      <Th columnId="c1" align="right">{t("Tokens", "Tokeny")}</Th>
-      <Th columnId="c2" align="right" title={t("Standard API rates; ≥ = known part", "Stawki Standard API; ≥ = znana część")}>API-eq</Th>
-      <Th columnId="c3" align="right" title={t("API-eq of the priced tokens per 1M of them", "API-eq wycenionych tokenów na 1M z nich")}>{t("Actual /1M", "Rzecz. /1M")}</Th>
-      <Th columnId="c4" align="right" title={t("Actual per 1M divided by the fresh-input price", "Rzeczywisty koszt 1M podzielony przez cenę świeżego inputu")}>{t("× input", "× input")}</Th>
-      {PARTS.map((part, index) => <Th key={part} columnId={`c${5 + index}`} align="right" title={t("List price, USD per 1M", "Cena cennikowa, USD za 1M")}>{partLabel(part, t)}</Th>)}
+      {PARTS.map((part, index) => <Th key={part} columnId={`c${1 + index}`} align="right" title={t("List price, USD per 1M", "Cena katalogowa, USD za 1M")}>{partLabel(part, t)}</Th>)}
+      <Th columnId="c5" title={t("API-eq of the priced tokens per 1M of them", "API-eq wycenionych tokenów na 1M z nich")}>{t("Our average /1M", "Nasza średnia /1M")}</Th>
+      <Th columnId="c6" align="right" title={t("Tokens $1,000 of allowance buys at our average", "Tokeny, które $1000 limitu kupuje przy naszej średniej")}>{t("Tokens per $1k", "Tokeny za $1k")}</Th>
+      <Th columnId="c7" align="right">{t("Tokens", "Tokeny")}</Th>
+      <Th columnId="c8" align="right" title={t("Standard API rates; ≥ = known part", "Stawki Standard API; ≥ = znana część")}>API-eq</Th>
     </TableRow></thead><tbody>
       {rows.map(row => {
         const input = rate(row, "input");
         const ratio = row.perMillion !== null && input ? row.perMillion / input : null;
-        return <TableRow key={row.model ?? ""}>
-          <Td sortValue={row.model ?? ""} style={{ overflow: "hidden", textOverflow: "ellipsis" }} title={row.model ?? undefined}>
-            <span className="muc-swatch" style={{ background: colors.get(row.model) ?? "var(--muted)" }} />
-            {row.model == null ? <span className="models-muted">{label(null)}</span> : <span className="mono">{row.model}</span>}
+        const perThousand = tokensPerThousandUsd(row.perMillion);
+        const provider = modelProvider(modelVendor(row.model));
+        const color = colors.get(row.model) ?? "var(--muted)";
+        // The average is API-eq ÷ priced tokens, not a lower bound: a partial row says so instead of carrying ≥.
+        const averageTitle = [
+          ...(row.partial ? [t("priced tokens only", "tylko wycenione tokeny")] : []),
+          ...(ratio !== null ? [t("{0} the fresh-input price", `${ratioText(ratio, locale)} ceny świeżego inputu`, [ratioText(ratio, locale)])] : []),
+        ].join(" · ") || undefined;
+        const meta = [provider ? providerName(provider) : null,
+          row.rates?.changed ? t("prices changed in the range; the latest are shown", "ceny zmieniły się w zakresie; pokazane są najnowsze") : null].filter(Boolean).join(" · ");
+        return <TableRow key={row.model ?? ""} className={row.model !== null && row.model === dearest ? "muc-row-dearest" : undefined}>
+          <Td sortValue={row.model ?? ""} title={row.model ?? undefined}>
+            <div className="muc-model"><span className="muc-swatch" style={{ background: color }} />
+              {row.model == null ? <span className="models-muted">{label(null)}</span> : <span className="mono">{row.model}</span>}</div>
+            {meta && <div className="muc-meta">{meta}</div>}
           </Td>
+          {PARTS.map(part => <Td key={part} sortValue={rate(row, part)} mono align="right">
+            {rate(row, part) === null ? missing(t("none", "brak"))
+              : part === "cacheRead" ? <b>{perMillionText(rate(row, part), locale)}</b> : perMillionText(rate(row, part), locale)}</Td>)}
+          <Td sortValue={row.perMillion} title={averageTitle}>
+            {row.perMillion === null ? missing(t("no rate", "brak stawki"))
+              : <div className="muc-average-cell">
+                <Bar value={peak > 0 ? row.perMillion / peak * 100 : 0} color={color} />
+                <span className={`mono muc-average-value${row.model !== null && busiest.has(row.model) ? " is-busy" : ""}`}>{perMillionText(row.perMillion, locale)}</span>
+              </div>}
+          </Td>
+          <Td sortValue={perThousand} mono align="right" title={perThousand !== null ? full(Math.round(perThousand)) : undefined}>
+            {perThousand !== null ? compact(perThousand) : row.perMillion === null ? missing(t("no rate", "brak stawki")) : missing(t("no cost", "bez kosztu"))}</Td>
           <Td sortValue={row.tokens} mono align="right" title={full(row.tokens)}>{compact(row.tokens)}</Td>
-          <Td sortValue={row.apiUsd} mono align="right">{row.apiUsd === null ? <span className="models-muted">{t("no rate", "brak stawki")}</span> : `${row.partial ? "≥ " : ""}${usd(row.apiUsd)}`}</Td>
-          <Td sortValue={row.perMillion} mono align="right" title={row.partial ? t("priced tokens only", "tylko wycenione tokeny") : undefined}><b>{perMillionText(row.perMillion, locale)}</b></Td>
-          <Td sortValue={ratio} mono align="right">{ratioText(ratio, locale)}</Td>
-          {PARTS.map(part => <Td key={part} sortValue={rate(row, part)} mono align="right"
-            title={row.rates?.changed ? t("Prices changed in the range; the latest are shown.", "Ceny zmieniły się w zakresie; pokazane są najnowsze.") : undefined}>
-            {perMillionText(rate(row, part), locale)}{row.rates?.changed && part === "output" ? " *" : ""}</Td>)}
+          <Td sortValue={row.apiUsd} mono align="right">{row.apiUsd === null ? missing(t("no rate", "brak stawki")) : `${row.partial ? "≥ " : ""}${usd(row.apiUsd)}`}</Td>
         </TableRow>;
       })}
     </tbody></Table>
