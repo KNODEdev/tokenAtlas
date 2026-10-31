@@ -3,6 +3,7 @@ import type { Database } from "../db/sqlite";
 import { database, settle as prepareSums, card, sources, opened } from "./window-usage-codex.fixture";
 import { ensureCapacityCycleResults, markCapacityCycleResultsDirty } from "../db/capacity-cycle-results";
 import { advanceCapacityCycleResults } from "./capacity-cycle-producer";
+import * as cycles from "./capacity-cycles";
 import { handleCapacityCycles } from "./capacity-cycles";
 import { handleAllowanceSummary } from "./allowance-summary";
 import { DATA_VIEWS, serveDataView } from "./data-views";
@@ -110,5 +111,46 @@ test("rejects bad input with a reason before reading cycles", async () => {
     // A chosen scoped weekly sub-limit is a weekly counter the account has, so it is allowed.
     const scoped = await handleAllowanceSummary(ctx, summaryUrl(`a=claude1&a_counter=${encodeURIComponent(CLAUDE_COUNTERS[1]!)}&since=2026-09-01&until=2026-09-21`), NOW);
     expect(scoped.status).toBe(200);
+  } finally { close(db); }
+});
+
+test("a side whose read fails is that side's error: the other side and the candidate list stay", async () => {
+  const db = database(), ctx = context(db);
+  const original = cycles.handleCapacityCycles;
+  // An unreadable manual-capacity file throws inside the Claude account's read, as readManualCapacity does.
+  const spy = spyOn(cycles, "handleCapacityCycles").mockImplementation((context, url, selection) => {
+    if (selection?.account === "claude1") throw Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
+    return original(context, url, selection);
+  });
+  try {
+    prepareSums(db); ensureCapacityCycleResults(db); settle(ctx); claudeCounters(db);
+    const response = await handleAllowanceSummary(ctx, summaryUrl("a=codex1&b=claude1&since=2026-09-01&until=2026-09-21"), NOW);
+    expect(response.status).toBe(200);
+    const body = await response.json() as AllowanceSummaryResponse;
+    expect(body.sides.map(side => [side.account, side.state])).toEqual([["codex1", "current"], ["claude1", "error"]]);
+    expect(body.sides[1]!.error).toContain("EACCES");
+    expect(body.sides[0]!.summary).not.toBeNull();
+    const listed = await (await handleAllowanceSummary(ctx, summaryUrl("candidates=1"), NOW)).json() as AllowanceCandidatesResponse;
+    expect(listed.candidates.map(candidate => [candidate.account, candidate.state])).toEqual([["codex1", "current"], ["claude1", "error"]]);
+    // Once the file is readable again the same request answers normally.
+    spy.mockImplementation(original);
+    const again = await (await handleAllowanceSummary(ctx, summaryUrl("a=codex1&b=claude1&since=2026-09-01&until=2026-09-21"), NOW)).json() as AllowanceSummaryResponse;
+    expect(again.sides[1]!.state).toBe("preparing");
+  } finally { spy.mockRestore(); close(db); }
+});
+
+test("an account whose only weekly meter belongs to the Free plan is neither resolved nor listed", async () => {
+  const db = database(), ctx = context(db);
+  try {
+    prepareSums(db); ensureCapacityCycleResults(db); settle(ctx);
+    db.query(`INSERT INTO limit_windows(provider,account,counter,seq,window_id,start_ts,end_ts,reset_ts,cycle_end_basis,window_minutes,plan,plan_detail,
+        plan_mismatch,readings,manual,start_drop,end_drop,seen_reset,last_input)
+      VALUES('claude','claude1',?,0,'w0','2026-09-01T00:00:00Z','2026-09-08T00:00:00Z','2026-09-08T00:00:00Z','scheduled',10080,'free',NULL,0,'[]',NULL,NULL,NULL,0,'')`)
+      .run(CLAUDE_COUNTERS[0]!);
+    const response = await handleAllowanceSummary(ctx, summaryUrl("a=claude1&since=2026-09-01&until=2026-09-21"), NOW);
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as { error: string }).error).toContain("No weekly counter");
+    const listed = await (await handleAllowanceSummary(ctx, summaryUrl("candidates=1"), NOW)).json() as AllowanceCandidatesResponse;
+    expect(listed.candidates.map(candidate => candidate.account)).toEqual(["codex1"]);
   } finally { close(db); }
 });

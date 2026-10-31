@@ -295,3 +295,24 @@ test("the model card says why it is empty instead of drawing nothing", async () 
   await renderModels(withModels([group("gpt-5.4", 1, 2e7, 13, 0.5)], []), text => expect(text).toContain("Only single-cycle groups"));
   await renderModels(withModels([], []), text => expect(text).toContain("No week with one model at 70% of its value"));
 });
+
+test("an open cycle that is a lower bound keeps its ≥, and a tokens-only range says it has no priced week", async () => {
+  const body = twoSides();
+  const codex = body.sides[0]!.summary!;
+  await renderModels({ ...body, sides: [{ ...body.sides[0]!, summary: { ...codex, partial: { ...codex.partial!, lower_bound: true } } }, body.sides[1]!] },
+    text => expect(text).toContain("~≥ $1,253"));
+  const unpriced = { ...month("2026-10", 0, 3), api_standard: stats(null, 0) };
+  const tokensOnly = { ...body, sides: [{ ...body.sides[0]!, summary: { ...summary([unpriced]), models: [] } }], ratios: [], headline: null };
+  const dom = installMonthDom(), root = createRoot(dom.host as unknown as Element);
+  const listed = spyOn(api, "allowanceCandidates").mockResolvedValue(candidates as never);
+  const read = spyOn(api, "allowanceSummary").mockResolvedValue(tokensOnly);
+  setLanguage("en");
+  try {
+    await act(async () => root.render(valueView("value-summary", "codex1", "codex")));
+    await flushUntil(() => dom.host.textContent.includes("No priced week in this range"));
+    expect(findByAttribute(dom.host, "aria-label", "What one allowance buys by month")).toBeNull();
+    await invoke(findByText(dom.host, "BUTTON", "Tokens")!, "onClick");
+    await flushUntil(() => findByAttribute(dom.host, "aria-label", "What one allowance buys by month") !== null);
+    expect(dom.host.textContent).not.toContain("No priced week in this range");
+  } finally { await act(async () => root.unmount()); listed.mockRestore(); read.mockRestore(); dom.restore(); }
+});

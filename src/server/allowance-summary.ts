@@ -20,8 +20,8 @@ const CODEX_WEEKLY = CODEX_COUNTERS[WEEKLY_MINUTES].id;
 /** The account's main weekly counter on a paid plan: never a scoped sub-limit, never a longer Free meter. */
 function mainWeeklyCounter(ctx: AppContext, provider: string, account: string): string | null {
   if (provider === "codex") return CODEX_WEEKLY;
-  const weekly = countersOf(ctx.sqlite, provider, account).filter(c => c.minutes === WEEKLY_MINUTES);
-  return (mainCounterOf(weekly.filter(c => counterFitsPlan(c, false))) ?? mainCounterOf(weekly))?.id ?? null;
+  const weekly = countersOf(ctx.sqlite, provider, account).filter(c => c.minutes === WEEKLY_MINUTES && counterFitsPlan(c, false));
+  return mainCounterOf(weekly)?.id ?? null;
 }
 function weeklyCounters(ctx: AppContext, provider: string, account: string): string[] {
   return provider === "codex" ? [CODEX_WEEKLY] : countersOf(ctx.sqlite, provider, account).filter(c => c.minutes === WEEKLY_MINUTES).map(c => c.id);
@@ -33,6 +33,11 @@ async function weeklyEntries(ctx: AppContext, url: URL, since: string, until: st
   const response = handleCapacityCycles(ctx, request, { ...(account ? { account } : {}), allowStale: true });
   if (response.status !== 200) throw new Error(((await response.json()) as { error?: string }).error ?? `capacity cycles ${response.status}`);
   return ((await response.json()) as CapacityCyclesResponse).accounts;
+}
+/** One account's entries, or the reason its read failed; another account's failure never reaches this one. */
+async function accountEntries(ctx: AppContext, url: URL, since: string, until: string, account: string): Promise<CapacityCyclesEntry[] | { error: string }> {
+  try { return await weeklyEntries(ctx, url, since, until, account); }
+  catch (error) { return { error: error instanceof Error ? error.message : String(error) }; }
 }
 function stateOf(entry: CapacityCyclesEntry | undefined): AllowanceSideState {
   return !entry || entry.unavailable ? "unavailable" : entry.error ? "error" : entry.preparing ? "preparing" : entry.stale ? "updating" : "current";
@@ -71,7 +76,12 @@ export async function handleAllowanceSummary(ctx: AppContext, url: URL, now = Da
   const sides: AllowanceSide[] = [];
   for (const pick of picks) {
     const provider = subjects.get(pick.account)!;
-    const rows = (await weeklyEntries(ctx, url, since, until, pick.account)).filter(row => row.provider === provider);
+    const read = await accountEntries(ctx, url, since, until, pick.account);
+    if (!Array.isArray(read)) {
+      sides.push({ provider, account: pick.account, counter: pick.counter!, counter_label: "", state: "error", error: read.error, summary: null });
+      continue;
+    }
+    const rows = read.filter(row => row.provider === provider);
     // Before any cycle is published a provider answers once for the account, without a counter.
     const entry = rows.find(row => row.counter === pick.counter) ?? rows.find(row => row.counter === "");
     const state = stateOf(entry);
@@ -88,13 +98,18 @@ export async function handleAllowanceSummary(ctx: AppContext, url: URL, now = Da
 
 async function candidates(ctx: AppContext, url: URL, subjects: Map<string, string>, readAt: string, now: number): Promise<Response> {
   const since = dayOf(now - 31 * 86_400_000), until = dayOf(now), from = Date.parse(`${since}T00:00:00Z`);
-  const entries = await weeklyEntries(ctx, url, since, until);
   const list: AllowanceCandidate[] = [];
   for (const [account, provider] of subjects) {
     if (account.endsWith("::business")) continue;
     const counter = mainWeeklyCounter(ctx, provider, account);
     if (!counter) continue;
-    const rows = entries.filter(row => row.account === account && row.provider === provider);
+    // Read per account, so one unreadable account is listed as an error and the others stay choosable.
+    const read = await accountEntries(ctx, url, since, until, account);
+    if (!Array.isArray(read)) {
+      list.push({ provider, account, counter, counter_label: "", state: "error", plan: null, plan_label: null, usd_per_month: null, recent_cycles: 0 });
+      continue;
+    }
+    const rows = read.filter(row => row.account === account && row.provider === provider);
     const entry = rows.find(row => row.counter === counter) ?? rows.find(row => row.counter === "");
     const windows = entry?.windows ?? [];
     const latest = [...windows].sort((x, y) => Date.parse(y.cycle_start ?? y.start) - Date.parse(x.cycle_start ?? x.start))[0];

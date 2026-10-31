@@ -85,6 +85,10 @@ function SummaryBody({ sides, ratios, headline, unit, format, counterLabel, sinc
     : view.side.state === "error" ? t("unavailable: {0}", `niedostępne: ${view.side.error ?? ""}`, [view.side.error ?? ""])
     : t("no measured week", "brak zmierzonego tygodnia");
   const updating = sides.some(view => view.side.state === "updating");
+  const valued = (view: SideView, which: AllowanceUnit) => !!view.side.summary
+    && (view.side.summary.months.some(month => month[which].median !== null) || view.side.summary.partial?.[which] != null);
+  // A month that holds tokens only draws nothing in dollars: chart and export follow the chosen unit.
+  const charted = sides.some(view => valued(view, unit)), measured = sides.some(view => valued(view, "tokens") || valued(view, "api_standard"));
   const excluded = sides.flatMap(view => Object.entries(view.side.summary?.excluded ?? {}).map(([reason, count]) => `${view.name}: ${reason.replace(/_/g, " ")} ${count}`));
   const notes = sides.flatMap(view => {
     const note = view.side.summary?.notes;
@@ -115,14 +119,15 @@ function SummaryBody({ sides, ratios, headline, unit, format, counterLabel, sinc
       })}
     </KpiRow>
     <div className="global-capacity-body">
-      <ChartExport title={t("What one allowance buys", "Co kupuje jeden limit")} available={sides.some(view => view.side.summary?.months.length)}>
+      <ChartExport title={t("What one allowance buys", "Co kupuje jeden limit")} available={charted}>
         <section className="models-chart" aria-label={t("What one allowance buys", "Co kupuje jeden limit")}>
           <div className="archive-head">
             <div><b>{t("What one allowance buys", "Co kupuje jeden limit")}</b> <span className="archive-sub">· {capacityUnitLabel(unit, t)} · {t("median per month", "mediana miesiąca")} · {since} – {until} UTC</span></div>
             <div className="archive-legend">{sides.map(view => <span key={view.side.account}><i className="allowance-swatch" style={{ background: view.color }} />{view.name}</span>)}</div>
           </div>
-          {sides.some(view => view.side.summary?.months.length || view.side.summary?.partial)
-            ? <MonthsChart sides={sides} ratios={ratios} unit={unit} format={format} t={t} locale={locale} />
+          {charted ? <MonthsChart sides={sides} ratios={ratios} unit={unit} format={format} t={t} locale={locale} />
+            : measured && unit === "api_standard" ? <EmptyState title={t("No priced week in this range", "Brak wycenionego tygodnia w tym zakresie")}
+              detail={t("These weeks have tokens but no API price; switch to Tokens to compare them.", "Te tygodnie mają tokeny, ale bez ceny API; przełącz na Tokeny, aby je porównać.")} />
             : <EmptyState title={t("No measured week in this range", "Brak zmierzonego tygodnia w tym zakresie")}
               detail={t("A week counts from 40% of the meter used.", "Tydzień liczy się od 40% zużytego licznika.")} />}
         </section>
@@ -191,7 +196,7 @@ function MonthsChart({ sides, ratios, unit, format, t, locale }: {
 }) {
   const [ref, width] = useWidth(900);
   const hatchId = `allowance-hatch-${useId().replace(/:/g, "")}`;
-  const monthKeys = [...new Set(sides.flatMap(view => view.side.summary?.months.map(month => month.month) ?? []))].sort();
+  const monthKeys = [...new Set(sides.flatMap(view => view.side.summary?.months.filter(month => month[unit].median !== null).map(month => month.month) ?? []))].sort();
   const years = new Set(monthKeys.map(key => key.slice(0, 4)));
   const groups: Group[] = monthKeys.map(key => ({ key, label: monthLabel(key, locale, years.size > 1), sub: null,
     ratio: ratios.find(ratio => ratio.month === key) ?? null,
@@ -237,7 +242,8 @@ function MonthsChart({ sides, ratios, unit, format, t, locale }: {
             if (!item) return null;
             const x = first + slotIndex * (bar + gap), top = y(item.value), path = barPath(x, top, bar, bottom);
             const partial = item.partial, n = item.stats?.n ?? 0;
-            const prefix = partial ? "~" : item.stats?.lower_bound ? "≥ " : "";
+            const bound = partial ? unit === "api_standard" && partial.lower_bound : item.stats?.lower_bound;
+            const prefix = `${partial ? "~" : ""}${bound ? "≥ " : ""}`;
             const title = partial
               ? `${item.view.name} · ${t("current cycle, {0}% of the meter so far", `bieżący cykl, dotąd ${Math.round(partial.observed_pp)}% licznika`, [Math.round(partial.observed_pp)])}`
               : `${item.view.name} · ${t("median of {0}", `mediana: ${cyclesText(n, t)}`, [cyclesText(n, t)])} · ${format.full(item.stats!.min!)} – ${format.full(item.stats!.max!)}${item.plans && item.plans.length > 1 ? ` · ${item.plans.join(" → ")}` : ""}`;
