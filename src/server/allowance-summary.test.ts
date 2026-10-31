@@ -68,7 +68,7 @@ test("a recalculation keeps the last published cycles as updating, and one prepa
     const current = await (await handleAllowanceSummary(ctx, url, NOW)).json() as AllowanceSummaryResponse;
     // The Claude side resolves its account-wide weekly meter, never the scoped sub-limit or the 5-hour one.
     expect(current.sides.map(side => [side.account, side.counter, side.state])).toEqual([
-      ["codex1", "weekly", "current"], ["claude1", CLAUDE_COUNTERS[0], "preparing"]]);
+      ["codex1", "weekly", "current"], ["claude1", CLAUDE_COUNTERS[0]!, "preparing"]]);
     expect(current.sides[0]!.summary).not.toBeNull();
     expect(current.sides[1]!.summary).toBeNull();
     expect(current.ratios).toEqual([]);
@@ -91,7 +91,7 @@ test("lists candidates with their main weekly counter and recent cycles", async 
     expect(byAccount.codex1!.recent_cycles).toBeGreaterThan(0);
     // The catalog in this context prices nothing: unknown, never $0.
     expect(byAccount.codex1!.usd_per_month).toBeNull();
-    expect(byAccount.claude1).toMatchObject({ counter: CLAUDE_COUNTERS[0], state: "preparing", recent_cycles: 0 });
+    expect(byAccount.claude1).toMatchObject({ counter: CLAUDE_COUNTERS[0]!, state: "preparing", recent_cycles: 0 });
   } finally { close(db); }
 });
 
