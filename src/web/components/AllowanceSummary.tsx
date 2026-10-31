@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
-import type { AllowanceCandidate, AllowanceMonth, AllowancePartial, AllowanceRatio, AllowanceSide, AllowanceStats, AllowanceUnit } from "../../shared/allowance-summary";
+import type { AllowanceCandidate, AllowanceModelGroup, AllowanceMonth, AllowancePartial, AllowanceRatio, AllowanceSide, AllowanceStats, AllowanceUnit } from "../../shared/allowance-summary";
 import { api } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useI18n } from "../lib/i18n";
@@ -127,8 +127,60 @@ function SummaryBody({ sides, ratios, headline, unit, format, counterLabel, sinc
               detail={t("A week counts from 40% of the meter used.", "Tydzień liczy się od 40% zużytego licznika.")} />}
         </section>
       </ChartExport>
+      <ModelsCard sides={sides} since={since} until={until} t={t} locale={locale} />
     </div>
   </>;
+}
+
+/**
+ * Card C (REQ-062): one allowance in tokens by the model that carried at least 70% of a week's API Standard value, so
+ * the model, not only the plan, shows how many tokens an allowance buys. Groups of one cycle are left out.
+ */
+function ModelsCard({ sides, since, until, t, locale }: { sides: SideView[]; since: string; until: string; t: T; locale: string }) {
+  const tokens = capacityUnitFormat("tokens", locale), dollars = capacityUnitFormat("api_standard", locale);
+  const groups = sides.flatMap(view => (view.side.summary?.models ?? []).map(group => ({ view, group })));
+  const rows = groups.filter(({ group }) => !group.thin);
+  const thin = groups.length - rows.length;
+  const excluded = sides.reduce((sum, view) => sum + Object.values(view.side.summary?.dominance_excluded ?? {}).reduce((total, n) => total + (n ?? 0), 0), 0);
+  const peak = Math.max(1, ...rows.map(({ group }) => group.tokens.median ?? 0));
+  const per = (group: AllowanceModelGroup) => {
+    const usd = group.api_standard.median, perM = group.usd_per_million;
+    const missing = <span className="ui-missing">{t("no price", "brak ceny")}</span>;
+    const bound = group.lower_bound ? "≥ " : "";
+    return <>{usd === null ? missing : `${bound}${dollars.full(usd)}`} · {perM === null ? missing : `$${perM.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 3 })}`}</>;
+  };
+  return <ChartExport title={t("One allowance in tokens", "Jeden limit w tokenach")} available={rows.length > 0}>
+    <section className="models-chart allowance-models" aria-label={t("One allowance in tokens by model", "Jeden limit w tokenach według modelu")}>
+      <div className="archive-head">
+        <div><b>{t("One allowance in tokens: the model decides", "Jeden limit w tokenach: decyduje model")}</b> <span className="archive-sub">· {since} – {until} UTC · {t("≥ 70% of value", "≥ 70% wartości")}</span>{" "}
+          <span data-capture-exclude=""><HelpDot label={t("Tokens per allowance by model", "Tokeny na limit według modelu")}>
+            <HelpBlock>{t("Weeks where one model carried at least 70% of the API Standard value, grouped by that model: the median tokens and dollars one allowance bought, and the API value per 1M tokens of those weeks (their total value ÷ their priced tokens).",
+              "Tygodnie, w których jeden model dał co najmniej 70% wartości Standard API, pogrupowane według tego modelu: mediana tokenów i dolarów, jakie kupił jeden limit, oraz wartość API na 1M tokenów tych tygodni (ich łączna wartość ÷ wycenione tokeny).")}</HelpBlock>
+            <HelpBlock>{t("≥ marks a lower bound: some of those weeks' traffic has no price, so their model was told from the priced part.",
+              "≥ oznacza dolną granicę: część ruchu tych tygodni nie ma ceny, więc model ustalono z wycenionej części.")}</HelpBlock>
+            {(thin > 0 || excluded > 0) && <HelpBlock>{[
+              thin > 0 ? t("{0} groups with one cycle left out", `pominięte grupy z jednym cyklem: ${thin}`, [thin]) : null,
+              excluded > 0 ? t("{0} weeks without one model at 70% or without a model split", `tygodnie bez modelu z 70% albo bez podziału na modele: ${excluded}`, [excluded]) : null,
+            ].filter(Boolean).join(" · ")}</HelpBlock>}
+          </HelpDot></span></div>
+      </div>
+      {!groups.length ? <EmptyState title={t("No week with one model at 70% of its value", "Brak tygodnia, w którym jeden model dał 70% wartości")} />
+        : !rows.length ? <EmptyState title={t("Only single-cycle groups", "Tylko grupy z jednym cyklem")}
+          detail={t("A model shows once it carried two weeks.", "Model pojawi się, gdy przeważy w dwóch tygodniach.")} />
+        : <div className="allowance-model-rows">
+          <div className="allowance-model-row is-head"><span /><span>{t("tokens per allowance", "tokeny na limit")}</span><span>{t("$ per allowance · $ per 1M", "$ na limit · $ za 1M")}</span></div>
+          {rows.map(({ view, group }) => <div className="allowance-model-row" key={`${view.side.account}:${group.model}`}>
+            <div className="allowance-model-name"><b>{view.name}</b>
+              <span>{t("mostly {0} · {1}", `głównie ${group.model} · ${cyclesText(group.n, t)}`, [group.model, cyclesText(group.n, t)])}</span></div>
+            <div className="allowance-model-bar">
+              <i style={{ width: `calc((100% - 84px) * ${(group.tokens.median ?? 0) / peak})`, backgroundColor: view.color }} />
+              <b className="mono">{group.tokens.median === null ? "" : tokens.full(group.tokens.median)}</b>
+            </div>
+            <div className="mono allowance-model-dollars">{per(group)}</div>
+          </div>)}
+        </div>}
+    </section>
+  </ChartExport>;
 }
 
 interface Bar { view: SideView; value: number; stats?: AllowanceStats; partial?: AllowancePartial; plans?: string[] }
@@ -160,6 +212,10 @@ function MonthsChart({ sides, ratios, unit, format, t, locale }: {
   const slot = (width - LEFT - RIGHT) / Math.max(1, groups.length);
   // Wide enough gaps that the labels under neighbouring bars ("7 cycles", "first 55%") never touch.
   const bar = Math.min(56, slot / (sides.length + 1.6)), gap = Math.min(24, Math.max(12, slot * 0.08));
+  // Narrow bars (six months and more) keep short labels; the tooltip still says everything.
+  const narrow = bar + gap < 64;
+  const valueText = (value: number) => narrow && unit === "api_standard" && value >= 1000
+    ? `$${(value / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })}k` : format.full(value);
   return <div ref={ref}>
     <svg className="muc-svg" viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label={t("What one allowance buys by month", "Co kupuje jeden limit według miesięcy")}>
       <defs><pattern id={hatchId} width={7} height={7} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -190,10 +246,11 @@ function MonthsChart({ sides, ratios, unit, format, t, locale }: {
               {partial
                 ? <path d={path} className="allowance-partial" style={{ stroke: item.view.color, fill: `color-mix(in oklab, ${item.view.color} 16%, transparent)` }} />
                 : <><path d={path} style={{ fill: item.view.color }} /><path d={path} fill={`url(#${hatchId})`} /></>}
-              <text className="muc-value" x={x + bar / 2} y={top - 7} textAnchor="middle">{`${prefix}${format.full(item.value)}`}</text>
+              <text className="muc-value" x={x + bar / 2} y={top - 7} textAnchor="middle">{`${prefix}${valueText(item.value)}`}</text>
               <text className={`muc-tick${!partial && n < 2 ? " allowance-thin" : ""}`} x={x + bar / 2} y={bottom + 17} textAnchor="middle">
-                {partial ? t("first {0}%", `pierwsze ${Math.round(partial.observed_pp)}%`, [Math.round(partial.observed_pp)]) : cyclesText(n, t)}</text>
-              {!partial && item.plans && item.plans.length > 1 && <text className="muc-tick allowance-thin" x={x + bar / 2} y={bottom + 31} textAnchor="middle">
+                {partial ? narrow ? `${Math.round(partial.observed_pp)}%` : t("first {0}%", `pierwsze ${Math.round(partial.observed_pp)}%`, [Math.round(partial.observed_pp)])
+                  : narrow ? `n ${n}` : cyclesText(n, t)}</text>
+              {!partial && !narrow && item.plans && item.plans.length > 1 && <text className="muc-tick allowance-thin" x={x + bar / 2} y={bottom + 31} textAnchor="middle">
                 {t("plan changed", "zmiana planu")}</text>}
             </g>;
           })}

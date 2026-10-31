@@ -253,3 +253,45 @@ test("without a weekly-limit subscription the summary says so instead of drawing
     expect(read).not.toHaveBeenCalled();
   } finally { await act(async () => root.unmount()); listed.mockRestore(); read.mockRestore(); dom.restore(); }
 });
+
+/* ---- Value → Summary, tokens by model (UR-014 REQ-062) ---- */
+
+const group = (model: string, n: number, tokens: number, usd: number | null, perM: number | null, lower = false) => ({ model, n, cycles: [],
+  api_standard: { ...stats(usd, n, lower) }, tokens: stats(tokens, n), usd_per_million: perM, lower_bound: lower, thin: n < 2 });
+function withModels(codex: ReturnType<typeof group>[], claude: ReturnType<typeof group>[], excluded: Record<string, number> = {}): SummaryBody {
+  const body = twoSides();
+  return { ...body, sides: [{ ...body.sides[0]!, summary: { ...body.sides[0]!.summary!, models: codex, dominance_excluded: excluded } },
+    { ...body.sides[1]!, summary: { ...body.sides[1]!.summary!, models: claude } }] };
+}
+async function renderModels(body: SummaryBody, check: (text: string) => void) {
+  const dom = installMonthDom(), root = createRoot(dom.host as unknown as Element);
+  const listed = spyOn(api, "allowanceCandidates").mockResolvedValue(candidates as never);
+  const read = spyOn(api, "allowanceSummary").mockResolvedValue(body);
+  setLanguage("en");
+  try {
+    await act(async () => root.render(valueView("value-summary", "codex1", "codex")));
+    await flushUntil(() => dom.host.textContent.includes("One allowance in tokens"));
+    check(dom.host.textContent);
+  } finally { await act(async () => root.unmount()); listed.mockRestore(); read.mockRestore(); dom.restore(); }
+}
+
+test("the model card shows tokens and dollars per allowance by dominant model, bounds and gaps included", async () => {
+  await renderModels(withModels([group("gpt-6.1-sol", 5, 6.32e9, 1085, 0.192, true), group("gpt-6-astra", 9, 1.65e9, 1298, 0.813, true), group("gpt-5.4", 1, 2e7, 13, 0.5)],
+    [group("claude-opus-5-5", 6, 6.57e9, null, null)], { below_threshold: 3 }), text => {
+    expect(text).toContain("mostly gpt-6.1-sol · 5 cycles");
+    expect(text).toContain("6.32B");
+    expect(text).toContain("≥ $1,085 · $0.192");
+    expect(text).toContain("mostly claude-opus-5-5 · 6 cycles");
+    expect(text).toContain("no price");
+    expect(text).not.toContain("$0 ·");
+    // A single-cycle group is left out of the rows and counted in the card's help instead.
+    expect(text).not.toContain("mostly gpt-5.4");
+    expect(text).toContain("1 groups with one cycle left out");
+    expect(text).toContain("3 weeks without one model at 70%");
+  });
+});
+
+test("the model card says why it is empty instead of drawing nothing", async () => {
+  await renderModels(withModels([group("gpt-5.4", 1, 2e7, 13, 0.5)], []), text => expect(text).toContain("Only single-cycle groups"));
+  await renderModels(withModels([], []), text => expect(text).toContain("No week with one model at 70% of its value"));
+});
