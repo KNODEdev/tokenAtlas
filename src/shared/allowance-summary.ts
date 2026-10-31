@@ -194,3 +194,42 @@ export function allowanceRatios(a: AllowanceSummary, b: AllowanceSummary, unit: 
 export function allowanceHeadline(ratios: readonly AllowanceRatio[]): AllowanceRatio | null {
   return [...ratios].reverse().find(ratio => ratio.ratio !== null && ratio.min_n >= 2 && !ratio.approximate) ?? null;
 }
+
+/* ---- The read contract (`GET /api/allowance-summary`, REQ-060) ---- */
+
+export type AllowanceSideState = "current" | "updating" | "preparing" | "unavailable" | "error";
+export interface AllowanceSide {
+  provider: string;
+  account: string;
+  counter: string;
+  counter_label: string;
+  state: AllowanceSideState;
+  error?: string;
+  /** Null while nothing is published (preparing, unavailable or error). */
+  summary: AllowanceSummary | null;
+}
+export interface AllowanceSummaryResponse {
+  since: string;
+  until: string;
+  unit: AllowanceUnit;
+  read_at: string;
+  sides: AllowanceSide[];
+  /** With two sides: B ÷ A per month in `unit`, and the latest well-sampled exact one. */
+  ratios: AllowanceRatio[];
+  headline: AllowanceRatio | null;
+}
+export interface AllowanceCandidate {
+  provider: string;
+  account: string;
+  counter: string;
+  counter_label: string;
+  state: AllowanceSideState;
+  /** The latest weekly cycle's plan, as stored and as displayed. */
+  plan: string | null;
+  plan_label: string | null;
+  /** Catalog price on the read day; null when the catalog does not price the plan. */
+  usd_per_month: number | null;
+  /** Weekly cycles starting in the last 31 days. */
+  recent_cycles: number;
+}
+export interface AllowanceCandidatesResponse { read_at: string; candidates: AllowanceCandidate[] }
