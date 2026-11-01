@@ -124,6 +124,7 @@ export function SubscriptionRail({
   width = SUBS_RAIL_W,
   headerHeight = 52,
   compact = false,
+  onToggleCompact,
 }: {
   cards: RosterCard[];
   selected: string;
@@ -132,6 +133,8 @@ export function SubscriptionRail({
   headerHeight?: number;
   /** Smaller desktop screens: each row keeps name, account, percentage, pace and meter. */
   compact?: boolean;
+  /** Switches between the full and the compact rail; absent while the window only fits the compact one. */
+  onToggleCompact?: () => void;
 }) {
   const { t } = useI18n();
   const [vendor, setVendor] = useState("all");
@@ -171,6 +174,14 @@ export function SubscriptionRail({
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
               <path d="M2 4h12M2 12h12" /><path d="M5 2v4M11 10v4" strokeWidth="3" />
             </svg>
+          </button>
+          {/* The same arrows as the navigation panel's collapse, so one gesture reads the same in both rails. */}
+          <button type="button" data-rail-compact={compact ? "expand" : "collapse"} className="rail-icon-button rail-compact-toggle"
+            disabled={!onToggleCompact} onClick={onToggleCompact}
+            aria-label={compact ? t("Expand subscription panel", "Rozwiń panel subskrypcji") : t("Collapse subscription panel", "Zwiń panel subskrypcji")}
+            title={!onToggleCompact ? t("The window is too narrow for the full subscription panel.", "Okno jest za wąskie na pełny panel subskrypcji.")
+              : compact ? t("Expand subscription panel", "Rozwiń panel subskrypcji") : t("Collapse subscription panel: only the most important figures", "Zwiń panel subskrypcji: tylko najważniejsze liczby")}>
+            {compact ? "»" : "«"}
           </button>
         </div>
         <Dropdown data-provider-filter ariaLabel={t("Filter by provider", "Filtruj po dostawcy")} value={activeVendor}

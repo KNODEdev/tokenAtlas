@@ -95,12 +95,17 @@ import path from "node:path";
 // 2026-10-30: owner approved the fresh-start fixes: without a limit window VendorOverview shows one
 // actionable notice with a Usage link instead of five identical empty sections. The owner then approved the
 // first-import mockup: while the first import runs, that notice says the history is still being counted.
+// 2026-11-01: owner approved TALK-001 D8 (UR-015 REQ-065): the subscription rail gets a collapse/expand control
+// beside its settings; App resolves the rail from the window width and the saved choice (useBreakpoint), so a
+// narrow window still compacts or hides it. No other layout, navigation or token changed. Only useBreakpoint's hash
+// moves here: App.tsx, main.tsx and AppHeader.tsx already differed from their recorded hashes on main@9250aa6,
+// and re-baselining those earlier changes is the owner's call.
 const baseline = [
   ["src/web/App.tsx", "a5f51ca61cc564e1e84816fa4d14bf038373cb14"],
   ["src/web/main.tsx", "70d74c18d6c784da3aca991d787a36348bc8efc0"],
   ["src/web/components/AppHeader.tsx", "45ebafbcd646a4711896241c81328b370150a290"],
   ["src/web/components/VendorOverview.tsx", "54945167afb87db2c69e6bebe96802bab272e56d"],
-  ["src/web/lib/useBreakpoint.ts", "11508f856921167d13aaed61d604523b6fcce6d9"],
+  ["src/web/lib/useBreakpoint.ts", "6eaa84f0639726bc4f9fa9c4b6746c605d738e41"],
   ["src/web/index.css", "1454091035a126c654f1c0494685f0e3de2b87c4"],
   ["src/web/tokens.css", "73ad4621e31e3eaa19ea651b3dc03f3dd0a436b8"],
 ] as const;

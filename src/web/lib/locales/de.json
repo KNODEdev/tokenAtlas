@@ -1,4 +1,8 @@
 {
+  "Expand subscription panel": "Abonnement-Leiste ausklappen",
+  "Collapse subscription panel": "Abonnement-Leiste einklappen",
+  "Collapse subscription panel: only the most important figures": "Abonnement-Leiste einklappen: nur die wichtigsten Zahlen",
+  "The window is too narrow for the full subscription panel.": "Das Fenster ist zu schmal für die volle Abonnement-Leiste.",
   "Continues where the import stopped. What is already imported is not read again.": "Setzt den Import dort fort, wo er angehalten wurde. Bereits Importiertes wird nicht erneut gelesen.",
   "Import paused": "Import angehalten",
   "Pause": "Anhalten",

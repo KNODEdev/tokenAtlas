@@ -41,6 +41,27 @@ export function useRailMode(): RailMode {
   const width = useViewportWidth();
   return width >= RAIL_MIN ? "full" : width >= RAIL_COMPACT_MIN ? "compact" : "none";
 }
+export type RailPreference = "full" | "compact";
+const RAIL_PREFERENCE_KEY = "tokenatlas.subscription-rail.v1";
+/**
+ * The user's choice wins only where the window has room for both forms (TALK-001 D8): a narrower window
+ * still compacts or hides the rail, and widening it brings the saved choice back.
+ */
+export function resolveRailMode(viewport: RailMode, preferred: RailPreference): RailMode {
+  return viewport === "full" && preferred === "compact" ? "compact" : viewport;
+}
+function readRailPreference(): RailPreference {
+  try { return localStorage.getItem(RAIL_PREFERENCE_KEY) === "compact" ? "compact" : "full"; } catch { return "full"; }
+}
+/** The saved full/compact choice of the subscription rail on this computer. */
+export function useRailPreference(): [RailPreference, (next: RailPreference) => void] {
+  const [preferred, setPreferred] = useState<RailPreference>(readRailPreference);
+  const save = (next: RailPreference) => {
+    setPreferred(next);
+    try { localStorage.setItem(RAIL_PREFERENCE_KEY, next); } catch { /* Storage can be unavailable. */ }
+  };
+  return [preferred, save];
+}
 export function useRailRoom(): boolean {
   const [wide, setWide] = useState(() => (typeof window === "undefined" ? true : window.innerWidth >= RAIL_MIN));
   useEffect(() => {
