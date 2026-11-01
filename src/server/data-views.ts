@@ -194,6 +194,7 @@ export const DIRECT_DATA_ROUTES:Readonly<Record<string,string>>={
   "/api/setup/confirm":"explicit first-run confirmation of the folders and network choices; releases a fresh database's first import",
   "/api/setup/preview":"read-only file counts and sizes of the detected sources before the first import",
   "/api/setup/limit-readings":"local on/off choice for provider limit readings",
+  "/api/sync/pause":"explicit pause or resume of the import, kept across restarts",
   "/api/setup/temporary":"explicit local temporary directory configuration",
   "/api/setup/cloud-sessions":"explicit local Claude cloud session interval and its last run",
   "/api/source-profile":"focused local source configuration",

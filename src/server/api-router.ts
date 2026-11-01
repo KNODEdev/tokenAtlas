@@ -20,6 +20,7 @@ import { preparingDataResponse } from "./preparing-response";
 import { saveTemporaryDirectory } from "../config/temporary-storage";
 import { readCloudSyncSetting, saveCloudSyncMinutes } from "../sync/claude-cloud-settings";
 import { readLimitReadingsSetting, saveLimitReadingsEnabled } from "../sync/limit-readings-settings";
+import { importPaused } from "../sync/import-pause";
 import { readSourcePreview } from "./source-preview";
 import { resolveDbPath } from "../db";
 import { validateDatabaseDestination } from "../db/relocate";
@@ -327,6 +328,12 @@ export function createFetchHandler(ctx: AppContext) {
     if (url.pathname === "/api/index-snapshot") {
       return handleIndexSnapshot(ctx, req);
     }
+    if (url.pathname === "/api/sync/pause" && req.method === "POST") {
+      const body = await req.json().catch(() => ({})) as { paused?: unknown };
+      if (typeof body.paused !== "boolean") return Response.json({ error: "paused must be true or false" }, { status: 400 });
+      ctx.setImportPaused?.(body.paused);
+      return Response.json({ paused: importPaused() });
+    }
     if (url.pathname === "/api/sync") {
       if (req.method === "POST") {
         const mode = url.searchParams.get("mode") === "full" ? "full" : "incremental";
@@ -352,6 +359,7 @@ export function createFetchHandler(ctx: AppContext) {
         readings_revision: readingsRevision(ctx.sqlite),
         read_changes: readRefreshCheck(ctx, url),
         first_import: ctx.firstImport ?? null,
+        paused: importPaused(),
         remap: getRemapState(),
         watch: ctx.syncWatcher?.status() ?? null,
         bootstrap: getAtlasBootstrapState(),

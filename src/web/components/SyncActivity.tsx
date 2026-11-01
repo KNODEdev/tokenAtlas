@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { VENDOR_IDS, type VendorSyncResult } from "../../sync/contracts";
 import type {
   AtlasBootstrapStage,
@@ -389,7 +389,7 @@ export function DetailsChevron() {
 }
 
 /** The collapsed line of a synchronization: title, counters and one rail segment per source. */
-export function SyncSummaryContent({ view, compact = false }: { view: SyncView; compact?: boolean }) {
+export function SyncSummaryContent({ view, compact = false, action }: { view: SyncView; compact?: boolean; action?: ReactNode }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
@@ -402,6 +402,7 @@ export function SyncSummaryContent({ view, compact = false }: { view: SyncView; 
             {view.count} · {view.current} · {view.elapsed}
           </span>
         </div>
+        {action}
         <DetailsChevron />
       </div>
       <VendorProgressRail items={view.items} sync={view.sync} />

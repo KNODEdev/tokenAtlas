@@ -150,6 +150,7 @@ export const api = {
   confirmLocations: (choices: { limit_readings?: boolean; cloud_import?: boolean } = {}) =>
     post<{ ok: true; locations_confirmed: boolean }>("/api/setup/confirm", choices),
   setupPreview: () => get<SourcePreview>("/api/setup/preview"),
+  pauseImport: (paused: boolean) => post<{ paused: boolean }>("/api/sync/pause", { paused }),
   limitReadings: () => get<{ setting: { enabled: boolean; source: "settings" | "default" } }>("/api/setup/limit-readings"),
   saveLimitReadings: (enabled: boolean) => post<{ setting: { enabled: boolean; source: "settings" | "default" } }>("/api/setup/limit-readings", { enabled }),
   sourceHealth: (signal?:AbortSignal) => get<SourceHealthResponse>("/api/source-health",undefined,signal),

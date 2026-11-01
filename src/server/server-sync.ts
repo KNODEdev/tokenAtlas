@@ -11,7 +11,7 @@ import { rebuildBlockingSync } from "../sync/rebuild-source-gate";
 import { resolveDbPath } from "../db";
 import { DEFAULT_PROBE_MINUTES } from "./probe-health";
 import { ProgressRegistry, progressDirectory } from "../sync/progress";
-import { SyncStore } from "../sync/store";
+import { SyncStore, recoverInterruptedSyncRuns } from "../sync/store";
 import type { AppContext } from "./app-context-types";
 import { awaitingLocations, firstImportPending } from "./server-bootstrap";
 import { getRemapState } from "./server-remap";
@@ -20,6 +20,7 @@ import { analysisRebuildStatus, updateAnalysisRebuild } from "./analysis-rebuild
 import { gaugeJournalDeliveryStatus } from "../providers/core/journal-runtime";
 import { gaugeJournalOutboxStatus } from "../providers/core/journal";
 import { withLiveProgress } from "../sync/live-progress";
+import { importPaused } from "../sync/import-pause";
 
 /** Mirrors the stage banners _sync.bat prints. The script numbers them [1/4]
  *  through [4/4] with lettered sub-stages, which counts to eight actual waits -
@@ -149,6 +150,30 @@ export let activeSyncCompletion: Promise<SyncRunResult | null> | null = null;
 // files in place).
 let standaloneMirror: Promise<void> | null = null;
 
+/** The running sync process, so the user's Pause can stop it (TALK-001 D12). */
+let activeSyncChild: { child: ReturnType<typeof Bun.spawn>; rebuild: boolean; stoppedForPause: boolean } | null = null;
+
+/** A sync process stopped by Pause: not a failure, the import continues on Resume. */
+export class SyncPausedError extends Error {
+  constructor() { super("Import paused by the user"); }
+}
+
+/**
+ * Stops the running import for Pause. The process is ended the way an application shutdown ends it, a path
+ * the sync engine already recovers from: published vendors stay, an unpublished stage is discarded and its
+ * files stay queued for the next run, and archive copies are written to a temporary name and renamed.
+ * An analysis rebuild is left to finish; Pause only holds the next one.
+ */
+export function stopSyncForPause(): boolean {
+  const active = activeSyncChild;
+  if (!active || active.rebuild || active.stoppedForPause) return false;
+  active.stoppedForPause = true;
+  // The native parser workers are children of the sync process; the whole tree ends with it.
+  if (process.platform === "win32") Bun.spawn(["taskkill", "/pid", String(active.child.pid), "/T", "/F"], { stdout: "ignore", stderr: "ignore", windowsHide: true });
+  else active.child.kill();
+  return true;
+}
+
 export type SyncProcessRunner = (
   rootDir: string,
   dbPath: string,
@@ -190,6 +215,15 @@ export async function runSyncProcess(
     stdout: "pipe",
     stderr: "pipe",
   });
+  const tracked = { child, rebuild: request.rebuildGeneration !== undefined, stoppedForPause: false };
+  activeSyncChild = tracked;
+  // A run that finished just as Pause arrived keeps its published result.
+  try { return await syncProcessResult(child); }
+  catch (error) { throw tracked.stoppedForPause ? new SyncPausedError() : error; }
+  finally { if (activeSyncChild === tracked) activeSyncChild = null; }
+}
+
+async function syncProcessResult(child: Bun.Subprocess<"ignore", "pipe", "pipe">): Promise<SyncRunResult> {
   const [stderrLog, stderrDetail] = child.stderr.tee();
   const [exitCode, stdout, stderr] = await Promise.all([
     child.exited,
@@ -221,6 +255,7 @@ export function startSyncCompletion(
 ): Promise<SyncRunResult | null> | null {
   if (activeSyncCompletion) return activeSyncCompletion;
   if (awaitingLocations || getRemapState().running) return null;
+  if (rebuildGeneration === undefined && importPaused()) return null;
   if (ctx?.sqlite && rebuildGeneration === undefined && rebuildBlockingSync(ctx.sqlite) !== null) return null;
   const dbPath = ctx?.dbPath ?? resolveDbPath();
   const before = ctx ? readSyncRevisions(ctx.sqlite) : unavailableSyncRevisions;
@@ -273,6 +308,11 @@ export function startSyncCompletion(
         Object.assign(syncState, { ...syncStateFromRun(new SyncStore(ctx.sqlite).latestRun(), readSyncRevisions(ctx.sqlite)), running: false });
         return null;
       }
+      // Pause pressed while the limits were being read.
+      if (rebuildGeneration === undefined && importPaused()) {
+        Object.assign(syncState, { running: false });
+        return null;
+      }
       return runner(rootDir, dbPath, request);
     })
     .then(
@@ -286,7 +326,13 @@ export function startSyncCompletion(
       Object.assign(syncState, syncStateFromRun(result, after));
       return result;
     },
-    (error): SyncRunResult => {
+    (error): SyncRunResult | null => {
+      if (error instanceof SyncPausedError) {
+        // The stopped process left its run marked as running; close it as interrupted, as the next start would.
+        if (ctx) recoverInterruptedSyncRuns(ctx.sqlite);
+        Object.assign(syncState, { running: false });
+        return null;
+      }
       const message = error instanceof Error ? error.message : String(error);
       const failedRun: SyncRunResult = {
         ...initial,

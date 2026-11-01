@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { firstImportMemory, firstImportProgress, publishFirstImport, remainingMinutes, type FirstImportProgress } from "../lib/first-import";
 import type { AppActivity as ActivitySnapshot } from "../../shared/app-activity";
 import type { AnalysisRebuildJob, SyncStatus } from "../lib/api";
@@ -14,7 +14,7 @@ import type { ProbeNotice } from "../../shared/probe-error";
 import { requestSettingsTab } from "../lib/settings-link";
 import type { MissingRateSummary } from "../../shared/missing-rate";
 import { isOpenCreditNotice, type CreditNoticeView } from "../../shared/credit-notices";
-import { api } from "../lib/api";
+import { api, bustApiMemo } from "../lib/api";
 import { creditNoticeAlert, creditNoticeLine, creditNoticeSuffix, useCreditNotices } from "../lib/credit-notices";
 import { AppActivityDetails, viewName } from "./AppActivity";
 import "./StatusBar.css";
@@ -313,11 +313,15 @@ export function StatusBar(props: StatusBarProps) {
         onRead={ids => { void api.acknowledgeCreditNotices(ids).then(credit.reload, credit.reload); }} />}
     </div>
   );
+  if (sync?.paused && !sync.running) return <StatusShell label={t("Import paused", "Import wstrzymany")} expand={t("Expand details", "Rozwiń szczegóły")}
+    stickyTop={stickyTop} state={state} events={events} summary={<PausedImportSummary fraction={first?.fraction ?? null} />} />;
   if (sync?.running) {
     const job = rebuild.job;
     const context = job && (job.state === "running" || job.state === "queued") && sync.run?.rebuildGeneration === job.generation
       ? `${t("Data rebuild", "Przebudowa danych")} · 1/${REBUILD_PHASES} ${t("Source files", "Pliki źródłowe")}` : undefined;
+    // An analysis rebuild is not an import: it has its own controls in Settings.
     return <SyncStatusBar sync={sync} context={context} compact={compact} stickyTop={stickyTop} state={state} events={events}
+      action={sync.run?.rebuildGeneration === undefined ? <ImportPauseButton paused={false} /> : undefined}
       firstImport={importing ? { progress: first!, startedAt: sync.first_import!.started_at } : undefined} />;
   }
   if (importing) return <StatusShell label={t("First history import", "Pierwszy import historii")} expand={t("Expand details", "Rozwiń szczegóły")}
@@ -354,18 +358,18 @@ export function StatusBar(props: StatusBarProps) {
 }
 
 /** A running synchronization keeps the same bar and details; its sources lead the state column. */
-function SyncStatusBar({ sync, context, compact, stickyTop, state, events, firstImport }: { sync: SyncStatus; context?: string; compact: boolean;
-  stickyTop: number; state: ReactNode; events: ReactNode; firstImport?: { progress: FirstImportProgress; startedAt: string } }) {
+function SyncStatusBar({ sync, context, compact, stickyTop, state, events, firstImport, action }: { sync: SyncStatus; context?: string; compact: boolean;
+  stickyTop: number; state: ReactNode; events: ReactNode; firstImport?: { progress: FirstImportProgress; startedAt: string }; action?: ReactNode }) {
   const { t } = useI18n();
   const view = useSyncView(sync, context);
   return <StatusShell label={t("Synchronization progress", "Postęp synchronizacji")}
     expand={t("Expand provider synchronization details", "Rozwiń szczegóły synchronizacji dostawców")} stickyTop={stickyTop}
-    summary={firstImport ? <FirstImportSummary progress={firstImport.progress} startedAt={firstImport.startedAt} current={view.current} />
-      : <SyncSummaryContent view={view} compact={compact} />} state={<><SyncSources view={view} />{state}</>} events={events} />;
+    summary={firstImport ? <FirstImportSummary progress={firstImport.progress} startedAt={firstImport.startedAt} current={view.current} action={action} />
+      : <SyncSummaryContent view={view} compact={compact} action={action} />} state={<><SyncSources view={view} />{state}</>} events={events} />;
 }
 
 /** One line and one bar for the whole first import; the bar never moves back. */
-function FirstImportSummary({ progress, startedAt, current }: { progress: FirstImportProgress; startedAt: string; current: string }) {
+function FirstImportSummary({ progress, startedAt, current, action }: { progress: FirstImportProgress; startedAt: string; current: string; action?: ReactNode }) {
   const { t } = useI18n();
   const elapsed = useElapsed(startedAt, true);
   const minutes = progress.remainingMs === null ? null : remainingMinutes(progress.remainingMs);
@@ -382,6 +386,7 @@ function FirstImportSummary({ progress, startedAt, current }: { progress: FirstI
           {left} · {current} · {elapsed}
         </span>
       </div>
+      {action}
       <DetailsChevron />
     </div>
     <div role="progressbar" aria-label={t("First history import", "Pierwszy import historii")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}
@@ -389,6 +394,52 @@ function FirstImportSummary({ progress, startedAt, current }: { progress: FirstI
         "Kopiowanie oryginałów, potem indeksowanie i przygotowanie widoków; czas wynika ze zmierzonego tempa tego komputera.")}
       style={{ height: 6, borderRadius: "var(--r-bar)", background: "var(--sunk)", border: "1px solid var(--line)", overflow: "hidden" }}>
       <div style={{ height: "100%", width: `${percent}%`, background: "var(--accent)" }} />
+    </div>
+  </>;
+}
+
+/**
+ * Pause / Resume of the import (TALK-001 D12). It sits inside the bar's summary, so its click must not
+ * open the details; the explanation is in the tooltip.
+ */
+function ImportPauseButton({ paused }: { paused: boolean }) {
+  const { t } = useI18n();
+  const [busy, setBusy] = useState(false);
+  const toggle = () => {
+    setBusy(true);
+    void api.pauseImport(!paused).catch(() => undefined).finally(() => { setBusy(false); bustApiMemo(); });
+  };
+  return <span onClick={event => { event.preventDefault(); event.stopPropagation(); }} data-import-pause={paused ? "resume" : "pause"}>
+    <GhostButton onClick={toggle} disabled={busy} title={paused
+      ? t("Continues where the import stopped. What is already imported is not read again.", "Wznawia import tam, gdzie się zatrzymał. To, co już zaimportowane, nie jest czytane ponownie.")
+      : t("Stops copying and importing within moments. What is already imported is kept. Stays paused until you resume, also after a restart.",
+        "Zatrzymuje kopiowanie i import w ciągu chwili. To, co już zaimportowane, zostaje. Pozostaje wstrzymany do wznowienia, także po restarcie.")}>
+      {paused ? t("Resume", "Wznów") : t("Pause", "Wstrzymaj")}
+    </GhostButton>
+  </span>;
+}
+
+/** The bar while the import is paused: no moving estimate, the share done so far and Resume. */
+function PausedImportSummary({ fraction }: { fraction: number | null }) {
+  const { t } = useI18n();
+  const percent = fraction === null ? null : Math.floor(fraction * 100);
+  return <>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+      <span aria-hidden="true" style={{ width: 8, height: 8, flex: "0 0 auto", borderRadius: "var(--r-dot)", background: "var(--warn)" }} />
+      <div style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: 9, flex: 1 }}>
+        <strong style={{ minWidth: 0, fontSize: "var(--fs-4)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {t("Import paused", "Import wstrzymany")}
+        </strong>
+        <span className="mono" style={{ minWidth: 0, color: "var(--muted)", fontSize: "var(--fs-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {percent !== null ? `${percent}% · ` : ""}{t("imported data is kept", "zaimportowane dane zostają")}
+        </span>
+      </div>
+      <ImportPauseButton paused />
+      <DetailsChevron />
+    </div>
+    <div role="progressbar" aria-label={t("Import paused", "Import wstrzymany")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent ?? undefined}
+      style={{ height: 6, borderRadius: "var(--r-bar)", background: "var(--sunk)", border: "1px solid var(--line)", overflow: "hidden" }}>
+      {percent !== null && <div style={{ height: "100%", width: `${percent}%`, background: "var(--faint)" }} />}
     </div>
   </>;
 }

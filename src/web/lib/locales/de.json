@@ -1,4 +1,10 @@
 {
+  "Continues where the import stopped. What is already imported is not read again.": "Setzt den Import dort fort, wo er angehalten wurde. Bereits Importiertes wird nicht erneut gelesen.",
+  "Import paused": "Import angehalten",
+  "Pause": "Anhalten",
+  "Resume": "Fortsetzen",
+  "Stops copying and importing within moments. What is already imported is kept. Stays paused until you resume, also after a restart.": "Hält Kopieren und Import in wenigen Augenblicken an. Bereits Importiertes bleibt erhalten. Bleibt angehalten, bis Sie fortsetzen, auch nach einem Neustart.",
+  "imported data is kept": "importierte Daten bleiben erhalten",
   "An antivirus may react while the app reads sign-in files and many session files. Everything it reads and contacts is listed here; sign-ins stay on this computer and go only to their own provider.": "Ein Virenschutz kann reagieren, während die App Anmeldedateien und viele Sitzungsdateien liest. Alles, was sie liest und kontaktiert, steht hier; Anmeldungen bleiben auf diesem Computer und gehen nur an ihren eigenen Anbieter.",
   "Antivirus": "Virenschutz",
   "Asks each provider how much of your plan's limit is left, using the sign-in already on this computer. Off: no provider is contacted for limits.": "Fragt jeden Anbieter, wie viel vom Limit Ihres Tarifs übrig ist, mit der Anmeldung, die schon auf diesem Computer ist. Aus: kein Anbieter wird nach Limits gefragt.",
