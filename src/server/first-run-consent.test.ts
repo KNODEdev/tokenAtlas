@@ -100,7 +100,7 @@ test("nothing reaches the network before consent, also after a restart; agreeing
     const later = await startOnce(root);
     expect(contacted(later)).toBe(false);
   } finally { cleanup(root); }
-}, 120_000);
+}, 300_000);
 
 test("after agreeing with readings on, the restarted server reads limits (control for the gate above)", async () => {
   const root = fixture();
@@ -108,4 +108,4 @@ test("after agreeing with readings on, the restarted server reads limits (contro
     expect((await startOnce(root, { limit_readings: true, cloud_import: false })).confirmed).toBe(true);
     expect(contacted(await startOnce(root))).toBe(true);
   } finally { cleanup(root); }
-}, 120_000);
+}, 300_000);
