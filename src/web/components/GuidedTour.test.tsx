@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { GuidedTour, initialTourMode, presentSteps, tourSteps } from "./GuidedTour";
+import { GuidedTour } from "./GuidedTour";
+import { initialTourMode, presentSteps, tourSteps } from "../lib/guided-tour";
 import { translateForLanguage, type MessageTranslator } from "../lib/i18n";
 
 const t: MessageTranslator = (en, pl, values) => translateForLanguage("en", en, pl, values);

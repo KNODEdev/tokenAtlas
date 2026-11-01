@@ -7,7 +7,7 @@ import { Brand } from "../components/Sidebar";
 import { LANGUAGE_OPTIONS, useI18n } from "../lib/i18n";
 import { countLabel } from "../lib/format";
 import { VENDOR_LABELS } from "../components/SyncActivity";
-import { requestTourAfterConsent } from "../components/GuidedTour";
+import { requestTourAfterConsent } from "../lib/guided-tour";
 import { SetupSources, setupDeclarations, useDatabaseMove, type SetupRow } from "./Setup";
 import "../components/AppHeader.css";
 import "./FirstRun.css";
