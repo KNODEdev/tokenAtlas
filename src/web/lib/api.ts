@@ -179,6 +179,7 @@ export {
 export {
   type SuggestedSubscription,
   type SetupState,
+  type SourcePreview,
   type SetupSaveRequest,
   type SetupSaveResponse,
   type HealthUnpricedItem,

@@ -26,9 +26,11 @@ The dashboard and API bind to loopback by default. Local storage does not mean
 the program is fully offline: configured account probes and cloud-session sync
 can contact providers with locally available authentication; price and exchange
 rate refreshes contact their sources. Setup/build may download dependencies and
-a matching native parser. The web dashboard currently requests IBM Plex fonts
-from Google Fonts. Provider, font-host and cloud-storage policies apply to those
-requests. tokenAtlas is an independent project, not an official provider client.
+a matching native parser. The web dashboard bundles its IBM Plex fonts and requests
+none from the network. On a new installation the first-run screen lists what the app
+will contact and nothing leaves the computer before the user agrees; limit readings
+and Claude cloud history each have their own switch. Provider and cloud-storage policies
+apply to those requests. tokenAtlas is an independent project, not an official provider client.
 
 ## Removing data
 

@@ -11,7 +11,7 @@ import { rebuildBlockingSync } from "../sync/rebuild-source-gate";
 import { resolveDbPath } from "../db";
 import { DEFAULT_PROBE_MINUTES } from "./probe-health";
 import { ProgressRegistry, progressDirectory } from "../sync/progress";
-import { SyncStore } from "../sync/store";
+import { SyncStore, recoverInterruptedSyncRuns } from "../sync/store";
 import type { AppContext } from "./app-context-types";
 import { awaitingLocations, firstImportPending } from "./server-bootstrap";
 import { getRemapState } from "./server-remap";
@@ -20,6 +20,9 @@ import { analysisRebuildStatus, updateAnalysisRebuild } from "./analysis-rebuild
 import { gaugeJournalDeliveryStatus } from "../providers/core/journal-runtime";
 import { gaugeJournalOutboxStatus } from "../providers/core/journal";
 import { withLiveProgress } from "../sync/live-progress";
+import { importPaused } from "../sync/import-pause";
+import { hasUnfinishedFirstFills, recoverFirstFills } from "../sync/first-fill";
+import { WriteLease, writeLeaseHolder } from "../db/write-lease";
 
 /** Mirrors the stage banners _sync.bat prints. The script numbers them [1/4]
  *  through [4/4] with lettered sub-stages, which counts to eight actual waits -
@@ -149,6 +152,58 @@ export let activeSyncCompletion: Promise<SyncRunResult | null> | null = null;
 // files in place).
 let standaloneMirror: Promise<void> | null = null;
 
+/** The running sync process, so the user's Pause can stop it (TALK-001 D12). */
+let activeSyncChild: { child: ReturnType<typeof Bun.spawn>; stoppedForPause: boolean } | null = null;
+
+/**
+ * After Pause stopped a process mid-publication: a first fill it left unfinished is undone now, under the
+ * write lease, as the next run would do it, so nothing half-published is readable while the import is paused
+ * (docs/golden-rules.md). Its files stay queued and are filled again on Resume.
+ */
+export async function undoStoppedFirstFills(sqlite: Database): Promise<string[]> {
+  if (!hasUnfinishedFirstFills(sqlite)) return [];
+  const lease = new WriteLease(sqlite, "sync");
+  await lease.acquire();
+  try { return recoverFirstFills(sqlite); }
+  finally { lease.release(); }
+}
+
+/**
+ * At startup of a paused installation: a Pause whose cleanup the previous server never finished (it stopped
+ * first) leaves the fill for this server, since no run will start before Resume. Nothing in this process writes
+ * yet. A request left by the previous, stopped server can refuse the lease for a few seconds; without a live
+ * holder the undo (one immediate transaction) is safe anyway. A live holder is another writer and recovers it itself.
+ */
+export function undoStoppedFirstFillsAtStartup(sqlite: Database): string[] {
+  if (!hasUnfinishedFirstFills(sqlite)) return [];
+  const lease = new WriteLease(sqlite, "sync");
+  const held = lease.tryAcquire();
+  if (!held && writeLeaseHolder(sqlite) !== null) return [];
+  try { return recoverFirstFills(sqlite); }
+  finally { if (held) lease.release(); }
+}
+
+/** A sync process stopped by Pause: not a failure, the import continues on Resume. */
+export class SyncPausedError extends Error {
+  constructor() { super("Import paused by the user"); }
+}
+
+/**
+ * Stops the running import for Pause. The process is ended the way an application shutdown ends it, a path
+ * the sync engine already recovers from: published vendors stay, an unpublished stage is discarded and its
+ * files stay queued for the next run, and archive copies are written to a temporary name and renamed.
+ * An analysis rebuild's source pass stops the same way and is queued again for Resume.
+ */
+export function stopSyncForPause(): boolean {
+  const active = activeSyncChild;
+  if (!active || active.stoppedForPause) return false;
+  active.stoppedForPause = true;
+  // The native parser workers are children of the sync process; the whole tree ends with it.
+  if (process.platform === "win32") Bun.spawn(["taskkill", "/pid", String(active.child.pid), "/T", "/F"], { stdout: "ignore", stderr: "ignore", windowsHide: true });
+  else active.child.kill();
+  return true;
+}
+
 export type SyncProcessRunner = (
   rootDir: string,
   dbPath: string,
@@ -190,6 +245,15 @@ export async function runSyncProcess(
     stdout: "pipe",
     stderr: "pipe",
   });
+  const tracked = { child, stoppedForPause: false };
+  activeSyncChild = tracked;
+  // A run that finished just as Pause arrived keeps its published result.
+  try { return await syncProcessResult(child); }
+  catch (error) { throw tracked.stoppedForPause ? new SyncPausedError() : error; }
+  finally { if (activeSyncChild === tracked) activeSyncChild = null; }
+}
+
+async function syncProcessResult(child: Bun.Subprocess<"ignore", "pipe", "pipe">): Promise<SyncRunResult> {
   const [stderrLog, stderrDetail] = child.stderr.tee();
   const [exitCode, stdout, stderr] = await Promise.all([
     child.exited,
@@ -221,6 +285,8 @@ export function startSyncCompletion(
 ): Promise<SyncRunResult | null> | null {
   if (activeSyncCompletion) return activeSyncCompletion;
   if (awaitingLocations || getRemapState().running) return null;
+  // Pause holds every source pass, an analysis rebuild's included (TALK-001 D12).
+  if (importPaused()) return null;
   if (ctx?.sqlite && rebuildGeneration === undefined && rebuildBlockingSync(ctx.sqlite) !== null) return null;
   const dbPath = ctx?.dbPath ?? resolveDbPath();
   const before = ctx ? readSyncRevisions(ctx.sqlite) : unavailableSyncRevisions;
@@ -273,6 +339,11 @@ export function startSyncCompletion(
         Object.assign(syncState, { ...syncStateFromRun(new SyncStore(ctx.sqlite).latestRun(), readSyncRevisions(ctx.sqlite)), running: false });
         return null;
       }
+      // Pause pressed while the limits were being read.
+      if (importPaused()) {
+        Object.assign(syncState, { running: false });
+        return null;
+      }
       return runner(rootDir, dbPath, request);
     })
     .then(
@@ -286,7 +357,18 @@ export function startSyncCompletion(
       Object.assign(syncState, syncStateFromRun(result, after));
       return result;
     },
-    (error): SyncRunResult => {
+    async (error): Promise<SyncRunResult | null> => {
+      if (error instanceof SyncPausedError) {
+        // The stopped process left its run marked as running and maybe a first fill half-published;
+        // both are settled now, as the next start would, before the import reads as paused.
+        if (ctx) {
+          recoverInterruptedSyncRuns(ctx.sqlite);
+          const undone = await undoStoppedFirstFills(ctx.sqlite);
+          if (undone.length) console.warn(`[tokenAtlas sync] Pause undid the unfinished first fill of ${undone.join(", ")}; it is filled again on Resume`);
+        }
+        Object.assign(syncState, { running: false });
+        return null;
+      }
       const message = error instanceof Error ? error.message : String(error);
       const failedRun: SyncRunResult = {
         ...initial,
@@ -317,6 +399,8 @@ export async function advanceAnalysisRebuildSources(ctx:AppContext):Promise<void
   if(sourceRebuilds.has(ctx.sqlite) || activeSyncCompletion || getRemapState().running)return;
   const job=analysisRebuildStatus(ctx.sqlite);
   if(!job || job.phase!=="sources" || (job.state!=="queued" && job.state!=="running"))return;
+  // A paused import holds the rebuild's source pass too; it waits, queued, for Resume.
+  if(importPaused())return;
   sourceRebuilds.add(ctx.sqlite);
   try {
     updateAnalysisRebuild(ctx.sqlite,job.generation,{state:"running"});
@@ -325,7 +409,11 @@ export async function advanceAnalysisRebuildSources(ctx:AppContext):Promise<void
     const result=await completion;
     // Another process may still own an older sync after an application restart.
     if(result && result.rebuildGeneration!==job.generation)return;
-    if(!result)throw new Error("Source verification failed");
+    if(!result) {
+      // Stopped by Pause: not a failure; the source pass starts again on Resume.
+      if(importPaused()) { updateAnalysisRebuild(ctx.sqlite,job.generation,{state:"queued"}); return; }
+      throw new Error("Source verification failed");
+    }
     const warnings=result.vendors.flatMap(v=> {
       const reparse=v.diagnostics?.reparse as {unavailable?:unknown[]}|undefined;
       const mirror=v.diagnostics?.mirror as {warnings?:string[]}|undefined;

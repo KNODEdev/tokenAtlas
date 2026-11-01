@@ -1,3 +1,4 @@
+import { importPaused } from "./import-pause";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -42,6 +43,8 @@ export interface CloudSyncOptions {
   repositories?: () => CloudRepositoryConfig;
   auth?: (profile: CloudProfile) => Promise<CloudAuth>;
   now?: () => Date;
+  /** The user's Pause (TALK-001 D12): checked before each profile and session, so a running import stops between files. */
+  paused?: () => boolean;
 }
 
 /** One cloud folder per Claude profile this computer mirrors (`EXAMPLE-MAIN-cloud`, `EXAMPLE-MAIN-sample_a-claude-2-cloud`). */
@@ -185,7 +188,9 @@ export async function syncClaudeCloudSessions(options: CloudSyncOptions = {}): P
     repositories ??= (options.repositories ?? readRepositoryConfig)();
     return cloudPlaces(sources, clones, repositories);
   };
+  const paused = options.paused ?? (() => importPaused());
   for (const profile of options.profiles ?? cloudProfiles()) {
+    if (paused()) break;
     const outcome: CloudProfileResult = { archiveDir: profile.archiveDir, sessions: 0, changed: 0, published: 0, errors: [] };
     result.profiles.push(outcome);
     let auth: CloudAuth, sessions: Array<Record<string, unknown>>, owner: string;
@@ -201,6 +206,8 @@ export async function syncClaudeCloudSessions(options: CloudSyncOptions = {}): P
     }
     const checkpoints = (state.profiles[profileKey(profile)] ??= { sessions: {} }).sessions;
     for (const session of sessions) {
+      // Each finished session already saved its checkpoint; the next run continues from there.
+      if (paused()) break;
       const id = session.id as string, updatedAt = String(session.updated_at ?? "");
       if (!/^[A-Za-z0-9_-]+$/.test(id)) { outcome.errors.push(`unexpected session id: ${id.slice(0, 60)}`); continue; }
       const eventsFile = path.join(profile.archiveDir, `${id}.events.jsonl`);

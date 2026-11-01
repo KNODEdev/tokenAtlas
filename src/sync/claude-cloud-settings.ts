@@ -6,7 +6,8 @@ import { localStateRoot } from "../config/local-identity";
 /**
  * How often this computer reads Claude cloud sessions (user decision 23.10.2026: 30 minutes by default,
  * changeable in Settings; 0 turns the source off). Machine-local: the computer that syncs writes its own
- * `-cloud` archive folders. `TOKENATLAS_CLOUD_MINUTES` overrides the stored choice, like the other cycles.
+ * `-cloud` archive folders. `TOKENATLAS_CLOUD_MINUTES` overrides the stored choice, like the other cycles,
+ * except a stored 0: the user's "off" (first-run consent, TALK-001 D4) is a veto no environment value lifts.
  */
 export const DEFAULT_CLOUD_SYNC_MINUTES = 30;
 const MAX_MINUTES = 24 * 60;
@@ -21,13 +22,17 @@ export function validCloudSyncMinutes(value: unknown): number {
 }
 
 export function readCloudSyncSetting(env: NodeJS.ProcessEnv = process.env, root = localStateRoot(env)): CloudSyncSetting {
+  const file = path.join(root, FILE);
+  let stored: CloudSyncSetting | null = null;
+  if (fs.existsSync(file)) {
+    const raw = JSON.parse(fs.readFileSync(file, "utf8")) as { schema?: unknown; minutes?: unknown };
+    if (raw.schema !== 1) throw new Error("Invalid local cloud session setting.");
+    stored = { minutes: validCloudSyncMinutes(raw.minutes), source: "settings" };
+  }
+  if (stored?.minutes === 0) return stored;
   const override = env.TOKENATLAS_CLOUD_MINUTES?.trim();
   if (override) return { minutes: validCloudSyncMinutes(Number(override)), source: "environment" };
-  const file = path.join(root, FILE);
-  if (!fs.existsSync(file)) return { minutes: DEFAULT_CLOUD_SYNC_MINUTES, source: "default" };
-  const stored = JSON.parse(fs.readFileSync(file, "utf8")) as { schema?: unknown; minutes?: unknown };
-  if (stored.schema !== 1) throw new Error("Invalid local cloud session setting.");
-  return { minutes: validCloudSyncMinutes(stored.minutes), source: "settings" };
+  return stored ?? { minutes: DEFAULT_CLOUD_SYNC_MINUTES, source: "default" };
 }
 
 export function saveCloudSyncMinutes(minutes: unknown, root = localStateRoot()): CloudSyncSetting {

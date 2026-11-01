@@ -1,7 +1,8 @@
 /* Side drawer (column chooser, timeline points): a paper sheet with a pencil edge, sections divided by rules. */
 .codex-columns-drawer {
   position: fixed; inset: 0 0 0 auto; margin: 0; padding: 0;
-  width: min(680px, 100vw); max-width: 100vw; height: 100dvh; max-height: 100dvh;
+  /* As tall as its content up to the viewport, then it scrolls inside (TALK-001 D14). */
+  width: min(680px, 100vw); max-width: 100vw; height: auto; max-height: 100dvh; inset: 0 0 auto auto; overflow-y: auto;
   background: var(--surface); color: var(--text); border: 1px solid var(--pencil); border-right: 0; border-radius: var(--r-card);
   box-shadow: var(--shadow); font-family: var(--font-sans); font-size: var(--fs-4);
 }

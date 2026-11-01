@@ -41,7 +41,8 @@ export function CloudSessionsHelp({ problems = [] }: { problems?: readonly strin
     <span ref={trigger}><GhostButton onClick={() => { returnFocus.current = trigger.current?.querySelector("button") ?? null; setOpen(true); }}>
       {t("Cloud import details", "Szczegóły importu chmury")}
     </GhostButton></span>
-    {open && createPortal(<AccountPeriodDrawer title={t("Claude cloud history", "Historia Claude w chmurze")}
+    {/* The window carries the name of the button that opens it, the same everywhere (TALK-001 D9). */}
+    {open && createPortal(<AccountPeriodDrawer title={t("Cloud import details", "Szczegóły importu chmury")}
       subtitle={t("Access and measurement coverage", "Dostęp i kompletność pomiaru")} busy={false}
       closeLabel={t("Close cloud import details", "Zamknij szczegóły importu chmury")} className="ui-detail-drawer cloud-sessions-help"
       onClose={() => setOpen(false)} returnFocus={returnFocus.current}>

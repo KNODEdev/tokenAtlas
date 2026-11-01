@@ -6,6 +6,9 @@
 
 .rail-icon-button { margin-left: auto; padding: var(--s-1); border: 0; background: transparent; color: var(--muted); cursor: pointer; line-height: 0; }
 .rail-icon-button:hover { color: var(--text); }
+/* Collapse/expand beside settings: the navigation panel's arrows, in its mono type. */
+.rail-icon-button.rail-compact-toggle { margin-left: 0; line-height: 1; font-family: var(--font-mono); font-size: var(--fs-3); }
+.rail-compact-toggle:disabled { color: var(--faint); cursor: default; }
 .ui-dropdown.rail-filter { width: 100%; padding: 0; border: 0; background: transparent; font-family: var(--font-sans); font-size: var(--fs-3); color: var(--muted); cursor: pointer; }
 /* The filter reads as a line of the rail's caption, without a field's caret. */
 .rail-filter .ui-dropdown-caret { display: none; }

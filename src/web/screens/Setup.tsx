@@ -6,7 +6,7 @@ import { DataTable, TableRow, Card, CardTitle, Dropdown, ErrorState, GhostButton
 import { polishPlural } from "../lib/mixFormat";
 import { useI18n } from "../lib/i18n";
 import { CloudSessionsHelp } from "../components/CloudSessionsHelp";
-import { cloudSessionProblems, useCloudSessions } from "../lib/cloud-sessions";
+import { cloudActionTitle, cloudProblemAction, cloudSessionProblems, useCloudSessions } from "../lib/cloud-sessions";
 export interface SetupRow extends SuggestedSubscription {
   editedId: string;
   include: boolean;
@@ -191,6 +191,7 @@ export function Setup({ onDone, heading }: { onDone: () => void; heading?: strin
         <ArchiveMoveLocation archive={data.archive.root} disabled={busy} />
         <DatabaseLocation database={data.snapshot.database} disabled={busy} />
         {data.temporary && <TemporaryLocation root={data.temporary.root} disabled={busy} />}
+        <LimitReadingsSwitch disabled={busy} />
         <CloudSessionsInterval disabled={busy} />
       </Card>
       <SetupSources data={data} rows={rows} setRows={setRows} onError={setErr} Frame={Card} />
@@ -548,6 +549,32 @@ function TemporaryLocation({ root, disabled }: { root: string; disabled: boolean
   </div>;
 }
 /** How often this computer reads Claude cloud sessions into its `-cloud` archive folders (0 turns it off). */
+/** Limit readings on or off for this computer, the same switch as on the first-run consent screen (TALK-001 D4). */
+function LimitReadingsSwitch({ disabled }: { disabled: boolean }) {
+  const { t } = useI18n();
+  const read = useAsync(() => api.limitReadings(), []);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const enabled = read.data?.setting.enabled;
+  const save = async (next: boolean) => {
+    setBusy(true); setError(null);
+    try { await api.saveLimitReadings(next); read.reload(); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); }
+    finally { setBusy(false); }
+  };
+  return <div style={{ marginTop: 14 }}>
+    <Field label={t("Limit readings", "Odczyty limitów")}>
+      <label className="ui-check" title={t("Asks each provider how much of your plan's limit is left, using the sign-in already on this computer. Off: no provider is contacted for limits.",
+        "Pyta każdego dostawcę, ile zostało z limitu planu, używając logowania z tego komputera. Wyłączone: żaden dostawca nie jest pytany o limity.")}>
+        <input type="checkbox" checked={enabled ?? false} disabled={disabled || busy || enabled === undefined}
+          onChange={event => void save(event.target.checked)} />
+        {enabled === undefined ? "…" : enabled ? t("on", "włączone") : t("off", "wyłączone")}
+      </label>
+    </Field>
+    {[...(error || read.error ? [error ?? read.error!] : [])].map(problem =>
+      <div key={problem} role="alert" style={{ marginTop: 6, fontSize: "var(--fs-4)", color: "var(--warn)" }}>{problem}</div>)}
+  </div>;
+}
 function CloudSessionsInterval({ disabled }: { disabled: boolean }) {
   const { t, locale } = useI18n();
   const read = useCloudSessions();
@@ -580,7 +607,7 @@ function CloudSessionsInterval({ disabled }: { disabled: boolean }) {
       <GhostButton onClick={() => void save()} disabled={disabled || busy || !valid}>{t("Save interval", "Zapisz odstęp")}</GhostButton>
       <CloudSessionsHelp problems={problems} />
     </Field>
-    {!!problems.length && <div role="alert" className="is-warn">{t("Claude cloud history incomplete", "Niepełna historia Claude z chmury")}</div>}
+    {!!problems.length && <div role="alert" className="is-warn">{cloudActionTitle(cloudProblemAction(problems), t)}</div>}
     {[...(error || read.error ? [error ?? read.error!] : [])].map(problem =>
       <div key={problem} role="alert" style={{ marginTop: 6, fontSize: "var(--fs-4)", color: "var(--warn)" }}>{problem}</div>)}
   </div>;

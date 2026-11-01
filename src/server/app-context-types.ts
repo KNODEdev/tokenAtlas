@@ -42,7 +42,9 @@ export interface AppContext {
   /** Settings → move archive (`archive-move.ts`); present only under the supervisor that performs the switch. */
   archiveMove?: import("./archive-move").ArchiveMove;
   /** The first-run screen's "Start with these folders": releases a fresh database's first import. */
-  confirmLocations?: () => void;
+  confirmLocations?: (choices?: { limitReadings?: boolean; cloudImport?: boolean }) => void;
+  /** Pause or resume the import (TALK-001 D12); kept across restarts. */
+  setImportPaused?: (paused: boolean) => void;
   /** Set when this process started the first import; the screen estimates its duration from it. */
   firstImport?: import("./first-import").FirstImport;
   snapshotPublisher?: (mode: "automatic" | "manual") => AtlasSnapshotPublishResult;

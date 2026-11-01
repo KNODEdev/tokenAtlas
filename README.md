@@ -80,9 +80,10 @@ checked with the versions recorded in [VERIFICATION.md](VERIFICATION.md).
    its SHA-256. Rust/MSVC is needed only when building the parser from source.
 3. Run `_dev.bat`. It checks dependencies, prepares the parser, builds the web
    interface and starts the local server.
-4. Open `http://127.0.0.1:7331`. On a new installation, confirm the archive and
-   source folders in setup before the first import. Configure account history and
-   subscriptions in Settings.
+4. Open `http://127.0.0.1:7331`. On a new installation the first screen lists what
+   tokenAtlas will copy and which hosts it will contact; nothing is copied or sent
+   until you agree there. The folders can be changed under **Change folders**.
+   Configure account history and subscriptions in Settings.
 
 If the port is already occupied, the launcher stops without terminating the
 application using it. Close that application yourself before starting tokenAtlas.

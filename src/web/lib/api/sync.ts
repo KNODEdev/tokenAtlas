@@ -173,6 +173,8 @@ export interface SyncStatus {
   read_changes?: ReadRefreshCheck;
   /** The first import of an empty database, while this server process runs it. */
   first_import?: { started_at: string; source_files: number | null } | null;
+  /** The user paused the import; it stays paused until Resume, also after a restart. */
+  paused?: boolean;
   watch?: {
     active: boolean;
     running: boolean;

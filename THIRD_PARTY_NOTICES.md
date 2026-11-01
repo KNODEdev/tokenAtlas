@@ -48,8 +48,11 @@ OFL notices with source and binary distributions:
 - `scripts/usage-monitor-assets/LICENSE.txt` (IBM Plex Sans)
 - `native/tokenatlas-monitor/assets/OFL-IBM-Plex-Sans.txt`
 - `native/tokenatlas-monitor/assets/OFL-IBM-Plex-Mono.txt`
+- `src/web/fonts/OFL-ibm-plex-sans.txt` and `src/web/fonts/OFL-ibm-plex-mono.txt`
 
-The web dashboard loads IBM Plex through Google Fonts; see [PRIVACY.md](PRIVACY.md).
+The web dashboard bundles IBM Plex Sans and Mono (weights 400–700, latin and latin-ext)
+as WOFF2 files in `src/web/fonts`, taken from `@fontsource/ibm-plex-sans` and
+`@fontsource/ibm-plex-mono` 5.3.0; it requests no font from the network.
 The GUI framework also has its own font/dependency notices in the generated
 inventory; project font notices do not replace them.
 

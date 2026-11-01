@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { hasFxRates, readFxRates, storeFxRates, type FxRate } from "../db/fx-rates";
 import { hasBillingCycles, markBillingCyclesDirty } from "../db/billing-cycles";
+import { awaitingConsent } from "./consent-state";
 
 /**
  * Exchange rates for payments in other currencies than USD (user decision 18.10): the NBP table A mid rate of the last
@@ -93,7 +94,8 @@ export interface FxRatesTurn { stored: number; waiting: number; fetching: boolea
 
 /** One turn: store what arrived (marking the cycles paid on those days), then start a request for what is still missing. */
 export function advanceFxRates(db: Database, options: FxRatesOptions): FxRatesTurn | null {
-  if (!hasFxRates(db) || !hasBillingCycles(db)) return null;
+  // Before the first-run consent nothing goes to the network, rates included (TALK-001 D3).
+  if (!hasFxRates(db) || !hasBillingCycles(db) || awaitingConsent(db)) return null;
   const now = options.now ?? Date.now();
   let stored = 0;
   if (state.fetched.length && options.canWrite()) {

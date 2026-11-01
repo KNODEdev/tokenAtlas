@@ -42,10 +42,11 @@ import {
   type Unit,
 } from "./lib/screens";
 import { dayTime, duration } from "./lib/format";
-import { NAV_W, NAV_W_COLLAPSED, SUBS_RAIL_COMPACT_W, SUBS_RAIL_W, WINDOW_RAIL_W, useBreakpoint, useRailMode, useWindowRailRoom } from "./lib/useBreakpoint";
+import { NAV_W, NAV_W_COLLAPSED, SUBS_RAIL_COMPACT_W, SUBS_RAIL_W, WINDOW_RAIL_W, resolveRailMode, useBreakpoint, useRailMode, useRailPreference, useWindowRailRoom } from "./lib/useBreakpoint";
 import { AppHeader } from "./components/AppHeader";
 import { contextPreviewAppliesTo, useContextPreview } from "./lib/context-premium";
 import { Sidebar } from "./components/Sidebar";
+import { GuidedTour } from "./components/GuidedTour";
 import { CommandPalette } from "./components/CommandPalette";
 import { CycleDrawer } from "./components/CycleDrawer";
 import { WindowRail } from "./components/CycleRail";
@@ -206,7 +207,10 @@ export function App() {
     [language, t],
   );
   const bp = useBreakpoint();
-  const railMode = useRailMode();
+  const [tourReplay, setTourReplay] = useState(0);
+  const viewportRailMode = useRailMode();
+  const [railPreference, setRailPreference] = useRailPreference();
+  const railMode = resolveRailMode(viewportRailMode, railPreference);
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     try {
@@ -686,7 +690,9 @@ export function App() {
         goto={goto}
         onMobileNav={isMobile ? () => setMobileNav(true) : undefined}
         compact={isMobile}
+        onHelp={isMobile ? undefined : () => setTourReplay(count => count + 1)}
       />
+      {!isMobile && <GuidedTour replay={tourReplay} onOpenUsage={() => goto("usage")} />}
       <StatusBar sync={sync} syncUnavailable={syncUnavailable} syncObservedAt={syncObservedAt} rebuild={rebuild}
         waitingForSubscriptions={bootstrapping} stickyTop={HEADER_H} compact={isMobile} onOpenSettings={() => goto("settings")}
         onOpenAccount={id => { setAccount(accountsList.find(entry => entry.id.toLowerCase() === id)?.id ?? id); goto("overview"); }} />
@@ -694,7 +700,8 @@ export function App() {
       <div style={{ display: "flex", flex: 1, minHeight: 0, minWidth: 0 }}>
         {showRail &&
           (rosterCards.length > 0 ? (
-            <SubscriptionRail cards={rosterCards} selected={account} onSelect={setAccount} headerHeight={shellHeaderHeight} width={subsWidth} compact={compactRail} />
+            <SubscriptionRail cards={rosterCards} selected={account} onSelect={setAccount} headerHeight={shellHeaderHeight} width={subsWidth} compact={compactRail}
+              onToggleCompact={viewportRailMode === "full" ? () => setRailPreference(compactRail ? "full" : "compact") : undefined} />
           ) : (
             <RailSkeleton width={subsWidth} rows={5} rowHeight={62} />
           ))}

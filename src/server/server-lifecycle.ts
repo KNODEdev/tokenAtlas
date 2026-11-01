@@ -41,10 +41,14 @@ import { readGlmKey, runGlmProbeCycle } from "../providers/adapters/glm";
 import { loadPool, runGeminiProbeCycle } from "../providers/adapters/gemini";
 import { ResetProbeWatch, readProbeSubjectLimits } from "./reset-probe";
 import { runAtlasBootstrap, firstImportPending, awaitingLocations, locationsConfirmed, getAtlasBootstrapState, LOCATIONS_CONFIRMED_KEY, setFirstImportPending, setAwaitingLocations } from "./server-bootstrap";
+import { markAwaitingConsent } from "./consent-state";
+import { limitReadingsEnabled, saveLimitReadingsEnabled } from "../sync/limit-readings-settings";
+import { saveCloudSyncMinutes } from "../sync/claude-cloud-settings";
+import { importPaused, saveImportPaused } from "../sync/import-pause";
 import { createAppContext, rebuildSubscriptionMaps } from "./app-context";
 import { refreshCodexDiscovery, refreshVendorDiscovery, probeTargets, runCodexProbePoll, probeSubscriptionGate, currentProbeSubscription } from "./account-probes";
 import { createFetchHandler } from "./api-router";
-import { advanceAnalysisRebuildSources, activeSyncCompletion, startSyncCompletion, needsRemap } from "./server-sync";
+import { advanceAnalysisRebuildSources, activeSyncCompletion, startSyncCompletion, needsRemap, stopSyncForPause, undoStoppedFirstFillsAtStartup } from "./server-sync";
 import { getRemapState, startStartupRemap } from "./server-remap";
 import { resolveSubscription } from "./account-scope";
 
@@ -150,6 +154,11 @@ export function startServer(
   const journalTarget = journalRoot && (ctx.dbPath || ownsContext) ? { journalRoot, archiveRoot: ARCHIVE_ROOT } : null;
   setGaugeJournalDelivery(!!journalTarget);
   if (journalRoot) console.log(`[tokenAtlas API] Gauge journal: ${journalRoot}`);
+  // A Pause interrupted before its cleanup (the server stopped first) is settled before any reader or producer starts.
+  if (ownsContext && importPaused()) {
+    const undone = undoStoppedFirstFillsAtStartup(ctx.sqlite);
+    if (undone.length) console.warn(`[tokenAtlas sync] paused import: unfinished first fill of ${undone.join(", ")} undone; it is filled again on Resume`);
+  }
   // The writer lives outside the HTTP event loop and resumes durable dirty keys after restart. The
   // sync process and a remap take turns with it through the write lease (U2.2); it only waits
   // while this thread writes readings, so those single rows never queue behind one of its batches.
@@ -196,6 +205,8 @@ export function startServer(
   setFirstImportPending(bootstrapCatchUpMode === "full" && bootstrapRecoveryId !== null);
   setAwaitingLocations(firstImportPending && process.env.TOKENATLAS_CONFIRM_LOCATIONS?.trim() !== "0"
     && !locationsConfirmed(ctx.sqlite));
+  // A key left by an earlier start that no longer waits (e.g. TOKENATLAS_CONFIRM_LOCATIONS=0) must not hold rates back.
+  markAwaitingConsent(ctx.sqlite, awaitingLocations);
   if (awaitingLocations) {
     getAtlasBootstrapState().message = "Waiting for the folders to be confirmed on the start screen";
     console.log("[tokenAtlas API] Empty database: the first import waits for the folders to be confirmed on the start screen " +
@@ -205,20 +216,21 @@ export function startServer(
     && process.env.TOKENATLAS_ARCHIVE_COMPRESSION?.trim() === "1"
     ? startArchiveCompressionMaintenance({ archiveRoot: ARCHIVE_ROOT, databasePath: ctx.dbPath ?? resolveDbPath(customDbPath) },
       () => !closed && !awaitingLocations && !firstImportPending && !bootstrapCatchUpMode
-        && !activeSyncCompletion && !getRemapState().running && !ctx.databaseRelocating,
+        && !activeSyncCompletion && !getRemapState().running && !ctx.databaseRelocating && !importPaused(),
       result => { if (result.turn?.job.compressed) ctx.syncWatcher?.reconcile(); }) : null;
   if (archiveCompression) scheduleInterval(archiveCompression.update, 1000);
   // Claude cloud sessions → `-cloud` archive folders; the archive watcher then queues them like another computer's files.
   const cloudSessions = ownsContext && process.env.NODE_ENV !== "test"
     ? startClaudeCloudMaintenance(
-      () => !closed && !awaitingLocations && !firstImportPending && !bootstrapCatchUpMode && !ctx.databaseRelocating,
+      () => !closed && !awaitingLocations && !firstImportPending && !bootstrapCatchUpMode && !ctx.databaseRelocating && !importPaused(),
       () => ctx.syncWatcher?.reconcile()) : null;
   ctx.cloudSessions = cloudSessions ?? undefined;
   if (cloudSessions) scheduleInterval(cloudSessions.update, 5000);
   // A catch-up started again after an incomplete one reads only what is still queued.
   let bootstrapRetry = false;
   const runQueuedReconciliation = () => {
-    if (!reconcileAfterWriter || getRemapState().running || awaitingLocations) return;
+    // A paused import keeps its queued work for Resume (TALK-001 D12).
+    if (!reconcileAfterWriter || getRemapState().running || awaitingLocations || importPaused()) return;
     reconcileAfterWriter = false;
     if (bootstrapCatchUpMode) {
       const mode = bootstrapCatchUpMode;
@@ -248,6 +260,14 @@ export function startServer(
         void ctx.refreshLiveReadings?.().catch(e => console.warn("[tokenAtlas readings] refresh after the first import failed", e));
       }).catch(() => undefined);
       void completion.then(({ collection: collectionResult, import: result, complete }) => {
+        if (!complete && importPaused()) {
+          // Stopped by Pause: nothing failed; what was published stays and the rest waits for Resume.
+          Object.assign(getAtlasBootstrapState(), { running: false, message: "First import paused", error: null, ok: null });
+          bootstrapCatchUpMode = mode;
+          bootstrapRetry = true;
+          reconcileAfterWriter = true;
+          return;
+        }
         if (!result) {
           Object.assign(getAtlasBootstrapState(), {
             running: false,
@@ -316,10 +336,25 @@ export function startServer(
         `(TOKENATLAS_SYNC_MINUTES to change, 0 to disable)`
     );
   }
-  ctx.confirmLocations = () => {
+  ctx.setImportPaused = paused => {
+    saveImportPaused(paused);
+    if (paused) {
+      console.log("[tokenAtlas API] Import paused by the user.");
+      stopSyncForPause();
+      return;
+    }
+    console.log("[tokenAtlas API] Import resumed by the user.");
+    reconcileAfterWriter = true;
+    runQueuedReconciliation();
+  };
+  ctx.confirmLocations = (choices = {}) => {
     if (!awaitingLocations) return;
+    // The consent screen's toggles are saved before anything may reach the network (TALK-001 D3/D4).
+    if (choices.limitReadings !== undefined) saveLimitReadingsEnabled(choices.limitReadings);
+    if (choices.cloudImport === false) saveCloudSyncMinutes(0);
     ctx.sqlite.query("INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
       .run(LOCATIONS_CONFIRMED_KEY, new Date().toISOString());
+    markAwaitingConsent(ctx.sqlite, false);
     setAwaitingLocations(false);
     console.log("[tokenAtlas API] Folders confirmed - starting the first import.");
     const firstImport: FirstImport = { started_at: new Date().toISOString(), source_files: null };
@@ -353,6 +388,9 @@ export function startServer(
     // not awaited: the next probe or the run's end takes it, and the event loop never waits for
     // them. The background writer's batches are short enough to wait for.
     if (closed) return false;
+    // No provider is contacted before the consent screen is accepted, while the user turned readings off, or
+    // with TOKENATLAS_PROBE_MINUTES=0, whatever starts the reading (schedule, sign-in change, Claude login).
+    if (awaitingLocations || !limitReadingsEnabled() || !(Number.isFinite(probeMin) && probeMin > 0)) return false;
     const holder = writeLeaseHolder(ctx.sqlite);
     return !holder || holder.kind === "background";
   };

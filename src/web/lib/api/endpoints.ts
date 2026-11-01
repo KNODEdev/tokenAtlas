@@ -11,7 +11,7 @@ import type { AccountHistoryResponse, AccountsResponse, AccountStateResponse, Cl
 import type { ProjectCostResponse } from "./project-cost";
 import type { ApiProject, AssignRequest, MergeRequest, MergeResponse, ProjectsResponse, ProjectUpdateRequest, ProjectUpdateResponse, ReassignRequest, ReassignResponse, RemapResult, RepoHistoryResponse, SubjectListResponse, UnassignedRow } from "./projects";
 import type { CycleSaveRequest, CycleSaveResponse, CyclesResponse, GrokAnchorResponse, GrokAnchorSaveRequest, HistoryCoverageResponse, PlanCapacityResult, PlanSaveRequest, PlansCatalog, PlansCatalogResponse, PlanSettingRow, PlansResponse, RateCardsResponse } from "./settings";
-import type { HealthResponse, SetupSaveRequest, SetupSaveResponse, SetupState } from "./setup";
+import type { HealthResponse, SetupSaveRequest, SetupSaveResponse, SetupState, SourcePreview } from "./setup";
 import type { AnalysisRebuildJob, AnalysisRebuildOptions, AnalysisRebuildScope, SyncStatus } from "./sync";
 import { fetchJson, get, indexSnapshotRequest, post, readRefreshPaths, syncRequestPath } from "./transport";
 import { publishDisplayPlanCatalog } from "../plan-catalog";
@@ -147,7 +147,12 @@ export const api = {
   startArchiveMove: (directory: string) => post<ArchiveMoveStatus>("/api/setup/archive-move", { directory }),
   databaseLocation: (signal?: AbortSignal) => get<{ database: string; result: { destination: string; error: string | null } | null }>("/api/setup/database", undefined, signal),
   setupStatus: () => get<Pick<SetupState, "configured"> & { locations_confirmed?: boolean }>("/api/setup", { summary: 1 }),
-  confirmLocations: () => post<{ ok: true; locations_confirmed: boolean }>("/api/setup/confirm", {}),
+  confirmLocations: (choices: { limit_readings?: boolean; cloud_import?: boolean } = {}) =>
+    post<{ ok: true; locations_confirmed: boolean }>("/api/setup/confirm", choices),
+  setupPreview: () => get<SourcePreview>("/api/setup/preview"),
+  pauseImport: (paused: boolean) => post<{ paused: boolean }>("/api/sync/pause", { paused }),
+  limitReadings: () => get<{ setting: { enabled: boolean; source: "settings" | "default" } }>("/api/setup/limit-readings"),
+  saveLimitReadings: (enabled: boolean) => post<{ setting: { enabled: boolean; source: "settings" | "default" } }>("/api/setup/limit-readings", { enabled }),
   sourceHealth: (signal?:AbortSignal) => get<SourceHealthResponse>("/api/source-health",undefined,signal),
   sourceProfiles: (discover?: string,signal?:AbortSignal) => get<SourceProfileConfiguration>("/api/source-profile", { discover },signal),
   sourceFolders: (path?: string) => get<import("../../../shared/source-folders").SourceFolderListing>("/api/source-folders", { path }),

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { firstImportMemory, firstImportProgress, publishFirstImport, remainingMinutes, type FirstImportProgress } from "../lib/first-import";
 import type { AppActivity as ActivitySnapshot } from "../../shared/app-activity";
 import type { AnalysisRebuildJob, SyncStatus } from "../lib/api";
@@ -14,13 +14,13 @@ import type { ProbeNotice } from "../../shared/probe-error";
 import { requestSettingsTab } from "../lib/settings-link";
 import type { MissingRateSummary } from "../../shared/missing-rate";
 import { isOpenCreditNotice, type CreditNoticeView } from "../../shared/credit-notices";
-import { api } from "../lib/api";
+import { api, bustApiMemo } from "../lib/api";
 import { creditNoticeAlert, creditNoticeLine, creditNoticeSuffix, useCreditNotices } from "../lib/credit-notices";
 import { AppActivityDetails, viewName } from "./AppActivity";
 import "./StatusBar.css";
 import { ClaudeConnect } from "./ClaudeConnect";
 import { CloudSessionsHelp } from "./CloudSessionsHelp";
-import { cloudSessionProblems, cloudSessionSignIns, useCloudSessions } from "../lib/cloud-sessions";
+import { cloudActionTitle, cloudProblemAction, cloudSessionProblems, cloudSessionSignIns, useCloudSessions } from "../lib/cloud-sessions";
 import type { CloudSessionsResponse } from "../../shared/cloud-sessions";
 import { GhostButton } from "./ui";
 import { BOOTSTRAP_STAGES, bootstrapStageIndex, bootstrapStageLabel, DetailsChevron, LiveMark, RemapActivity,
@@ -133,9 +133,11 @@ export function statusLine({ sync, syncUnavailable, rebuild, waitingForSubscript
   const partial = run?.status === "partial_success";
   if (cloudSessionsError && sync) return { tone: "warn", title: t("Cloud import status unavailable", "Status importu chmury niedostępny"),
     detail: t("Cloud import details in events", "Szczegóły importu chmury w zdarzeniach"), progress: null };
-  if (cloudSessionProblems(cloudSessions).length && sync) return { tone: "warn",
-    title: t("Claude cloud history incomplete", "Niepełna historia Claude z chmury"),
-    detail: t("Cloud import details in events", "Szczegóły importu chmury w zdarzeniach"), progress: null };
+  // The line names the next step for the actual cause; the state itself and the details follow (TALK-001 D9).
+  const cloudProblems = cloudSessionProblems(cloudSessions);
+  if (cloudProblems.length && sync) return { tone: "warn",
+    title: cloudActionTitle(cloudProblemAction(cloudProblems), t),
+    detail: `${t("Claude cloud history incomplete", "Niepełna historia Claude z chmury")} · ${t("Cloud import details in events", "Szczegóły importu chmury w zdarzeniach")}`, progress: null };
   // A reading not taken while a sign-in is expired is lost for good (a missing price applies later too), so it
   // comes first among the warnings; the details list every account and computer.
   const notices = probeNoticeLines(probeNotices);
@@ -291,9 +293,10 @@ export function StatusBar(props: StatusBarProps) {
       {cloudProblems.length > 0 && <div className="status-event" data-cloud-import-warning>
         <div className="status-event-head">
           <strong className="is-warn">{cloudRead.error ? t("Cloud import status unavailable", "Status importu chmury niedostępny")
-            : t("Claude cloud history incomplete", "Niepełna historia Claude z chmury")}</strong>
+            : cloudActionTitle(cloudProblemAction(cloudProblems), t)}</strong>
           <div className="status-event-actions"><CloudSessionsHelp problems={cloudProblems} /></div>
         </div>
+        {!cloudRead.error && <span className="status-event-meta">{t("Claude cloud history incomplete", "Niepełna historia Claude z chmury")}</span>}
       </div>}
       {alert && missingRates && <div ref={alertRef} data-missing-rate-alert className="status-event">
         <div className="status-event-head">
@@ -313,11 +316,15 @@ export function StatusBar(props: StatusBarProps) {
         onRead={ids => { void api.acknowledgeCreditNotices(ids).then(credit.reload, credit.reload); }} />}
     </div>
   );
+  if (sync?.paused && !sync.running) return <StatusShell label={t("Import paused", "Import wstrzymany")} expand={t("Expand details", "Rozwiń szczegóły")}
+    stickyTop={stickyTop} state={state} events={events} summary={<PausedImportSummary />} />;
   if (sync?.running) {
     const job = rebuild.job;
     const context = job && (job.state === "running" || job.state === "queued") && sync.run?.rebuildGeneration === job.generation
       ? `${t("Data rebuild", "Przebudowa danych")} · 1/${REBUILD_PHASES} ${t("Source files", "Pliki źródłowe")}` : undefined;
+    // Pause holds every source pass, an analysis rebuild's included (TALK-001 D12).
     return <SyncStatusBar sync={sync} context={context} compact={compact} stickyTop={stickyTop} state={state} events={events}
+      action={<ImportPauseButton paused={false} />}
       firstImport={importing ? { progress: first!, startedAt: sync.first_import!.started_at } : undefined} />;
   }
   if (importing) return <StatusShell label={t("First history import", "Pierwszy import historii")} expand={t("Expand details", "Rozwiń szczegóły")}
@@ -354,18 +361,18 @@ export function StatusBar(props: StatusBarProps) {
 }
 
 /** A running synchronization keeps the same bar and details; its sources lead the state column. */
-function SyncStatusBar({ sync, context, compact, stickyTop, state, events, firstImport }: { sync: SyncStatus; context?: string; compact: boolean;
-  stickyTop: number; state: ReactNode; events: ReactNode; firstImport?: { progress: FirstImportProgress; startedAt: string } }) {
+function SyncStatusBar({ sync, context, compact, stickyTop, state, events, firstImport, action }: { sync: SyncStatus; context?: string; compact: boolean;
+  stickyTop: number; state: ReactNode; events: ReactNode; firstImport?: { progress: FirstImportProgress; startedAt: string }; action?: ReactNode }) {
   const { t } = useI18n();
   const view = useSyncView(sync, context);
   return <StatusShell label={t("Synchronization progress", "Postęp synchronizacji")}
     expand={t("Expand provider synchronization details", "Rozwiń szczegóły synchronizacji dostawców")} stickyTop={stickyTop}
-    summary={firstImport ? <FirstImportSummary progress={firstImport.progress} startedAt={firstImport.startedAt} current={view.current} />
-      : <SyncSummaryContent view={view} compact={compact} />} state={<><SyncSources view={view} />{state}</>} events={events} />;
+    summary={firstImport ? <FirstImportSummary progress={firstImport.progress} startedAt={firstImport.startedAt} current={view.current} action={action} />
+      : <SyncSummaryContent view={view} compact={compact} action={action} />} state={<><SyncSources view={view} />{state}</>} events={events} />;
 }
 
 /** One line and one bar for the whole first import; the bar never moves back. */
-function FirstImportSummary({ progress, startedAt, current }: { progress: FirstImportProgress; startedAt: string; current: string }) {
+function FirstImportSummary({ progress, startedAt, current, action }: { progress: FirstImportProgress; startedAt: string; current: string; action?: ReactNode }) {
   const { t } = useI18n();
   const elapsed = useElapsed(startedAt, true);
   const minutes = progress.remainingMs === null ? null : remainingMinutes(progress.remainingMs);
@@ -382,6 +389,7 @@ function FirstImportSummary({ progress, startedAt, current }: { progress: FirstI
           {left} · {current} · {elapsed}
         </span>
       </div>
+      {action}
       <DetailsChevron />
     </div>
     <div role="progressbar" aria-label={t("First history import", "Pierwszy import historii")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}
@@ -390,6 +398,51 @@ function FirstImportSummary({ progress, startedAt, current }: { progress: FirstI
       style={{ height: 6, borderRadius: "var(--r-bar)", background: "var(--sunk)", border: "1px solid var(--line)", overflow: "hidden" }}>
       <div style={{ height: "100%", width: `${percent}%`, background: "var(--accent)" }} />
     </div>
+  </>;
+}
+
+/**
+ * Pause / Resume of the import (TALK-001 D12). It sits inside the bar's summary, so its click must not
+ * open the details; the explanation is in the tooltip.
+ */
+function ImportPauseButton({ paused }: { paused: boolean }) {
+  const { t } = useI18n();
+  const [busy, setBusy] = useState(false);
+  const toggle = () => {
+    setBusy(true);
+    void api.pauseImport(!paused).catch(() => undefined).finally(() => { setBusy(false); bustApiMemo(); });
+  };
+  return <span onClick={event => { event.preventDefault(); event.stopPropagation(); }} data-import-pause={paused ? "resume" : "pause"}>
+    <GhostButton onClick={toggle} disabled={busy} title={paused
+      ? t("Continues where the import stopped. What is already imported is not read again.", "Wznawia import tam, gdzie się zatrzymał. To, co już zaimportowane, nie jest czytane ponownie.")
+      : t("Stops copying and importing within moments. What is already imported is kept. Stays paused until you resume, also after a restart.",
+        "Zatrzymuje kopiowanie i import w ciągu chwili. To, co już zaimportowane, zostaje. Pozostaje wstrzymany do wznowienia, także po restarcie.")}>
+      {paused ? t("Resume", "Wznów") : t("Pause", "Wstrzymaj")}
+    </GhostButton>
+  </span>;
+}
+
+/**
+ * The bar while the import is paused: no estimate and no share, since a stopped run cannot measure what is
+ * left; the state, what happens to the data, and Resume.
+ */
+function PausedImportSummary() {
+  const { t } = useI18n();
+  return <>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+      <span aria-hidden="true" style={{ width: 8, height: 8, flex: "0 0 auto", borderRadius: "var(--r-dot)", background: "var(--warn)" }} />
+      <div style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: 9, flex: 1 }}>
+        <strong style={{ minWidth: 0, fontSize: "var(--fs-4)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {t("Import paused", "Import wstrzymany")}
+        </strong>
+        <span className="mono" style={{ minWidth: 0, color: "var(--muted)", fontSize: "var(--fs-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {t("imported data is kept", "zaimportowane dane zostają")}
+        </span>
+      </div>
+      <ImportPauseButton paused />
+      <DetailsChevron />
+    </div>
+    <div aria-hidden="true" style={{ height: 6, borderRadius: "var(--r-bar)", background: "var(--sunk)", border: "1px solid var(--line)" }} />
   </>;
 }
 
