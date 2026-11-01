@@ -62,6 +62,23 @@ function fixture() {
   return { root, options, events, session, lines };
 }
 
+describe("Pause", () => {
+  // TALK-001 D12: a cloud import already running stops before its next session once the user pauses.
+  test("a paused import starts no further session and keeps what it already saved", async () => {
+    const f = fixture();
+    const { remote, get } = provider({ events: 3, updatedAt: "2026-10-01T00:00:00Z" });
+    let checks = 0;
+    const result = await syncClaudeCloudSessions({ ...f.options(get), paused: () => checks++ > 0 });
+    // The profile was entered before Pause; the session loop stopped before reading any session.
+    expect(result.profiles[0]!.changed).toBe(0);
+    expect(remote.calls.some(call => call.includes("/events"))).toBe(false);
+    expect(fs.existsSync(f.events)).toBe(false);
+    const resumed = await syncClaudeCloudSessions({ ...f.options(get), paused: () => false });
+    expect(resumed.profiles[0]!.published).toBe(1);
+    expect(f.lines(f.events).map(e => e.event_id)).toEqual(["e1", "e2", "e3"]);
+  });
+});
+
 describe("eventsToAppend", () => {
   test("accepts consecutive events after the archived end and skips a re-read prefix", () => {
     expect(eventsToAppend([event(1), event(2)], null, false).map(e => e.event_id)).toEqual(["e1", "e2"]);

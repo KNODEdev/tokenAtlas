@@ -322,9 +322,9 @@ export function StatusBar(props: StatusBarProps) {
     const job = rebuild.job;
     const context = job && (job.state === "running" || job.state === "queued") && sync.run?.rebuildGeneration === job.generation
       ? `${t("Data rebuild", "Przebudowa danych")} · 1/${REBUILD_PHASES} ${t("Source files", "Pliki źródłowe")}` : undefined;
-    // An analysis rebuild is not an import: it has its own controls in Settings.
+    // Pause holds every source pass, an analysis rebuild's included (TALK-001 D12).
     return <SyncStatusBar sync={sync} context={context} compact={compact} stickyTop={stickyTop} state={state} events={events}
-      action={sync.run?.rebuildGeneration === undefined ? <ImportPauseButton paused={false} /> : undefined}
+      action={<ImportPauseButton paused={false} />}
       firstImport={importing ? { progress: first!, startedAt: sync.first_import!.started_at } : undefined} />;
   }
   if (importing) return <StatusShell label={t("First history import", "Pierwszy import historii")} expand={t("Expand details", "Rozwiń szczegóły")}

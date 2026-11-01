@@ -545,6 +545,8 @@ export function createFetchHandler(ctx: AppContext) {
     if (url.pathname === "/api/app-activity" && req.method === "GET") return handleAppActivity(ctx.sqlite, readData.activity());
     if (url.pathname === "/api/credit-notices") return await handleCreditNotices(ctx.sqlite, req);
     if (url.pathname === "/api/claude-login") {
+      // The Claude CLI sign-in goes online; before the first-run consent nothing may (TALK-001 D3).
+      if (awaitingLocations) return Response.json({ error: "Agree on the start screen first. / Najpierw zaakceptuj ekran startowy." }, { status: 409 });
       // A new token is read at once by the same scheduled Claude reading, not by a second scheduler.
       ctx.claudeLogin ??= createClaudeLoginService({ onSignedIn: () => {
         void ctx.refreshLiveReadings?.("claude")?.catch(error => console.warn("[tokenAtlas claude-login] reading after sign-in failed", error));

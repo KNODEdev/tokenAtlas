@@ -383,8 +383,9 @@ export function startServer(
     // not awaited: the next probe or the run's end takes it, and the event loop never waits for
     // them. The background writer's batches are short enough to wait for.
     if (closed) return false;
-    // No provider is contacted before the consent screen is accepted, nor while the user turned readings off.
-    if (awaitingLocations || !limitReadingsEnabled()) return false;
+    // No provider is contacted before the consent screen is accepted, while the user turned readings off, or
+    // with TOKENATLAS_PROBE_MINUTES=0, whatever starts the reading (schedule, sign-in change, Claude login).
+    if (awaitingLocations || !limitReadingsEnabled() || !(Number.isFinite(probeMin) && probeMin > 0)) return false;
     const holder = writeLeaseHolder(ctx.sqlite);
     return !holder || holder.kind === "background";
   };

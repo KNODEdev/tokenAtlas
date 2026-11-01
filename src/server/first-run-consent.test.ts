@@ -6,7 +6,7 @@ import path from "node:path";
 // TALK-001 D3/D4: before the consent screen is accepted nothing leaves this computer, also after a restart;
 // an "off" chosen there stays off whatever TOKENATLAS_PROBE_MINUTES says. Probes are enabled (1 min) on
 // purpose, with synthetic Codex and Claude sign-ins, so a missing gate would show as outbound traffic.
-interface Run { outbound: string[]; codexPolls: number; confirmed: boolean | null; preview: { sources: Array<{ vendor: string; files: number; bytes: number }> } | null }
+interface Run { outbound: string[]; codexPolls: number; login: number; confirmed: boolean | null; preview: { sources: Array<{ vendor: string; files: number; bytes: number }> } | null }
 
 async function startOnce(root: string, consent?: { limit_readings: boolean; cloud_import: boolean }): Promise<Run> {
   const script = path.join(root, `start-${Math.random().toString(36).slice(2)}.ts`);
@@ -28,6 +28,9 @@ async function startOnce(root: string, consent?: { limit_readings: boolean; clou
     });
     const base = "http://127.0.0.1:" + running.server.port;
     const preview = await (await fetch(base + "/api/setup/preview")).json();
+    // The Claude CLI sign-in goes online, so it is refused until the consent screen is accepted.
+    const login = (await fetch(base + "/api/claude-login", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ subject: "claude" }) })).status;
     let confirmed = null;
     const consent = ${JSON.stringify(consent ?? null)};
     if (consent) confirmed = (await (await fetch(base + "/api/setup/confirm", { method: "POST",
@@ -35,7 +38,7 @@ async function startOnce(root: string, consent?: { limit_readings: boolean; clou
     // Probes are first scheduled 3 and 4 seconds after the start.
     await new Promise(resolve => setTimeout(resolve, 6500));
     running.close?.();
-    process.stdout.write(JSON.stringify({ outbound, codexPolls, confirmed, preview }));
+    process.stdout.write(JSON.stringify({ outbound, codexPolls, login, confirmed, preview }));
     process.exit(0);`);
   const profile = path.join(root, "profile");
   const child = Bun.spawn([process.execPath, script], {
@@ -77,6 +80,7 @@ test("nothing reaches the network before consent, also after a restart; agreeing
     const waiting = await startOnce(root);
     expect(waiting.outbound).toEqual([]);
     expect(waiting.codexPolls).toBe(0);
+    expect(waiting.login).toBe(409);
     // The screen's facts come from a read-only scan: both synthetic sources with their files and bytes.
     const sources = Object.fromEntries(waiting.preview!.sources.map(source => [source.vendor, source]));
     expect(sources.claude).toMatchObject({ files: 1, bytes: 6 });

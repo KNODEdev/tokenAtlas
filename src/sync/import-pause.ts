@@ -9,11 +9,16 @@ import { localStateRoot } from "../config/local-identity";
  */
 const FILE = "import-paused.json";
 
+/** Only a missing file means "not paused": an unreadable or damaged one keeps the import stopped until Resume rewrites it. */
 export function importPaused(root = localStateRoot()): boolean {
+  const file = path.join(root, FILE);
+  let text: string;
+  try { text = fs.readFileSync(file, "utf8"); }
+  catch (error) { return (error as NodeJS.ErrnoException).code !== "ENOENT"; }
   try {
-    const stored = JSON.parse(fs.readFileSync(path.join(root, FILE), "utf8")) as { schema?: unknown; paused?: unknown };
-    return stored.schema === 1 && stored.paused === true;
-  } catch { return false; }
+    const stored = JSON.parse(text) as { schema?: unknown; paused?: unknown };
+    return stored.schema !== 1 || stored.paused !== false;
+  } catch { return true; }
 }
 
 export function saveImportPaused(paused: boolean, root = localStateRoot()): boolean {
