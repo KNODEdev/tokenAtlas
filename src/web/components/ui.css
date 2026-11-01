@@ -471,7 +471,11 @@ input[type="checkbox"]:disabled { opacity: .5; cursor: default; }
 
 /* Detail drawer (`.ui-detail-drawer`, opened from `.ui-open-row`): facts on top, then sections divided by dashed rules.
    Every row-detail drawer reads the same way, whatever it shows (paper-atlas §7). */
-.codex-columns-drawer.ui-detail-drawer { width: min(860px, 100vw); }
+/* A detail drawer is as wide as what it shows (TALK-001 D14): short text keeps a reading measure, a wide table
+   widens the sheet while the viewport has room. Text lines stay readable inside a wide sheet. */
+.codex-columns-drawer.ui-detail-drawer { width: fit-content; min-width: min(480px, 100vw); max-width: min(860px, 100vw); }
+.codex-columns-drawer.codex-columns-drawer:has(table) { width: fit-content; min-width: min(680px, 100vw); max-width: min(1280px, 100vw); }
+.codex-columns-drawer :is(p, li) { max-width: 72ch; }
 /* The scroll shading of wide tables must match the sheet behind them. */
 .ui-detail-drawer { --shade: var(--surface); }
 .ui-detail-drawer .codex-columns-drawer__body { min-width: 0; }
