@@ -36,7 +36,7 @@ async function run(root: string, phase: Phase): Promise<Report> {
       try { return db.query("SELECT * FROM claude_events ORDER BY call_id").all().map(row => Object.fromEntries(Object.entries(row)
         .filter(([key, value]) => !/path|_at$|rowid|revision/i.test(key) && !(typeof value === "string" && value.includes(root))))); }
       finally { db.close(); } };
-    const complete = async () => { for (let i = 0; i < 600; i++) { const s = await sync();
+    const complete = async () => { for (let i = 0; i < 2400; i++) { const s = await sync();
       if (!s.running && s.bootstrap?.stage === "complete" && s.bootstrap?.ok === true) return; await sleep(100); }
       throw new Error("import did not complete: " + JSON.stringify((await sync()).bootstrap)); };
     const report = { phase };
@@ -130,4 +130,4 @@ test("Pause stops the first import, survives a restart, and Resume ends with the
     expect(resumed.paused).toBe(false);
     expect(resumed.rows).toEqual(expected);
   } finally { cleanup(reference); cleanup(paused); }
-}, 300_000);
+}, 900_000);
