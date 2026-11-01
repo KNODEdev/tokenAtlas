@@ -19,6 +19,8 @@ import { SubscriptionFactsPending } from "../db/subscription-facts";
 import { preparingDataResponse } from "./preparing-response";
 import { saveTemporaryDirectory } from "../config/temporary-storage";
 import { readCloudSyncSetting, saveCloudSyncMinutes } from "../sync/claude-cloud-settings";
+import { readLimitReadingsSetting, saveLimitReadingsEnabled } from "../sync/limit-readings-settings";
+import { readSourcePreview } from "./source-preview";
 import { resolveDbPath } from "../db";
 import { validateDatabaseDestination } from "../db/relocate";
 import { serveCycleReadBatch } from "./cycle-read-batch";
@@ -134,6 +136,24 @@ export function createFetchHandler(ctx: AppContext) {
         return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 409 });
       }
     }
+    if (url.pathname === "/api/setup/preview" && req.method === "GET") {
+      // Read-only: file counts and sizes of the detected sources, shown before the user agrees to copy them.
+      return Response.json(await readSourcePreview(url.searchParams.get("refresh") === "1"));
+    }
+    if (url.pathname === "/api/setup/limit-readings" && req.method === "GET") {
+      try { return Response.json({ setting: readLimitReadingsSetting() }); }
+      catch (error) { return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 409 }); }
+    }
+    if (url.pathname === "/api/setup/limit-readings" && req.method === "POST") {
+      try {
+        const body = await req.json() as { enabled?: unknown };
+        const setting = saveLimitReadingsEnabled(body.enabled);
+        if (setting.enabled && !awaitingLocations) void ctx.refreshLiveReadings?.()?.catch(error => console.warn("[tokenAtlas readings] refresh after enabling failed", error));
+        return Response.json({ setting });
+      } catch (error) {
+        return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 409 });
+      }
+    }
     if (url.pathname === "/api/setup/cloud-sessions" && req.method === "GET") {
       try { return Response.json({ setting: readCloudSyncSetting(), status: ctx.cloudSessions?.status() ?? null }); }
       catch (error) { return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 409 }); }
@@ -214,7 +234,12 @@ export function createFetchHandler(ctx: AppContext) {
     }
     if (url.pathname === "/api/setup/confirm" && req.method === "POST") {
       // Releasing the first import is the app page's decision; `respond` refuses cross-site writes (write-guard.ts).
-      ctx.confirmLocations?.();
+      // The consent screen sends its network choices with it; an older page sends none and keeps the defaults.
+      const body = await req.json().catch(() => ({})) as { limit_readings?: unknown; cloud_import?: unknown };
+      ctx.confirmLocations?.({
+        ...(typeof body.limit_readings === "boolean" ? { limitReadings: body.limit_readings } : {}),
+        ...(typeof body.cloud_import === "boolean" ? { cloudImport: body.cloud_import } : {}),
+      });
       return Response.json({ ok: true, locations_confirmed: !awaitingLocations });
     }
     if (url.pathname === "/api/source-profile" && req.method === "POST") {

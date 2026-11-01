@@ -41,6 +41,9 @@ import { readGlmKey, runGlmProbeCycle } from "../providers/adapters/glm";
 import { loadPool, runGeminiProbeCycle } from "../providers/adapters/gemini";
 import { ResetProbeWatch, readProbeSubjectLimits } from "./reset-probe";
 import { runAtlasBootstrap, firstImportPending, awaitingLocations, locationsConfirmed, getAtlasBootstrapState, LOCATIONS_CONFIRMED_KEY, setFirstImportPending, setAwaitingLocations } from "./server-bootstrap";
+import { markAwaitingConsent } from "./consent-state";
+import { limitReadingsEnabled, saveLimitReadingsEnabled } from "../sync/limit-readings-settings";
+import { saveCloudSyncMinutes } from "../sync/claude-cloud-settings";
 import { createAppContext, rebuildSubscriptionMaps } from "./app-context";
 import { refreshCodexDiscovery, refreshVendorDiscovery, probeTargets, runCodexProbePoll, probeSubscriptionGate, currentProbeSubscription } from "./account-probes";
 import { createFetchHandler } from "./api-router";
@@ -196,6 +199,8 @@ export function startServer(
   setFirstImportPending(bootstrapCatchUpMode === "full" && bootstrapRecoveryId !== null);
   setAwaitingLocations(firstImportPending && process.env.TOKENATLAS_CONFIRM_LOCATIONS?.trim() !== "0"
     && !locationsConfirmed(ctx.sqlite));
+  // A key left by an earlier start that no longer waits (e.g. TOKENATLAS_CONFIRM_LOCATIONS=0) must not hold rates back.
+  markAwaitingConsent(ctx.sqlite, awaitingLocations);
   if (awaitingLocations) {
     getAtlasBootstrapState().message = "Waiting for the folders to be confirmed on the start screen";
     console.log("[tokenAtlas API] Empty database: the first import waits for the folders to be confirmed on the start screen " +
@@ -316,10 +321,14 @@ export function startServer(
         `(TOKENATLAS_SYNC_MINUTES to change, 0 to disable)`
     );
   }
-  ctx.confirmLocations = () => {
+  ctx.confirmLocations = (choices = {}) => {
     if (!awaitingLocations) return;
+    // The consent screen's toggles are saved before anything may reach the network (TALK-001 D3/D4).
+    if (choices.limitReadings !== undefined) saveLimitReadingsEnabled(choices.limitReadings);
+    if (choices.cloudImport === false) saveCloudSyncMinutes(0);
     ctx.sqlite.query("INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
       .run(LOCATIONS_CONFIRMED_KEY, new Date().toISOString());
+    markAwaitingConsent(ctx.sqlite, false);
     setAwaitingLocations(false);
     console.log("[tokenAtlas API] Folders confirmed - starting the first import.");
     const firstImport: FirstImport = { started_at: new Date().toISOString(), source_files: null };
@@ -353,6 +362,8 @@ export function startServer(
     // not awaited: the next probe or the run's end takes it, and the event loop never waits for
     // them. The background writer's batches are short enough to wait for.
     if (closed) return false;
+    // No provider is contacted before the consent screen is accepted, nor while the user turned readings off.
+    if (awaitingLocations || !limitReadingsEnabled()) return false;
     const holder = writeLeaseHolder(ctx.sqlite);
     return !holder || holder.kind === "background";
   };

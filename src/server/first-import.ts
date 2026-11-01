@@ -9,16 +9,21 @@ export interface FirstImport { started_at: string; source_files: number | null }
  * Reads directory entries only; an unreadable folder is skipped rather than failing the import.
  */
 export async function countSourceFiles(roots: readonly { path: string }[]): Promise<number> {
-  let files = 0;
+  return (await measureSourceFiles(roots)).files;
+}
+
+/** Files and bytes under the roots, from directory entries and sizes only: nothing is opened or written. */
+export async function measureSourceFiles(roots: readonly { path: string }[]): Promise<{ files: number; bytes: number }> {
+  let files = 0, bytes = 0;
   const visit = async (entry: string): Promise<void> => {
     let stat;
     try { stat = await fs.lstat(entry); } catch { return; }
-    if (stat.isFile()) { files++; return; }
+    if (stat.isFile()) { files++; bytes += stat.size; return; }
     if (!stat.isDirectory()) return;
     let names: string[];
     try { names = await fs.readdir(entry); } catch { return; }
     for (const name of names) await visit(path.join(entry, name));
   };
   for (const root of new Set(roots.map(root => path.resolve(root.path)))) await visit(root);
-  return files;
+  return { files, bytes };
 }

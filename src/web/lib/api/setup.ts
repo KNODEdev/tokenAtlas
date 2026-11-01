@@ -51,6 +51,14 @@ export interface SetupState {
   suggestion: SuggestedSubscription[];
   notes: string[];
 }
+/** What the first import would copy and whom the app would contact (`/api/setup/preview`, server/source-preview.ts). */
+export interface SourcePreview {
+  archive: string;
+  sources: Array<{ vendor: string; paths: string[]; files: number; bytes: number }>;
+  readings: Array<{ vendor: string; hosts: string[]; via_cli?: boolean }>;
+  cloud: { hosts: string[] };
+  rates: { hosts: string[] };
+}
 export interface SetupSaveRequest {
   archive?: string | null;
   archiveAction?: "create" | "connect";

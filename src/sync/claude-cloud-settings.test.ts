@@ -10,13 +10,19 @@ afterEach(() => { for (const root of roots.splice(0)) removeTestFixture(root, { 
 const root = () => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-cloud-setting-")); roots.push(dir); return dir; };
 
 describe("cloud session interval", () => {
-  test("defaults to 30 minutes, keeps a saved choice and lets the environment override it", () => {
+  test("defaults to 30 minutes, keeps a saved choice and lets the environment override an enabled one", () => {
     const dir = root();
     expect(readCloudSyncSetting({}, dir)).toEqual({ minutes: DEFAULT_CLOUD_SYNC_MINUTES, source: "default" });
+    expect(readCloudSyncSetting({ TOKENATLAS_CLOUD_MINUTES: "15" }, dir)).toEqual({ minutes: 15, source: "environment" });
     expect(saveCloudSyncMinutes(60, dir)).toEqual({ minutes: 60, source: "settings" });
     expect(readCloudSyncSetting({}, dir)).toEqual({ minutes: 60, source: "settings" });
-    expect(saveCloudSyncMinutes(0, dir).minutes).toBe(0);
     expect(readCloudSyncSetting({ TOKENATLAS_CLOUD_MINUTES: "15" }, dir)).toEqual({ minutes: 15, source: "environment" });
+    expect(readCloudSyncSetting({ TOKENATLAS_CLOUD_MINUTES: "0" }, dir).minutes).toBe(0);
+  });
+  test("a saved off is a veto the environment cannot lift", () => {
+    const dir = root();
+    expect(saveCloudSyncMinutes(0, dir).minutes).toBe(0);
+    expect(readCloudSyncSetting({ TOKENATLAS_CLOUD_MINUTES: "15" }, dir)).toEqual({ minutes: 0, source: "settings" });
   });
   test("refuses anything but whole minutes within a day", () => {
     const dir = root();
