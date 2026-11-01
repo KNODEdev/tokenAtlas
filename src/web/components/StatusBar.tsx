@@ -317,7 +317,7 @@ export function StatusBar(props: StatusBarProps) {
     </div>
   );
   if (sync?.paused && !sync.running) return <StatusShell label={t("Import paused", "Import wstrzymany")} expand={t("Expand details", "Rozwiń szczegóły")}
-    stickyTop={stickyTop} state={state} events={events} summary={<PausedImportSummary fraction={first?.fraction ?? null} />} />;
+    stickyTop={stickyTop} state={state} events={events} summary={<PausedImportSummary />} />;
   if (sync?.running) {
     const job = rebuild.job;
     const context = job && (job.state === "running" || job.state === "queued") && sync.run?.rebuildGeneration === job.generation
@@ -422,10 +422,12 @@ function ImportPauseButton({ paused }: { paused: boolean }) {
   </span>;
 }
 
-/** The bar while the import is paused: no moving estimate, the share done so far and Resume. */
-function PausedImportSummary({ fraction }: { fraction: number | null }) {
+/**
+ * The bar while the import is paused: no estimate and no share, since a stopped run cannot measure what is
+ * left; the state, what happens to the data, and Resume.
+ */
+function PausedImportSummary() {
   const { t } = useI18n();
-  const percent = fraction === null ? null : Math.floor(fraction * 100);
   return <>
     <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
       <span aria-hidden="true" style={{ width: 8, height: 8, flex: "0 0 auto", borderRadius: "var(--r-dot)", background: "var(--warn)" }} />
@@ -434,16 +436,13 @@ function PausedImportSummary({ fraction }: { fraction: number | null }) {
           {t("Import paused", "Import wstrzymany")}
         </strong>
         <span className="mono" style={{ minWidth: 0, color: "var(--muted)", fontSize: "var(--fs-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {percent !== null ? `${percent}% · ` : ""}{t("imported data is kept", "zaimportowane dane zostają")}
+          {t("imported data is kept", "zaimportowane dane zostają")}
         </span>
       </div>
       <ImportPauseButton paused />
       <DetailsChevron />
     </div>
-    <div role="progressbar" aria-label={t("Import paused", "Import wstrzymany")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent ?? undefined}
-      style={{ height: 6, borderRadius: "var(--r-bar)", background: "var(--sunk)", border: "1px solid var(--line)", overflow: "hidden" }}>
-      {percent !== null && <div style={{ height: "100%", width: `${percent}%`, background: "var(--faint)" }} />}
-    </div>
+    <div aria-hidden="true" style={{ height: 6, borderRadius: "var(--r-bar)", background: "var(--sunk)", border: "1px solid var(--line)" }} />
   </>;
 }
 

@@ -1,0 +1,18 @@
+/* Guided tour (TALK-001 D13): a paper slip beside its element and an accent ring around it; nothing is dimmed,
+   so the app, the import bar and Pause stay usable underneath. */
+.guided-tour-ring {
+  position: fixed; z-index: var(--z-drawer); pointer-events: none;
+  border: 2px solid var(--accent); border-radius: var(--r-card);
+}
+.guided-tour-bubble, .guided-tour-offer {
+  position: fixed; z-index: var(--z-drawer); padding: var(--s-6) var(--s-7);
+  background: var(--surface); color: var(--text); border: 1px solid var(--pencil); border-radius: var(--r-card);
+  box-shadow: var(--shadow); font-family: var(--font-sans); font-size: var(--fs-4);
+}
+.guided-tour-bubble p { margin: var(--s-3) 0 var(--s-5); color: var(--muted); line-height: 1.5; }
+.guided-tour-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-4); }
+.guided-tour-head strong { font-weight: var(--fw-semibold); }
+.guided-tour-head .mono { color: var(--faint); font-size: var(--fs-2); }
+.guided-tour-actions { display: flex; justify-content: flex-end; align-items: center; gap: var(--s-5); }
+/* The one-time offer for an installation that predates the tour: bottom right, away from the status bar. */
+.guided-tour-offer { right: var(--s-8); bottom: var(--s-8); display: flex; flex-direction: column; gap: var(--s-5); max-width: 340px; }

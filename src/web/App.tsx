@@ -46,6 +46,7 @@ import { NAV_W, NAV_W_COLLAPSED, SUBS_RAIL_COMPACT_W, SUBS_RAIL_W, WINDOW_RAIL_W
 import { AppHeader } from "./components/AppHeader";
 import { contextPreviewAppliesTo, useContextPreview } from "./lib/context-premium";
 import { Sidebar } from "./components/Sidebar";
+import { GuidedTour } from "./components/GuidedTour";
 import { CommandPalette } from "./components/CommandPalette";
 import { CycleDrawer } from "./components/CycleDrawer";
 import { WindowRail } from "./components/CycleRail";
@@ -206,6 +207,7 @@ export function App() {
     [language, t],
   );
   const bp = useBreakpoint();
+  const [tourReplay, setTourReplay] = useState(0);
   const viewportRailMode = useRailMode();
   const [railPreference, setRailPreference] = useRailPreference();
   const railMode = resolveRailMode(viewportRailMode, railPreference);
@@ -688,7 +690,9 @@ export function App() {
         goto={goto}
         onMobileNav={isMobile ? () => setMobileNav(true) : undefined}
         compact={isMobile}
+        onHelp={isMobile ? undefined : () => setTourReplay(count => count + 1)}
       />
+      {!isMobile && <GuidedTour replay={tourReplay} onOpenUsage={() => goto("usage")} />}
       <StatusBar sync={sync} syncUnavailable={syncUnavailable} syncObservedAt={syncObservedAt} rebuild={rebuild}
         waitingForSubscriptions={bootstrapping} stickyTop={HEADER_H} compact={isMobile} onOpenSettings={() => goto("settings")}
         onOpenAccount={id => { setAccount(accountsList.find(entry => entry.id.toLowerCase() === id)?.id ?? id); goto("overview"); }} />

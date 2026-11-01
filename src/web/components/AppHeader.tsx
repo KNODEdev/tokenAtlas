@@ -25,6 +25,7 @@ export function AppHeader({
   compact,
   activity,
   contextPreviewApplies = false,
+  onHelp,
 }: {
   account: string;
   accounts: ApiAccount[];
@@ -36,6 +37,8 @@ export function AppHeader({
   compact?: boolean;
   activity?: ReactNode;
   contextPreviewApplies?: boolean;
+  /** Replays the guided tour (TALK-001 D10). */
+  onHelp?: () => void;
 }) {
   const { language, setLanguage, t } = useI18n();
   const hidden = usePrivacy();
@@ -98,6 +101,8 @@ return (
         </svg>
         {!compact && (hidden ? t("Privacy on", "Dane ukryte") : t("Hide data", "Ukryj dane"))}
       </button>
+      {onHelp && <button type="button" className="ui-button shell-theme" data-tour-help onClick={onHelp}
+        aria-label={t("Show what is where", "Pokaż, co jest gdzie")} title={t("Show what is where", "Pokaż, co jest gdzie")}>?</button>}
       <button type="button" className="ui-button shell-theme" onClick={onToggleTheme}
         aria-label={theme === "dark" ? t("Switch to light theme", "Włącz jasny motyw") : t("Switch to dark theme", "Włącz ciemny motyw")}
         title={theme === "dark" ? t("Switch to light theme", "Włącz jasny motyw") : t("Switch to dark theme", "Włącz ciemny motyw")}>

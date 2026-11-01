@@ -7,6 +7,7 @@ import { Brand } from "../components/Sidebar";
 import { LANGUAGE_OPTIONS, useI18n } from "../lib/i18n";
 import { countLabel } from "../lib/format";
 import { VENDOR_LABELS } from "../components/SyncActivity";
+import { requestTourAfterConsent } from "../components/GuidedTour";
 import { SetupSources, setupDeclarations, useDatabaseMove, type SetupRow } from "./Setup";
 import "../components/AppHeader.css";
 import "./FirstRun.css";
@@ -111,6 +112,8 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
       }
       if (restartReason) { setDone({ wrote, restart: restartReason }); return; }
       await api.confirmLocations(consent ? { limit_readings: readings, cloud_import: cloud } : {});
+      // The tour opens with the application, while the import runs (TALK-001 D13).
+      if (consent) requestTourAfterConsent();
       onDone();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
