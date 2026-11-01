@@ -5,7 +5,8 @@ import path from "node:path";
 // fonts and corner shapes from tokens, and never style text as capitals.
 const WEB = path.join(import.meta.dir, "..", "..", "src", "web");
 // Token sources may define literal values; everything else must reference them.
-const TOKEN_FILES = new Set(["tokens.css", path.join("components", "ui.css")]);
+// fonts.css declares the bundled IBM Plex faces the font tokens name, so it may spell the family out.
+const TOKEN_FILES = new Set(["tokens.css", "fonts.css", path.join("components", "ui.css")]);
 
 function sources(dir: string, out: string[] = []): string[] {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
