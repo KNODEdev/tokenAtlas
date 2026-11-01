@@ -6,7 +6,7 @@ import { DataTable, TableRow, Card, CardTitle, Dropdown, ErrorState, GhostButton
 import { polishPlural } from "../lib/mixFormat";
 import { useI18n } from "../lib/i18n";
 import { CloudSessionsHelp } from "../components/CloudSessionsHelp";
-import { cloudSessionProblems, useCloudSessions } from "../lib/cloud-sessions";
+import { cloudActionTitle, cloudProblemAction, cloudSessionProblems, useCloudSessions } from "../lib/cloud-sessions";
 export interface SetupRow extends SuggestedSubscription {
   editedId: string;
   include: boolean;
@@ -607,7 +607,7 @@ function CloudSessionsInterval({ disabled }: { disabled: boolean }) {
       <GhostButton onClick={() => void save()} disabled={disabled || busy || !valid}>{t("Save interval", "Zapisz odstęp")}</GhostButton>
       <CloudSessionsHelp problems={problems} />
     </Field>
-    {!!problems.length && <div role="alert" className="is-warn">{t("Claude cloud history incomplete", "Niepełna historia Claude z chmury")}</div>}
+    {!!problems.length && <div role="alert" className="is-warn">{cloudActionTitle(cloudProblemAction(problems), t)}</div>}
     {[...(error || read.error ? [error ?? read.error!] : [])].map(problem =>
       <div key={problem} role="alert" style={{ marginTop: 6, fontSize: "var(--fs-4)", color: "var(--warn)" }}>{problem}</div>)}
   </div>;

@@ -1,4 +1,7 @@
 {
+  "Confirm this device in Claude Code (/login)": "Confirmez cet appareil dans Claude Code (/login)",
+  "Sign in to Claude Code": "Connectez-vous à Claude Code",
+  "Claude cloud history incomplete, retrying": "Historique cloud Claude incomplet, nouvelle tentative",
   "Expand subscription panel": "Déplier le panneau des abonnements",
   "Collapse subscription panel": "Replier le panneau des abonnements",
   "Collapse subscription panel: only the most important figures": "Replier le panneau des abonnements : seulement les chiffres essentiels",

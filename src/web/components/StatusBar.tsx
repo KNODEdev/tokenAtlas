@@ -20,7 +20,7 @@ import { AppActivityDetails, viewName } from "./AppActivity";
 import "./StatusBar.css";
 import { ClaudeConnect } from "./ClaudeConnect";
 import { CloudSessionsHelp } from "./CloudSessionsHelp";
-import { cloudSessionProblems, cloudSessionSignIns, useCloudSessions } from "../lib/cloud-sessions";
+import { cloudActionTitle, cloudProblemAction, cloudSessionProblems, cloudSessionSignIns, useCloudSessions } from "../lib/cloud-sessions";
 import type { CloudSessionsResponse } from "../../shared/cloud-sessions";
 import { GhostButton } from "./ui";
 import { BOOTSTRAP_STAGES, bootstrapStageIndex, bootstrapStageLabel, DetailsChevron, LiveMark, RemapActivity,
@@ -133,9 +133,11 @@ export function statusLine({ sync, syncUnavailable, rebuild, waitingForSubscript
   const partial = run?.status === "partial_success";
   if (cloudSessionsError && sync) return { tone: "warn", title: t("Cloud import status unavailable", "Status importu chmury niedostępny"),
     detail: t("Cloud import details in events", "Szczegóły importu chmury w zdarzeniach"), progress: null };
-  if (cloudSessionProblems(cloudSessions).length && sync) return { tone: "warn",
-    title: t("Claude cloud history incomplete", "Niepełna historia Claude z chmury"),
-    detail: t("Cloud import details in events", "Szczegóły importu chmury w zdarzeniach"), progress: null };
+  // The line names the next step for the actual cause; the state itself and the details follow (TALK-001 D9).
+  const cloudProblems = cloudSessionProblems(cloudSessions);
+  if (cloudProblems.length && sync) return { tone: "warn",
+    title: cloudActionTitle(cloudProblemAction(cloudProblems), t),
+    detail: `${t("Claude cloud history incomplete", "Niepełna historia Claude z chmury")} · ${t("Cloud import details in events", "Szczegóły importu chmury w zdarzeniach")}`, progress: null };
   // A reading not taken while a sign-in is expired is lost for good (a missing price applies later too), so it
   // comes first among the warnings; the details list every account and computer.
   const notices = probeNoticeLines(probeNotices);
@@ -291,9 +293,10 @@ export function StatusBar(props: StatusBarProps) {
       {cloudProblems.length > 0 && <div className="status-event" data-cloud-import-warning>
         <div className="status-event-head">
           <strong className="is-warn">{cloudRead.error ? t("Cloud import status unavailable", "Status importu chmury niedostępny")
-            : t("Claude cloud history incomplete", "Niepełna historia Claude z chmury")}</strong>
+            : cloudActionTitle(cloudProblemAction(cloudProblems), t)}</strong>
           <div className="status-event-actions"><CloudSessionsHelp problems={cloudProblems} /></div>
         </div>
+        {!cloudRead.error && <span className="status-event-meta">{t("Claude cloud history incomplete", "Niepełna historia Claude z chmury")}</span>}
       </div>}
       {alert && missingRates && <div ref={alertRef} data-missing-rate-alert className="status-event">
         <div className="status-event-head">

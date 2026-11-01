@@ -20,7 +20,9 @@ const line = (state: CloudSessionsResponse | null, error: string | null = null) 
 
 test("import errors retain their profile and stop the global all-current claim", () => {
   expect(cloudSessionProblems(failed)).toEqual(["PC-profile-cloud: missing trusted device"]);
-  expect(line(failed)).toMatchObject({ tone: "warn", title: "Claude cloud history incomplete" });
+  // TALK-001 D9: the line names the next step for the cause; the state moves into its detail.
+  expect(line(failed)).toMatchObject({ tone: "warn", title: "Confirm this device in Claude Code (/login)",
+    detail: "Claude cloud history incomplete · Cloud import details in events" });
   const recovered = structuredClone(failed);
   recovered.status!.last!.profiles[0]!.errors = [];
   expect(line(recovered).title).toBe("Data up to date");
