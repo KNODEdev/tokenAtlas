@@ -22,7 +22,7 @@ import { gaugeJournalOutboxStatus } from "../providers/core/journal";
 import { withLiveProgress } from "../sync/live-progress";
 import { importPaused } from "../sync/import-pause";
 import { hasUnfinishedFirstFills, recoverFirstFills } from "../sync/first-fill";
-import { WriteLease } from "../db/write-lease";
+import { WriteLease, writeLeaseHolder } from "../db/write-lease";
 
 /** Mirrors the stage banners _sync.bat prints. The script numbers them [1/4]
  *  through [4/4] with lettered sub-stages, which counts to eight actual waits -
@@ -166,6 +166,21 @@ export async function undoStoppedFirstFills(sqlite: Database): Promise<string[]>
   await lease.acquire();
   try { return recoverFirstFills(sqlite); }
   finally { lease.release(); }
+}
+
+/**
+ * At startup of a paused installation: a Pause whose cleanup the previous server never finished (it stopped
+ * first) leaves the fill for this server, since no run will start before Resume. Nothing in this process writes
+ * yet. A request left by the previous, stopped server can refuse the lease for a few seconds; without a live
+ * holder the undo (one immediate transaction) is safe anyway. A live holder is another writer and recovers it itself.
+ */
+export function undoStoppedFirstFillsAtStartup(sqlite: Database): string[] {
+  if (!hasUnfinishedFirstFills(sqlite)) return [];
+  const lease = new WriteLease(sqlite, "sync");
+  const held = lease.tryAcquire();
+  if (!held && writeLeaseHolder(sqlite) !== null) return [];
+  try { return recoverFirstFills(sqlite); }
+  finally { if (held) lease.release(); }
 }
 
 /** A sync process stopped by Pause: not a failure, the import continues on Resume. */

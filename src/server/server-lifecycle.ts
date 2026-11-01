@@ -48,7 +48,7 @@ import { importPaused, saveImportPaused } from "../sync/import-pause";
 import { createAppContext, rebuildSubscriptionMaps } from "./app-context";
 import { refreshCodexDiscovery, refreshVendorDiscovery, probeTargets, runCodexProbePoll, probeSubscriptionGate, currentProbeSubscription } from "./account-probes";
 import { createFetchHandler } from "./api-router";
-import { advanceAnalysisRebuildSources, activeSyncCompletion, startSyncCompletion, needsRemap, stopSyncForPause } from "./server-sync";
+import { advanceAnalysisRebuildSources, activeSyncCompletion, startSyncCompletion, needsRemap, stopSyncForPause, undoStoppedFirstFillsAtStartup } from "./server-sync";
 import { getRemapState, startStartupRemap } from "./server-remap";
 import { resolveSubscription } from "./account-scope";
 
@@ -154,6 +154,11 @@ export function startServer(
   const journalTarget = journalRoot && (ctx.dbPath || ownsContext) ? { journalRoot, archiveRoot: ARCHIVE_ROOT } : null;
   setGaugeJournalDelivery(!!journalTarget);
   if (journalRoot) console.log(`[tokenAtlas API] Gauge journal: ${journalRoot}`);
+  // A Pause interrupted before its cleanup (the server stopped first) is settled before any reader or producer starts.
+  if (ownsContext && importPaused()) {
+    const undone = undoStoppedFirstFillsAtStartup(ctx.sqlite);
+    if (undone.length) console.warn(`[tokenAtlas sync] paused import: unfinished first fill of ${undone.join(", ")} undone; it is filled again on Resume`);
+  }
   // The writer lives outside the HTTP event loop and resumes durable dirty keys after restart. The
   // sync process and a remap take turns with it through the write lease (U2.2); it only waits
   // while this thread writes readings, so those single rows never queue behind one of its batches.
