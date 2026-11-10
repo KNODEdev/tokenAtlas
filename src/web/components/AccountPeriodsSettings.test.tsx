@@ -71,6 +71,8 @@ function fixture(overrides: Partial<AccountPeriodsView> = {}): AccountPeriodsVie
 
 const emptyPreview = (overrides: Partial<PeriodEditPreview> = {}): PeriodEditPreview =>
   ({ events: { calls: 900, days: 14, first: "2026-08-01", last: "2026-08-14" }, overrides: [], errors: [], ...overrides });
+/** A check that stops Save, so a test reads the request it sends without saving. */
+const HELD = "Plik deklaracji ma błąd.";
 
 async function render(view: AccountPeriodsView = fixture(), provider = "all", aliases: string[] = [],
   coverage: PlanPriceCoverage = { since: null, until: null, subjects: [] }, extras?: AccountCardExtras, cycles: BillingCyclesView = { accounts: [] }) {
@@ -133,7 +135,7 @@ describe("AccountPeriodsSettings", () => {
 
     test("the date fields show and accept this computer's clock and store UTC; the UTC instant stays in the tooltip", async () => {
       const rendered = await render();
-      const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview());
+      const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview({ errors: [HELD] }));
       try {
         await selectHistoricalPlan(rendered.host);
         const form = formOf(rendered.host);
@@ -142,7 +144,7 @@ describe("AccountPeriodsSettings", () => {
         expect(labelled(form, "Od").getAttribute("title")).toBe("UTC 2026-02-28 00:00");
         expect(form.textContent).not.toContain("czasu lokalnego");
         await invoke(labelled(form, "Od"), "onChange", { target: { value: "2026-03-01T10:00" } });
-        await invoke(button(formOf(rendered.host), "Podgląd"), "onClick");
+        await invoke(formOf(rendered.host), "onSubmit", { preventDefault() {} });
         await flushUntil(() => preview.mock.calls.length > 0);
         expect(preview.mock.calls[0]?.[0]).toMatchObject({ row: { from: "2026-03-01T09:00:00.000Z" } });
       } finally { await cleanup(rendered, [preview]); }
@@ -158,7 +160,7 @@ describe("AccountPeriodsSettings", () => {
     try {
       await selectHistoricalPlan(rendered.host);
       await invoke(labelled(formOf(rendered.host), "Do"), "onChange", { target: { value: "2026-04-20T00:00" } });
-      await invoke(button(formOf(rendered.host), "Podgląd"), "onClick");
+      await invoke(formOf(rendered.host), "onSubmit", { preventDefault() {} });
       await flushUntil(() => formOf(rendered.host).textContent.includes("Te daty nakładają się na inny Twój okres:"));
       const form = formOf(rendered.host);
       expect(form.textContent).toContain("Max · ×5 · 2026-04-10 00:00 → trwa");
@@ -248,7 +250,9 @@ describe("AccountPeriodsSettings", () => {
       expect(labelled(form, "Okres rozliczeniowy").getAttribute("aria-haspopup")).toBe("listbox");
       expect(labelled(form, "Plan").getAttribute("aria-haspopup")).toBe("listbox");
       expect(labelled(form, "Od").value).toBe("2026-09-12T19:41");
-      expect(button(form, "Zapisz").hasAttribute("disabled")).toBe(true);
+      // Save checks the change itself: no separate preview step comes first.
+      expect(button(form, "Zapisz").hasAttribute("disabled")).toBe(false);
+      expect(nodes(form).some((node) => node.tagName === "BUTTON" && node.textContent === "Podgląd")).toBe(false);
       await invoke(button(form, "Anuluj"), "onClick");
       expect(formOf(rendered.host)).toBeUndefined();
     } finally { await cleanup(rendered); }
@@ -256,7 +260,7 @@ describe("AccountPeriodsSettings", () => {
 
   test("clicking an unknown plan period opens a prefilled creation drawer and Escape dismisses it", async () => {
     const rendered = await render();
-    const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview());
+    const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview({ errors: [HELD] }));
     try {
       await selectAccount(rendered.host, "account_0006@example.test");
       const trigger = bar(rendered.host, "Plan nieustalony,");
@@ -265,7 +269,7 @@ describe("AccountPeriodsSettings", () => {
       expect(labelled(form, "Od").value).toBe("2026-09-09T15:48");
       expect(labelled(form, "Do").value).toBe("2026-09-12T19:41");
       await chooseOption(labelled(form, "Plan"), "pro");
-      await invoke(button(form, "Podgląd"), "onClick");
+      await invoke(formOf(rendered.host), "onSubmit", { preventDefault() {} });
       await flushUntil(() => preview.mock.calls.length > 0);
       expect(preview.mock.calls[0]?.[0]).toMatchObject({ kind: "plan", replace: null, row: { account: "claude-1", from: "2026-09-09T15:48:00.000Z", until: "2026-09-12T19:41:00.000Z", plan: "pro" } });
       const dialog = nodes(rendered.host).find((node) => node.tagName === "DIALOG")!;
@@ -278,7 +282,7 @@ describe("AccountPeriodsSettings", () => {
     const data = fixture();
     data.planPeriods.push(plan({ id: 12, provider: "codex", account: "codex1", plan: "none", from: "2026-08-01", until: "2026-09-01", origin: "declared", readings: 0 }));
     const rendered = await render(data);
-    const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview());
+    const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview({ errors: [HELD] }));
     try {
       await selectAccount(rendered.host, "account_0006@example.test");
       await invoke(bar(rendered.host, "Plan nieustalony,"), "onClick");
@@ -286,7 +290,7 @@ describe("AccountPeriodsSettings", () => {
       const options = await dropdownOptions(labelled(form, "Plan"));
       expect(options.map((option) => [option.value, option.label]).at(-2)).toEqual(["none", "Brak abonamentu"]);
       await chooseOption(labelled(form, "Plan"), "none");
-      await invoke(button(form, "Podgląd"), "onClick");
+      await invoke(formOf(rendered.host), "onSubmit", { preventDefault() {} });
       await flushUntil(() => preview.mock.calls.length > 0);
       expect(preview.mock.calls[0]?.[0]).toMatchObject({ kind: "plan", replace: null, row: { account: "claude-1", plan: "none" } });
       await invoke(button(form, "Anuluj"), "onClick");
@@ -305,14 +309,14 @@ describe("AccountPeriodsSettings", () => {
     data.accounts.push({ provider: "claude", id: "old-social", label: "account_0006@example.test", current: false });
     data.planPeriods.push(plan({ id: 99, account: "old-social", plan: "max-5x", from: "2026-09-12T19:41:00Z", origin: "declared" }));
     const rendered = await render(data);
-    const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview());
+    const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview({ errors: [HELD] }));
     try {
       await selectAccount(rendered.host, "account_0006@example.test");
       await invoke(bar(rendered.host, "Max · ×5,"), "onClick");
       await chooseOption(labelled(rendered.host, "Zapis okresu do poprawienia"), "plan|99");
       expect(nodes(rendered.host).filter((node) => node.tagName === "DIALOG")).toHaveLength(1);
       expect(nodes(rendered.host).filter((node) => node.tagName === "FORM")).toHaveLength(1);
-      await invoke(button(formOf(rendered.host), "Podgląd"), "onClick");
+      await invoke(formOf(rendered.host), "onSubmit", { preventDefault() {} });
       await flushUntil(() => preview.mock.calls.length > 0);
       expect(preview.mock.calls[0]?.[0]).toMatchObject({ kind: "plan", replace: { account: "old-social", from: "2026-09-12T19:41:00Z" }, row: { account: "old-social" } });
     } finally { await cleanup(rendered, [preview]); }
@@ -326,8 +330,6 @@ describe("AccountPeriodsSettings", () => {
       await selectHistoricalPlan(rendered.host);
       const form = formOf(rendered.host);
       await invoke(labelled(form, "Notatka"), "onChange", { target: { value: "potwierdzenie płatności" } });
-      await invoke(button(form, "Podgląd"), "onClick");
-      await flushUntil(() => !button(form, "Zapisz").hasAttribute("disabled"));
       await invoke(form, "onSubmit", { preventDefault() {} });
       await flushUntil(() => save.mock.calls.length > 0);
       expect(save.mock.calls[0]?.[0]).toMatchObject({ revision: "rev-1", kind: "plan", replace: { account: "claude-2", from: "2026-02-28" },
@@ -337,14 +339,14 @@ describe("AccountPeriodsSettings", () => {
 
   test("declared source corrections keep original keys and evidence when opened from the chart", async () => {
     const rendered = await render();
-    const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview());
+    const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview({ errors: [HELD] }));
     try {
       await selectAccount(rendered.host, "account_0002@example.test");
       await invoke(button(rendered.host, "Cała historia"), "onClick");
       await invoke(bar(rendered.host, "PC-B .claude-2,"), "onClick");
       await invoke(button(rendered.host, "▸ zaobserwowany oryginał (1)"), "onClick");
       expect(rendered.host.textContent).toContain("Zaobserwowany oryginał: account_0006@example.test");
-      await invoke(button(formOf(rendered.host), "Podgląd"), "onClick");
+      await invoke(formOf(rendered.host), "onSubmit", { preventDefault() {} });
       await flushUntil(() => preview.mock.calls.length > 0);
       expect(preview.mock.calls[0]?.[0]).toMatchObject({ kind: "account", replace: { source: "claude/pc-b", from: "2026-08-01" },
         row: { source: "claude/pc-b", account: "claude-2", from: "2026-08-01T00:00:00.000Z", until: "2026-08-15T00:00:00.000Z" } });
@@ -353,14 +355,14 @@ describe("AccountPeriodsSettings", () => {
 
   test("assigning an unknown interval preserves its dates and does not replace another declaration", async () => {
     const rendered = await render();
-    const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview());
+    const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview({ errors: [HELD] }));
     try {
       await invoke(findButton(rendered.host, "Do uzupełnienia"), "onClick");
       const gap = findButton(rendered.host, "Niepewne konto");
       await invoke(gap, "onClick");
       const form = formOf(rendered.host);
       await chooseOption(labelled(form, "Konto"), "claude-1");
-      await invoke(button(form, "Podgląd"), "onClick");
+      await invoke(formOf(rendered.host), "onSubmit", { preventDefault() {} });
       await flushUntil(() => preview.mock.calls.length > 0);
       expect(preview.mock.calls[0]?.[0]).toMatchObject({ kind: "account", replace: null,
         row: { source: "claude/pc-a", account: "claude-1", from: "2026-03-10T00:00:00.000Z", until: "2026-09-09T15:48:00.000Z" } });
@@ -369,14 +371,14 @@ describe("AccountPeriodsSettings", () => {
 
   test("an archive with no identified accounts still allows adding plan history", async () => {
     const rendered = await render(fixture({ accounts: [], accountPeriods: [], planPeriods: [] }), "anthropic", ["claude"]);
-    const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview());
+    const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview({ errors: [HELD] }));
     try {
       await invoke(button(rendered.host, "+ Dodaj historię planu"), "onClick");
       const form = formOf(rendered.host);
       await invoke(labelled(form, "Identyfikator konta"), "onChange", { target: { value: "new-account" } });
       await chooseOption(labelled(form, "Plan"), "pro");
       await invoke(labelled(form, "Od"), "onChange", { target: { value: "2026-09-01T00:00" } });
-      await invoke(button(form, "Podgląd"), "onClick");
+      await invoke(formOf(rendered.host), "onSubmit", { preventDefault() {} });
       await flushUntil(() => preview.mock.calls.length > 0);
       expect(preview.mock.calls[0]?.[0]).toMatchObject({ kind: "plan", replace: null, row: { provider: "claude", account: "new-account", plan: "pro" } });
     } finally { await cleanup(rendered, [preview]); }
@@ -394,8 +396,6 @@ describe("AccountPeriodsSettings", () => {
       expect(save.mock.calls[0]?.[0]).toEqual({ revision: "rev-1", kind: "plan", replace: { account: "claude-2", from: "2026-02-28" }, row: null });
       await invoke(button(formOf(rendered.host), "Anuluj"), "onClick");
       const form = formOf(rendered.host);
-      await invoke(button(form, "Podgląd"), "onClick");
-      await flushUntil(() => !button(form, "Zapisz").hasAttribute("disabled"));
       await invoke(form, "onSubmit", { preventDefault() {} });
       await flushUntil(() => form.textContent.includes("Deklaracje zmieniły się"));
       expect(formOf(rendered.host)).toBeDefined();
@@ -654,8 +654,6 @@ describe("AccountPeriodsSettings", () => {
       await invoke(button(rendered.host, "Cała historia"), "onClick");
       await invoke(bar(rendered.host, "PC-B .claude-2,"), "onClick");
       const form = formOf(rendered.host);
-      await invoke(button(form, "Podgląd"), "onClick");
-      await flushUntil(() => !button(form, "Zapisz").hasAttribute("disabled"));
       await invoke(form, "onSubmit", { preventDefault() {} });
       await flushUntil(() => form.textContent.includes("Odśwież dane"));
       const changed = fixture({ revision: "rev-2" });
@@ -666,7 +664,7 @@ describe("AccountPeriodsSettings", () => {
       await act(async () => { await Promise.resolve(); });
       expect(nodes(rendered.host).filter((node) => node.tagName === "FORM")).toHaveLength(1);
       expect(labelled(formOf(rendered.host), "Do").value).toBe("2026-08-15T00:00");
-      expect(button(formOf(rendered.host), "Zapisz").hasAttribute("disabled")).toBe(true);
+      expect(button(formOf(rendered.host), "Zapisz").hasAttribute("disabled")).toBe(false);
       await invoke(button(formOf(rendered.host), "Anuluj"), "onClick");
       await invoke(findButton(rendered.host, "Wszystkie konta — przegląd"), "onClick");
       await invoke(findButton(rendered.host, "+ Dodaj okres planu"), "onClick");
@@ -924,7 +922,7 @@ describe("AccountPeriodsSettings", () => {
 
     test("✎ on a declared period edits its row; the renewal day and an annual period are saved with it", async () => {
       const rendered = await render(fixture(), "all", [], undefined, undefined, cycles);
-      const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview({ billing: { provider: "claude", account: "claude-2", from: "2026-02-20T00:00:00.000Z" } }));
+      const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview({ billing: { provider: "claude", account: "claude-2", from: "2026-02-20T00:00:00.000Z" }, errors: [HELD] }));
       try {
         await selectAccount(rendered.host, "account_0002@example.test");
         await flushUntil(() => rendered.host.textContent.includes("Abonament2"));
@@ -934,7 +932,7 @@ describe("AccountPeriodsSettings", () => {
         expect(labelled(form, "Od").value).toBe("2026-02-28T00:00");
         await invoke(labelled(form, "Dzień odnowienia"), "onChange", { target: { value: "2026-02-20T00:00" } });
         await chooseOption(labelled(form, "Okres rozliczeniowy"), "12");
-        await invoke(button(form, "Podgląd"), "onClick");
+        await invoke(formOf(rendered.host), "onSubmit", { preventDefault() {} });
         await flushUntil(() => preview.mock.calls.length > 0);
         expect(preview.mock.calls[0]?.[0]).toMatchObject({ kind: "plan", replace: { account: "claude-2", from: "2026-02-28" },
           row: { plan: "max-20x", from: "2026-02-28T00:00:00.000Z", anchor: "2026-02-20T00:00:00.000Z", cycle_months: 12 } });
@@ -974,8 +972,6 @@ describe("AccountPeriodsSettings", () => {
         await invoke(button(rendered.host, "Abonament2"), "onClick");
         await invoke(bar(rendered.host, "Max · ×20 2026-02-28 00:00 – 2026-03-28 00:00"), "onClick");
         const form = formOf(rendered.host);
-        await invoke(button(form, "Podgląd"), "onClick");
-        await flushUntil(() => !button(form, "Zapisz").hasAttribute("disabled"));
         await invoke(form, "onSubmit", { preventDefault() {} });
         await flushUntil(() => save.mock.calls.length > 0 && formOf(rendered.host) === undefined);
         // While editing the table holds the periods alone; Gotowe brings the cycles back with the recalculation.
@@ -989,7 +985,7 @@ describe("AccountPeriodsSettings", () => {
 
     test("✎ on a cycle from readings starts a declaration of its run", async () => {
       const rendered = await render(fixture(), "all", [], undefined, undefined, cycles);
-      const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview());
+      const preview = spyOn(api, "previewPeriodEdit").mockResolvedValue(emptyPreview({ errors: [HELD] }));
       try {
         await selectAccount(rendered.host, "account_0002@example.test");
         await flushUntil(() => rendered.host.textContent.includes("Abonament2"));
@@ -998,7 +994,7 @@ describe("AccountPeriodsSettings", () => {
         const form = formOf(rendered.host);
         expect(labelled(form, "Od").value).toBe("2026-03-28T00:00");
         expect(labelled(form, "Do").value).toBe("");
-        await invoke(button(form, "Podgląd"), "onClick");
+        await invoke(formOf(rendered.host), "onSubmit", { preventDefault() {} });
         await flushUntil(() => preview.mock.calls.length > 0);
         expect(preview.mock.calls[0]?.[0]).toMatchObject({ kind: "plan", replace: null, row: { account: "claude-2", plan: "max-20x", evidence: "owner" } });
       } finally { await cleanup(rendered, [preview]); }

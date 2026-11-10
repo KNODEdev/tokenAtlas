@@ -295,7 +295,12 @@ function PeriodsBody({ data, reload, provider, providerAliases, focus, extras }:
     try {
       const edit = { ...editOf(target, view.revision, mode === "remove"), ...(mode === "save-ending-earlier" ? { end_earlier: true } : {}) };
       if (mode === "preview") setPreview(await api.previewPeriodEdit(edit));
-      else await save(edit);
+      else if (mode === "save") {
+        // One step (owner decision 31.10): Save checks first and stops only on a problem the owner must resolve.
+        const checked = await api.previewPeriodEdit(edit);
+        if (checked.errors.length > 0) setPreview(checked);
+        else await save(edit);
+      } else await save(edit);
     } catch (e) {
       failed(e);
     } finally {
@@ -469,7 +474,7 @@ function PeriodsBody({ data, reload, provider, providerAliases, focus, extras }:
           paidUsd={draft.kind === "plan" && original && "plan" in original ? paymentUsd(original) : null}
           accountLabel={accountLabel} providers={draft.kind === "plan" && draft.lockAccount ? [draft.provider] : visibleProviders}
           onPatch={patch} onPatchPlan={patchPlan} onCancel={closeDrawer}
-          onPreview={() => void run("preview")} onSave={() => void run("save")} onSaveEndingEarlier={() => void run("save-ending-earlier")} onEndBefore={endBefore} onReload={reload}
+          onSave={() => void run("save")} onSaveEndingEarlier={() => void run("save-ending-earlier")} onEndBefore={endBefore} onReload={reload}
           onRemove={draft.replace ? () => setRemoving(draft.anchor) : undefined}
           removing={removing === draft.anchor} onConfirmRemove={() => void run("remove")} onCancelRemove={() => setRemoving(null)}>
           {drawerContext?.plan && <details className="account-periods-form-extra">
@@ -570,7 +575,7 @@ function Origin({ row, covered, expanded, onToggle, planEvidence = [] }: {
   );
 }
 
-function PeriodEditor({ draft, view, busy, preview, error, stale, knownPlans, paidUsd = null, providers, accountLabel, onPatch, onPatchPlan, onCancel, onPreview, onSave, onSaveEndingEarlier, onEndBefore, onReload, children, onRemove, removing, onConfirmRemove, onCancelRemove }: {
+function PeriodEditor({ draft, view, busy, preview, error, stale, knownPlans, paidUsd = null, providers, accountLabel, onPatch, onPatchPlan, onCancel, onSave, onSaveEndingEarlier, onEndBefore, onReload, children, onRemove, removing, onConfirmRemove, onCancelRemove }: {
   draft: Draft;
   view: AccountPeriodsView;
   busy: boolean;
@@ -585,7 +590,6 @@ function PeriodEditor({ draft, view, busy, preview, error, stale, knownPlans, pa
   onPatch: (values: Partial<DraftBase>) => void;
   onPatchPlan: (values: Partial<{ plan: string; amount: string; currency: string; renewal: string; cycleMonths: string }>) => void;
   onCancel: () => void;
-  onPreview: () => void;
   onSave: () => void;
   /** Saves the edit and ends the earlier declared periods it runs into at its start. */
   onSaveEndingEarlier: () => void;
@@ -602,7 +606,8 @@ function PeriodEditor({ draft, view, busy, preview, error, stale, knownPlans, pa
   const accounts = groupAccountPeriods(view.accounts.filter((account) => account.provider === draft.provider), [], [])
     .map((group) => ({ id: group.aliases.includes(draft.account) ? draft.account : group.account, label: group.label }));
   const [customPlan, setCustomPlan] = useState(false);
-  const canSave = !!preview && preview.errors.length === 0;
+  // A checked change with problems waits for a fix; any edit clears the check and Save checks again.
+  const canSave = !preview || preview.errors.length === 0;
   const overlaps = preview && preview.errors.length > 0 ? overlapsOf(draft, view) : null;
   const offerEarlier = !!preview?.endEarlier && preview.endEarlier.errors.length === 0;
   // The server's overlap message carries raw instants; the readable list below replaces it when it names the rows.
@@ -756,9 +761,8 @@ function PeriodEditor({ draft, view, busy, preview, error, stale, knownPlans, pa
           <GhostButton disabled={busy} onClick={onCancelRemove}>{t("Cancel", "Anuluj")}</GhostButton>
         </div>}
         <div className="account-periods-actions">
-          <GhostButton onClick={onPreview} disabled={busy || removing} emphasis={!canSave}>{t("Preview", "Podgląd")}</GhostButton>
-          <GhostButton type="submit" disabled={busy || !canSave || removing} emphasis={canSave}
-            title={canSave ? undefined : t("Check the impact before saving.", "Sprawdź skutki zmiany przed zapisem.")}>{busy ? t("Saving…", "Zapisywanie…") : t("Save", "Zapisz")}</GhostButton>
+          <GhostButton type="submit" disabled={busy || !canSave || removing} emphasis
+            title={canSave ? undefined : t("Resolve the problem above first.", "Najpierw rozwiąż problem powyżej.")}>{busy ? t("Saving…", "Zapisywanie…") : t("Save", "Zapisz")}</GhostButton>
           {onRemove && <GhostButton onClick={onRemove} disabled={busy || removing}>{draft.kind === "plan" ? t("Remove", "Usuń") : t("Remove correction", "Usuń korektę")}</GhostButton>}
           <GhostButton onClick={onCancel} disabled={busy}>{t("Cancel", "Anuluj")}</GhostButton>
         </div>
