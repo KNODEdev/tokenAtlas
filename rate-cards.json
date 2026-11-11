@@ -2040,9 +2040,38 @@
         "claude-fable-5-1 and claude-mythos-5-1 read cache at 0.025x base input ($0.25/MTok), not the 0.1x every other model uses (platform.claude.com/docs/en/about-claude/pricing, 2026-09-20).",
         "claude-opus-4-5-20251101 and claude-sonnet-4-5-20250929 are dated ids the index carries; lookup is exact-match, so they need their own entry at the undated release's rates.",
         "claude-sonnet-5-5 ($2/$10, 5m write $2.50, 1h write $4, cache read $0.20; no fast mode) is from platform.claude.com/docs/en/about-claude/pricing, verified 2026-10-06.",
-        "claude-haiku-5-5 launched 2026-10-07: prompts up to 100,000 total input tokens cost $0.10/$0.50, cache read $0.01, writes 5m $0.125 / 1h $0.20 per MTok; strictly above 100,000 all categories cost 5x. Prompt length includes cache reads and writes. Source: https://platform.claude.com/docs/en/models/haiku-5-5/overview and https://platform.claude.com/docs/en/about-claude/pricing, verified 2026-10-13."
+        "claude-haiku-5-5 launched 2026-10-07: prompts up to 100,000 total input tokens cost $0.10/$0.50, cache read $0.01, writes 5m $0.125 / 1h $0.20 per MTok; strictly above 100,000 all categories cost 5x. Prompt length includes cache reads and writes. Source: https://platform.claude.com/docs/en/models/haiku-5-5/overview and https://platform.claude.com/docs/en/about-claude/pricing, verified 2026-10-13.",
+        "claude-fable-5-2 and claude-mythos-5-2: $8 input / $40 output, 5m write $10, 1h write $16, cache read $0.20 (0.025x input); fast mode $16/$80 with the same cache multipliers (read $0.40, 5m $20, 1h $32); full 1M context at standard rates. First local use 2026-11-09. Source: platform.claude.com/docs/en/about-claude/pricing, verified 2026-11-11."
       ],
       "models": {
+        "claude-fable-5-2": {
+          "in_uncached": 8.0,
+          "in_cache_read": 0.2,
+          "in_cache_write_5m": 10.0,
+          "in_cache_write_1h": 16.0,
+          "out_total": 40.0,
+          "fast": {
+            "in_uncached": 16.0,
+            "in_cache_read": 0.4,
+            "in_cache_write_5m": 20.0,
+            "in_cache_write_1h": 32.0,
+            "out_total": 80.0
+          }
+        },
+        "claude-mythos-5-2": {
+          "in_uncached": 8.0,
+          "in_cache_read": 0.2,
+          "in_cache_write_5m": 10.0,
+          "in_cache_write_1h": 16.0,
+          "out_total": 40.0,
+          "fast": {
+            "in_uncached": 16.0,
+            "in_cache_read": 0.4,
+            "in_cache_write_5m": 20.0,
+            "in_cache_write_1h": 32.0,
+            "out_total": 80.0
+          }
+        },
         "claude-fable-5": {
           "in_uncached": 10.0,
           "in_cache_read": 1.0,
@@ -2392,7 +2421,7 @@
     },
     "google": {
       "verified": true,
-      "source": "Official Gemini API Standard paid tier for the Flash models (ai.google.dev/gemini-api/docs/pricing and /changelog), verified 2026-10-06. Pro and default entries keep the hand-collected 2026-08-24 rates.",
+      "source": "Official Gemini API Standard paid tier for the Flash models (ai.google.dev/gemini-api/docs/pricing and /changelog), verified 2026-10-06; Gemini 4 Argon/Carbon from aistudio.google.com/docs/pricing, verified 2026-11-11. Pro and default entries keep the hand-collected 2026-08-24 rates.",
       "notes": [
         "Antigravity NIE podaje wlasnej ceny generacji - w odroznieniu od groka, ktory zwraca costUsdTicks.",
         "Dolary tego vendora sa wiec API-eq: nasz cennik zastosowany do zmierzonych tokenow. Mowia, ile ten ruch kosztowalby bez abonamentu, nie ile abonament kosztuje.",
@@ -2401,9 +2430,36 @@
         "claude-opus-4-6-thinking i claude-sonnet-4-6 pojawiaja sie w magazynie Antigravity, bo konto ma druga grupe limitu 'Claude and GPT models'. Antigravity nie publikuje dla nich stawek za token; wspolny rejestr szuka ich w tym cenniku, wiec decyzja wlasciciela 2026-10-27: PROXY po cenniku API Anthropic (tokeny myslenia licza sie jak output). gpt-oss-120b-medium i gemini-pro-b nie maja oficjalnej ceny - celowo bez ceny (UNKNOWN), nie koszt zero.",
         "Flash dates (changelog): 3 Flash Preview launched 2025-12-17, 3.6 Flash GA 2026-07-21, 3.7 Flash GA 2026-08-13 at an introductory price through 2026-12-31, 3.8 Flash GA 2026-09-02. The pricing page states one price per model plus the 2027-01-01 step for 3.6/3.7/3.8; no earlier official price was found, so the current official price applies from each model's first local use (3.8 Flash calls from 2026-08-30 precede its GA date and use the GA price). Vendor entries have no valid_from; only until/after is encoded.",
         "gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash: $0.75 input / $0.075 context caching / $3.75 output through 2026-12-31, then $1.50 / $0.15 / $7.50.",
-        "gemini-3-flash prices the gemini-3-flash-* Antigravity variants at the official gemini-3-flash-preview rate: $0.50 input / $0.05 context caching / $3.00 output (text, image, video), with no announced change date."
+        "gemini-3-flash prices the gemini-3-flash-* Antigravity variants at the official gemini-3-flash-preview rate: $0.50 input / $0.05 context caching / $3.00 output (text, image, video), with no announced change date.",
+        "gemini-4-argon and gemini-4-carbon (official ids, aistudio.google.com/docs/pricing, verified 2026-11-11): $2.00 input / $0.10 context caching (implicit only) / $10.00 output incl. thinking through 2026-11-30, then $4.00 / $0.20 / $20.00 from 2026-12-01. No prompt-length tiers. Antigravity variants of these names need their own PROXY entries once observed."
       ],
       "models": {
+        "gemini-4-argon": {
+          "in_uncached": 2.0,
+          "in_cache_read": 0.1,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 10.0,
+          "until": "2026-11-30",
+          "after": {
+            "in_uncached": 4.0,
+            "in_cache_read": 0.2,
+            "out_total": 20.0
+          }
+        },
+        "gemini-4-carbon": {
+          "in_uncached": 2.0,
+          "in_cache_read": 0.1,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 10.0,
+          "until": "2026-11-30",
+          "after": {
+            "in_uncached": 4.0,
+            "in_cache_read": 0.2,
+            "out_total": 20.0
+          }
+        },
         "gemini-3.8-flash": {
           "in_uncached": 0.75,
           "in_cache_read": 0.075,
