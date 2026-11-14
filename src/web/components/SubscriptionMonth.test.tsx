@@ -22,9 +22,16 @@ const units = (total: number) => ({ input: total * 0.9, cached: total * 0.6, out
 globalThis.requestAnimationFrame = (() => 0) as unknown as typeof requestAnimationFrame;
 globalThis.cancelAnimationFrame = () => {};
 const withAttribute = (root: TestNode, name: string) => findAll(root, (node) => node.getAttribute(name) !== null)[0] ?? null;
-const summaryText = (root: TestNode) => withAttribute(root, "data-summary")!.textContent;
-/** A tooltip that starts with the given words: breakdowns and warnings live in tooltips, not on screen. */
-const titled = (root: TestNode, start: string) => findAll(root, (node) => (node.getAttribute("title") ?? "").startsWith(start))[0]?.getAttribute("title") ?? null;
+/** The text on screen: what sits behind a figure's "?" is not part of it. */
+const shownText = (node: TestNode): string => (node as { className?: string }).className === "ui-help" ? ""
+  : node.childNodes?.length ? node.childNodes.map(shownText).join("") : node.textContent;
+const summaryText = (root: TestNode) => shownText(withAttribute(root, "data-summary")!);
+/**
+ * An explanation that starts with the given words: a native tooltip, or the text behind a figure's "?"
+ * (breakdowns and warnings are not on screen).
+ */
+const titled = (root: TestNode, start: string) => findAll(root, (node) => (node.getAttribute("title") ?? "").startsWith(start))[0]?.getAttribute("title")
+  ?? findAll(root, (node) => node.getAttribute("role") === "tooltip" && (node.textContent ?? "").startsWith(start))[0]?.textContent ?? null;
 const warnings = (root: TestNode) => withAttribute(root, "data-cycle-warnings")?.getAttribute("title") ?? "";
 
 /** The current cycle: 400 points worth $4000; 2 provider resets (+1 window) and 1 banked (+0.5) inside; $2000 used. */
@@ -221,8 +228,8 @@ test("the summary of one subscription: current, previous and whole period, a sel
     // The period choice names the period; the dates are the heading's tooltip.
     expect(text).not.toContain("Current cycle ·");
     // The tab already names the screen; explanations live in the help dot, not on screen (user decision 17.10).
-    expect(dom.host.textContent).not.toContain("Subscription month");
-    expect(dom.host.textContent).not.toContain("on average");
+    expect(shownText(dom.host)).not.toContain("Subscription month");
+    expect(shownText(dom.host)).not.toContain("on average");
     expect(withAttribute(dom.host, "data-excluded")).toBeNull();
     // What the resets added: the base and the bonuses by kind, in the capacity's tooltip.
     expect(text).not.toContain("Without early resets");

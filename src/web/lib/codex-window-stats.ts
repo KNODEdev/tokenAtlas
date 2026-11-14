@@ -102,6 +102,14 @@ export function windowForecast(cycle: CycleView, now = Date.now()) {
   };
 }
 
+/**
+ * The vendor's meter moved, yet the index holds no call of the window: its traffic is not imported yet or was
+ * made outside the archived computers. That is missing traffic, never zero.
+ */
+export function windowTrafficUnindexed(usedPercent: number | null, data: Pick<CycleBreakdownResponse, "totals"> | null): boolean {
+  return data !== null && data.totals.calls === 0 && (usedPercent ?? 0) > 0;
+}
+
 /** Descriptive traffic uses the whole selected window, including idle time. */
 export function windowTrafficSummary(cycle: CycleView, data: CycleBreakdownResponse | null, now = Date.now()) {
   const range = trafficRangeOf(cycle);

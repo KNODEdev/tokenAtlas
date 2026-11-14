@@ -3,9 +3,10 @@ import { Children, useEffect, useLayoutEffect, useRef, useState, type CSSPropert
 import type { CycleBreakdownResponse } from "../lib/api";
 import type { CycleView } from "../lib/cycle";
 import { isContextPreviewSelected } from "../../shared/context-preview";
-import { cyclePlanDescription, observationOf, windowForecast, windowTrafficSummary } from "../lib/codex-window-stats";
+import { cyclePlanDescription, observationOf, windowForecast, windowTrafficSummary, windowTrafficUnindexed } from "../lib/codex-window-stats";
 import { compact, dayTime, duration, full, pct, relativeTime, signedPct, usd } from "../lib/format";
 import { useI18n } from "../lib/i18n";
+import { useTrafficUpdating } from "../lib/traffic-updating";
 import { missingRateAmountTitle, missingRateIn, missingRateNote, useMissingRates } from "../lib/missing-rate";
 import type { WindowInsight } from "../lib/window-insights";
 import { clipAtLimit, typicalBand, typicalForecastPath, windowDays, type CoursePoint } from "../lib/window-status";
@@ -556,14 +557,17 @@ function StatusKpis({ k }: { k: StatusKpiValues }) {
  * The Overview's first block for any vendor: header with observation chips, four headline
  * numbers, the course chart and a right column with counters and this window's traffic.
  */
-export function StatusFrame({ title, meta, startIso, endIso, read, chips, strip, kpis, chart, aside }: {
+export function StatusFrame({ title, meta, startIso, endIso, read, updating = false, chips, strip, kpis, chart, aside }: {
   title: ReactNode; startIso: string | null; endIso: string | null; read: ReactNode;
+  /** The window's indexed traffic is still being brought up to date: said beside the reading, so nothing shifts. */
+  updating?: boolean;
   /** Only what the context bar and the subscription picker above do not already say, e.g. a closed window's own plan. */
   meta?: ReactNode;
   chips: ReactNode[]; kpis: StatusKpiValues; chart: ReactNode; aside: ReactNode;
   /** The account's credits under the chips; nothing without them. */
   strip?: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <Card frame={false}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--s-6)" }}>
@@ -574,7 +578,12 @@ export function StatusFrame({ title, meta, startIso, endIso, read, chips, strip,
             <When iso={startIso} /> → <When iso={endIso} />
           </span>
         </div>
-        <div className="mono" style={{ fontSize: "var(--fs-3)", color: "var(--faint)" }}>{read}</div>
+        <div className="mono" style={{ fontSize: "var(--fs-3)", color: "var(--faint)" }}>
+          {updating && <span role="status" data-traffic-updating style={{ color: "var(--accent)" }}
+            title={t("Tokens, calls and API-eq of this window are still being counted in the background; they refresh on their own.",
+              "Tokeny, wywołania i API-eq tego okna są jeszcze liczone w tle; odświeżą się same.")}>
+            {t("updating traffic", "aktualizuję ruch")} · </span>}
+          {read}</div>
       </div>
       {chips.length > 0 && <div className="mono" style={{ display: "flex", gap: "var(--s-3)", flexWrap: "wrap", marginTop: "var(--s-4)" }}>{chips}</div>}
       {strip}
@@ -609,15 +618,23 @@ export function WindowStatusCard({ cycle, insights, account, totals, loading, er
 }) {
   const { t, locale } = useI18n();
   const active = cycle.isActive;
+  const updating = useTrafficUpdating("codex");
   const insight = insights.find((i) => i.current.windowKey === String(cycle.index) && !i.isSublimit) ?? null;
   const observation = observationOf(cycle);
   const forecast = windowForecast(cycle);
   // A refresh keeps the scope's last totals on screen; useAsync never hands over another scope's data.
-  const traffic = windowTrafficSummary(cycle, error ? null : totals);
+  // A used meter without one indexed call is missing traffic, not zero tokens and $0.
+  const unindexed = windowTrafficUnindexed(observation.percent, error ? null : totals);
+  const indexed = unindexed ? null : totals;
+  const traffic = windowTrafficSummary(cycle, error ? null : indexed);
   const num = (n: number) => n.toLocaleString(locale, { maximumFractionDigits: 2 });
   const missing = error ? t("read failed", "błąd odczytu") : loading && !totals ? t("loading…", "odczyt…") : "—";
+  const noTraffic = unindexed ? <span className="ui-missing" data-unindexed
+    title={t("The meter moved, but the index holds no call of this window yet: the import is pending or the traffic comes from a computer outside the archive.",
+      "Licznik się zmienił, ale indeks nie ma jeszcze żadnego wywołania z tego okna: import trwa albo ruch pochodzi z komputera spoza archiwum.")}>
+    {t("no indexed traffic", "brak ruchu w indeksie")}</span> : missing;
 
-  const cached = totals ? Math.max(0, totals.totals.tokens - totals.totals.tokens_fresh) : null;
+  const cached = indexed ? Math.max(0, indexed.totals.tokens - indexed.totals.tokens_fresh) : null;
   const dailyChange = traffic.perDay != null && dailyMedian != null && dailyMedian > 0 ? (traffic.perDay / dailyMedian - 1) * 100 : null;
   const apiPartial = (totals?.unpriced.tokens ?? 0) > 0;
   const missingRate = missingRateIn(totals?.unpriced.models, useMissingRates());
@@ -647,6 +664,7 @@ export function WindowStatusCard({ cycle, insights, account, totals, loading, er
       meta={active ? undefined : cyclePlanDescription(cycle)}
       startIso={cycle.startIso} endIso={active ? cycle.resetIso : cycle.raw.work_to_ts}
       read={<span title={dayTime(observation.end)}>{t("% read", "% odczyt")} {relativeTime(observation.end)}</span>}
+      updating={updating}
       chips={chips}
       strip={<CreditStrip view={creditStripView(accountCredit?.account ?? null)} />}
       kpis={{
@@ -685,10 +703,10 @@ export function WindowStatusCard({ cycle, insights, account, totals, loading, er
         <div>
           {/* The card is this window; the heading only separates the rows from the counters above. */}
           {insights.length > 1 && <Eyebrow>{t("This window", "To okno")}</Eyebrow>}
-          <StatRow label={t("tokens", "tokeny")} value={totals ? compact(totals.totals.tokens) : missing}>
-            {totals && cached != null && <>
-              <Stack parts={[{ value: cached, color: ACCENT_SOFT }, { value: totals.totals.tokens_fresh, color: "var(--accent)" }]} />
-              <div style={mini}><span>cache {pct(totals.totals.tokens > 0 ? (cached / totals.totals.tokens) * 100 : null)}</span><span>{compact(totals.totals.tokens_fresh)}</span></div>
+          <StatRow label={t("tokens", "tokeny")} value={indexed ? compact(indexed.totals.tokens) : noTraffic}>
+            {indexed && cached != null && <>
+              <Stack parts={[{ value: cached, color: ACCENT_SOFT }, { value: indexed.totals.tokens_fresh, color: "var(--accent)" }]} />
+              <div style={mini}><span>cache {pct(indexed.totals.tokens > 0 ? (cached / indexed.totals.tokens) * 100 : null)}</span><span>{compact(indexed.totals.tokens_fresh)}</span></div>
             </>}
           </StatRow>
           <StatRow label={t("per day", "na dzień")} value={traffic.perDay == null ? missing : compact(traffic.perDay)}>
@@ -699,10 +717,10 @@ export function WindowStatusCard({ cycle, insights, account, totals, loading, er
             </>}
           </StatRow>
           <MachineRow shares={insight?.current.trafficByMachine ?? []} />
-          <StatRow label={t("calls", "wywołania")} value={totals ? num(totals.totals.calls) : missing} />
-          <StatRow label="API-eq" value={!totals ? missing : missingRate.tokens > 0 && !(totals.totals.usd > 0)
+          <StatRow label={t("calls", "wywołania")} value={indexed ? num(indexed.totals.calls) : missing} />
+          <StatRow label="API-eq" value={!indexed ? missing : missingRate.tokens > 0 && !(indexed.totals.usd > 0)
             ? <span style={{ color: "var(--warn)" }} title={missingRateAmountTitle(missingRate.models)}>{t("no price", "brak ceny")}</span>
-            : `${apiPartial ? "≥ " : ""}${usd(totals.totals.usd)}`}>
+            : `${apiPartial ? "≥ " : ""}${usd(indexed.totals.usd)}`}>
             {missingRate.tokens > 0 && <div data-missing-rate style={{ fontSize: "var(--fs-2)", color: "var(--warn)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
               title={missingRateAmountTitle(missingRate.models)}>{missingRateNote(missingRate.models)}</div>}
             {credits != null && <span style={{ fontSize: "var(--fs-2)", color: "var(--faint)" }}>{(credit?.unpriced_calls ?? 0) > 0 ? "≥ " : ""}{num(credits)} {t("credits", "kredytów")}</span>}

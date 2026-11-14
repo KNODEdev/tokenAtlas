@@ -1,39 +1,67 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import type { AppActivity } from "../../shared/app-activity";
 import { refreshApiData } from "./api";
 
-export function useAppActivity() {
-  const [state, setState] = useState<{ data: AppActivity | null; unavailable: boolean }>({ data: null, unavailable: false });
-  useEffect(() => {
-    let active = true;
-    let request: AbortController | null = null;
-    let previouslyBusy = false;
-    const poll = async () => {
-      if (request) return;
-      const controller = new AbortController();
-      request = controller;
-      const timeout = setTimeout(() => controller.abort(), 5000);
-      try {
-        // Status must not enter the prepared-report retry loop it is observing.
-        const response = await fetch("/api/app-activity", { signal: controller.signal, cache: "no-store" });
-        if (!response.ok) throw new Error("Activity unavailable");
-        const data: AppActivity = await response.json();
-        if (!active) return;
-        setState({ data, unavailable: false });
-        if (!data.unavailable) {
-          if (previouslyBusy && !data.busy) refreshApiData();
-          previouslyBusy = data.busy;
-        }
-      } catch {
-        if (active) setState(previous => ({ ...previous, unavailable: true }));
-      } finally {
-        clearTimeout(timeout);
-        request = null;
-      }
-    };
+interface ActivityState { data: AppActivity | null; unavailable: boolean }
+const INITIAL: ActivityState = { data: null, unavailable: false };
+
+// One poll for every reader (the status bar and the cards that mark their figures as updating).
+let state = INITIAL;
+const listeners = new Set<() => void>();
+let timer: ReturnType<typeof setInterval> | null = null;
+let request: AbortController | null = null;
+let previouslyBusy = false;
+
+function publish(next: ActivityState) {
+  state = next;
+  for (const listener of listeners) listener();
+}
+
+async function poll() {
+  if (request) return;
+  const controller = new AbortController();
+  request = controller;
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    // Status must not enter the prepared-report retry loop it is observing.
+    const response = await fetch("/api/app-activity", { signal: controller.signal, cache: "no-store" });
+    if (!response.ok) throw new Error("Activity unavailable");
+    const data: AppActivity = await response.json();
+    if (!listeners.size) return;
+    publish({ data, unavailable: false });
+    if (!data.unavailable) {
+      if (previouslyBusy && !data.busy) refreshApiData();
+      previouslyBusy = data.busy;
+    }
+  } catch {
+    if (listeners.size) publish({ ...state, unavailable: true });
+  } finally {
+    clearTimeout(timeout);
+    if (request === controller) request = null;
+  }
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  if (listeners.size === 1) {
     void poll();
-    const timer = setInterval(() => void poll(), 2000);
-    return () => { active = false; clearInterval(timer); request?.abort(); };
-  }, []);
-  return state;
+    timer = setInterval(() => void poll(), 2000);
+  }
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size) return;
+    // The last reader left: stop polling and forget the state, as an unmounted hook did.
+    if (timer) clearInterval(timer);
+    timer = null;
+    request?.abort();
+    request = null;
+    previouslyBusy = false;
+    state = INITIAL;
+  };
+}
+
+const snapshot = () => state;
+
+export function useAppActivity(): ActivityState {
+  return useSyncExternalStore(subscribe, snapshot, () => INITIAL);
 }

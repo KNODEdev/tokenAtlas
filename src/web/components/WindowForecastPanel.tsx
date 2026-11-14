@@ -31,9 +31,11 @@ export function BudgetCard({ units, usedPercent, typicalEnd, linearEnd, active, 
   units: BudgetUnit[]; usedPercent: number; typicalEnd: number | null; linearEnd: number | null; active: boolean; foot?: ReactNode;
 }) {
   const { t } = useI18n();
-  const capPercent = (u: BudgetUnit) => u.cap != null && u.rate != null && u.rate > 0 ? (u.cap / u.rate) * 100 : null;
+  // `rate` is the value of one percentage point, so the quotient is already a percentage.
+  const capPercent = (u: BudgetUnit) => u.cap != null && u.rate != null && u.rate > 0 ? u.cap / u.rate : null;
   const scale = Math.min(250, Math.max(100, typicalEnd ?? 0, linearEnd ?? 0, ...units.map((u) => capPercent(u) ?? 0)) * 1.04);
-  const at = (p: number) => `${(Math.max(0, p) / scale) * 100}%`;
+  // A value beyond the scale stays at the track's edge; an unclamped marker widens the whole page.
+  const at = (p: number) => `${(Math.min(scale, Math.max(0, p)) / scale) * 100}%`;
   const amount = (u: BudgetUnit, percent: number | null) => u.rate == null || percent == null ? "—"
     : `${u.partial ? "≥ " : u.key === "percent" ? "" : "≈ "}${u.format(u.rate * Math.max(0, percent))}`;
   const ends = (u: BudgetUnit) => [typicalEnd, linearEnd].map((p) => amount(u, p)).join(" · ");
@@ -41,14 +43,14 @@ export function BudgetCard({ units, usedPercent, typicalEnd, linearEnd, active, 
     <Card>
       <Eyebrow>{t("Window budget", "Budżet okna")} · ▮ {t("used", "użyte")} · ░ {t("left", "zostało")} · │ 100%
         {active && <> · <span style={{ color: "var(--accent)" }}>●</span> {t("typical", "typowo")} · <span style={{ color: "var(--crit)" }}>●</span> {t("current pace", "obecne tempo")}</>}
-        {" · "}◆ {t("historical cap", "cap z historii")}</Eyebrow>
+        {" · "}◆ {t("historical cap", "pułap z historii")}</Eyebrow>
       <div style={{ display: "grid", gridTemplateColumns: "64px minmax(200px, 1fr) auto auto auto auto", columnGap: "var(--s-7)", alignItems: "center", fontSize: "var(--fs-4)", marginTop: "var(--s-5)" }}>
         <span />
         <span />
         <Eyebrow style={head}>{t("used", "użyte")}</Eyebrow>
         <Eyebrow style={head}>{t("left", "zostało")}</Eyebrow>
         <Eyebrow style={head}>{active ? t("at reset: typical · pace", "na reset: typowo · tempo") : t("window result", "wynik okna")}</Eyebrow>
-        <Eyebrow style={head}>{t("historical cap", "cap z historii")}</Eyebrow>
+        <Eyebrow style={head}>{t("historical cap", "pułap z historii")}</Eyebrow>
         {units.map((u) => {
           const cap = capPercent(u);
           return [
@@ -58,7 +60,7 @@ export function BudgetCard({ units, usedPercent, typicalEnd, linearEnd, active, 
                 <div style={{ position: "absolute", inset: `0 auto 0 0`, width: at(Math.min(usedPercent, scale)), background: "var(--accent)", borderRadius: "inherit" }} />
                 {usedPercent < 100 && <div style={{ position: "absolute", top: 2, bottom: 2, left: at(usedPercent), width: `calc(${at(100)} - ${at(usedPercent)})`, background: "color-mix(in oklab, var(--accent) 22%, transparent)" }} />}
                 <div style={{ position: "absolute", top: -3, bottom: -3, width: 2, left: at(100), background: "var(--text)" }} />
-                {cap != null && <Marker left={at(cap)} color="var(--muted)" diamond title={t("historical cap", "cap z historii")} />}
+                {cap != null && <Marker left={at(cap)} color="var(--muted)" diamond title={t("historical cap", "pułap z historii")} />}
                 {active && typicalEnd != null && <Marker left={at(typicalEnd)} color="var(--accent)" title={t("at reset · typical", "na reset · typowo")} />}
                 {active && linearEnd != null && <Marker left={at(linearEnd)} color="var(--crit)" title={t("at reset · current pace", "na reset · obecne tempo")} />}
               </div>

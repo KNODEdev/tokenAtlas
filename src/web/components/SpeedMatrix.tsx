@@ -20,7 +20,7 @@ export function SpeedMatrix({ items, hidden, onToggle, onHover, firstDay, today,
   const { t } = useI18n();
   const { columns, sections } = matrixLayout(items);
   const all = (keys: string[]) => keys.every(key => !hidden.has(key));
-  const heading = (column: string) => column === UNKNOWN_EFFORT ? { label: "?", title: t("unknown effort", "effort nieznany") }
+  const heading = (column: string) => column === UNKNOWN_EFFORT ? { label: "?", title: t("unknown effort", "nieznany poziom rozumowania") }
     : column === NO_EXECUTION ? { label: "—", title: t("No reasoning setting recorded", "Brak zapisanego poziomu rozumowania") }
     : { label: column, title: column };
   const sectionName = (section: string) => section === "fast" ? "⚡ fast" : section === "mixed" ? t("mixed", "mieszany")

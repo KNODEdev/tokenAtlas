@@ -195,6 +195,10 @@ export const NAVIGATION: readonly NavSection[] = [
 export interface NavLocation { section: NavSection; tab: NavTab; view: NavView }
 const LOCATIONS = new Map<ScreenId, NavLocation>(NAVIGATION.flatMap(section =>
   section.tabs.flatMap(tab => tab.views.map(view => [view.screen, { section, tab, view }] as const))));
+/** A view the menu knows; anything else (a mistyped or retired address) is not a screen. */
+export function isScreenId(value: string): value is ScreenId {
+  return LOCATIONS.has(value as ScreenId);
+}
 /** Where a screen lives in the menu: its section, page tab and view. */
 export function navLocation(screen: ScreenId): NavLocation {
   return LOCATIONS.get(screen)!;

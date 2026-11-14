@@ -58,7 +58,7 @@ export function claudeCard(a: RosterAccount, color: string, nowMs: number): Card
     health: null,
     healthColor: "var(--accent)",
     confidence: c?.confidence ?? "none",
-    note: reading.measured ? reading.note : translate("no gauge · inferred", "brak gauge · wywnioskowane"),
+    note: reading.measured ? reading.note : translate("no gauge · inferred", "brak licznika · wywnioskowane"),
     noteLong: [
       reading.noteLong,
       c?.calibration_reason ??

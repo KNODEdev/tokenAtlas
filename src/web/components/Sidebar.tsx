@@ -19,7 +19,8 @@ export function Sidebar({
   goto: (s: ScreenId) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
-  status: { cycleBadge?: string; cycleCount?: number; lastSync: string | null; calls: number | null; live: boolean };
+  /** `basis` "sync": the foot reports the application's last synchronization, not a subscription's samples. */
+  status: { cycleBadge?: string; cycleCount?: number; lastSync: string | null; calls: number | null; live: boolean | null; basis?: "series" | "sync" };
   headerHeight?: number;
 }) {
   const { language } = useI18n();
@@ -50,10 +51,13 @@ export function Sidebar({
           <div className="shell-nav-status">
             <div className="shell-nav-live">
               <span className={`shell-nav-dot${status.live ? " is-live" : ""}`} />
-              <strong>{status.live ? translate("Tracking active", "Śledzenie aktywne") : translate("No fresh data", "Brak świeżych danych")}</strong>
+              <strong>{status.live === null ? translate("Checking status", "Sprawdzam stan")
+                : status.live ? translate("Tracking active", "Śledzenie aktywne") : translate("No fresh data", "Brak świeżych danych")}</strong>
             </div>
-            <div><span>{translate("last sample", "ostatnia próbka")}</span><span>{relativeTime(status.lastSync)}</span></div>
-            <div><span>{translate("indexed", "zindeksowano")}</span><span>{status.calls != null ? full(status.calls) : "—"}</span></div>
+            <div><span>{status.basis === "sync" ? translate("last synchronization", "ostatnia synchronizacja") : translate("last sample", "ostatnia próbka")}</span>
+              <span>{relativeTime(status.lastSync)}</span></div>
+            {/* The indexed count belongs to a subscription's series; without one the row is left out, not shown as a dash. */}
+            {status.basis !== "sync" && <div><span>{translate("indexed", "zindeksowano")}</span><span>{status.calls != null ? full(status.calls) : "—"}</span></div>}
           </div>
         )}
         <button type="button" onClick={onToggleCollapse} className="shell-nav-collapse"

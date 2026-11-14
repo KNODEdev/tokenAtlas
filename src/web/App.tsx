@@ -46,6 +46,8 @@ import { NAV_W, NAV_W_COLLAPSED, SUBS_RAIL_COMPACT_W, SUBS_RAIL_W, WINDOW_RAIL_W
 import { AppHeader } from "./components/AppHeader";
 import { contextPreviewAppliesTo, useContextPreview } from "./lib/context-premium";
 import { Sidebar } from "./components/Sidebar";
+import { navStatus } from "./lib/nav-status";
+import { initialUrlState, useUrlState, type UrlState } from "./lib/url-state";
 import { GuidedTour } from "./components/GuidedTour";
 import { CommandPalette } from "./components/CommandPalette";
 import { CycleDrawer } from "./components/CycleDrawer";
@@ -173,12 +175,13 @@ export function App() {
   useAsync(() => api.plansCatalog(), [], true);
   usePlanCatalog();
   const { language, t } = useI18n();
-  const [screen, setScreen] = useState<ScreenId>("overview");
+  // A reload or a pasted address opens the view and subscription it names (lib/url-state.ts).
+  const [screen, setScreen] = useState<ScreenId>(() => initialUrlState().screen ?? "overview");
   const [theme, setTheme] = useState<"dark" | "light">(readTheme);
   const [collapsed, setCollapsed] = useState(false);
   const [palette, setPalette] = useState(false);
   const [drawerCycle, setDrawerCycle] = useState<number | null>(null);
-  const [requestedAccount, setAccount] = useState("codex1");
+  const [requestedAccount, setAccount] = useState(() => initialUrlState().account ?? "codex1");
   const [dataSettings, setDataSettings] = useState<DataSettingsTarget | null>(null);
   const [eventsTarget, setEventsTarget] = useState<EventsTarget | null>(null);
   const [periodsOpen, setPeriodsOpen] = useState(false);
@@ -250,6 +253,11 @@ export function App() {
   const accountsList = accountsState.data?.subscriptions ?? [];
   const rosterIds = useMemo(() => new Set(rosterState.data?.accounts.map(entry => entry.id) ?? []), [rosterState.data]);
   const account = selectedAccountId(requestedAccount, preferredAccountOrder(accountsList, rosterIds));
+  const applyUrl = useCallback((url: UrlState) => {
+    if (url.screen) setScreen(url.screen);
+    if (url.account) setAccount(url.account);
+  }, []);
+  useUrlState(screen, account, applyUrl);
   const isAll = account === ALL_ACCOUNT;
   const activeRosterAccount = rosterState.data?.accounts.find((entry) => entry.id === account) ?? null;
   const accountWindowMinutes = activeRosterAccount?.live?.window_minutes ?? Number(windowMinutes);
@@ -670,7 +678,7 @@ export function App() {
       status={{
         cycleBadge: (chosen ?? current)?.label,
         cycleCount: isAll ? undefined : model?.cycles.length,
-        ...seriesRailFacts(scopedSeries),
+        ...navStatus(seriesRailFacts(scopedSeries), scopedSeries != null, sync),
       }}
     />
   );
@@ -756,7 +764,7 @@ export function App() {
                     })))
                   : [...new Map(accounts.map(a => [a.id, a])).values()].map((a) => ({
                       value: a.id, title: a.declared_account || a.label || a.id, group: vendorGroupName(a.vendor ?? ""), groupColor: providerColor(a.vendor),
-                      tag: a.has_gauge ? subscriptionPlan(a.vendor ?? "", a.plan) : `${a.plan ? `${subscriptionPlan(a.vendor ?? "", a.plan)} · ` : ""}${t("no gauge", "brak gauge")}`,
+                      tag: a.has_gauge ? subscriptionPlan(a.vendor ?? "", a.plan) : `${a.plan ? `${subscriptionPlan(a.vendor ?? "", a.plan)} · ` : ""}${t("no gauge", "brak licznika")}`,
                     }))
               }
             />
@@ -909,32 +917,32 @@ export function App() {
           )}
           {screenProps && isGemini && gaugeScreenUnavailable && !genericWindowScreen && (
             <EmptyState
-              title={t("{0} has no cycle series. Only a live counter is available.", `${account} nie ma serii cykli — jest sam licznik, bez historii`, [account])}
-              detail={t("Antigravity returns the current limit percentage and reset time, but no window history. Cycle history, comparisons, and tokens/% calibration require samples that this provider does not expose. Indexed tokens, cost, models, and events remain available. Check Overview, Models, or Usage events.", "Antigravity zwraca bieżący procent limitu i moment resetu, ale nie udostępnia przebiegu okna. Historia cykli, porównania i kalibracja tokens/% potrzebują serii próbek, której ten vendor nie daje. Tokeny, koszt, modele i zdarzenia są zindeksowane i działają — sprawdź Overview, Models albo Usage events.")}
+              title={t("{0} has no cycle series. Only a live counter is available.", `${account}: jest bieżący licznik, bez historii okien`, [account])}
+              detail={t("Antigravity reports the current limit percentage and the reset time, but not how the window went. Window history, comparisons and the per-1% conversion need that. Tokens, costs, models and events are counted as usual: see Overview, Models or Usage › Events.", "Antigravity podaje bieżący procent limitu i czas resetu, ale nie przebieg okna. Bez niego nie ma historii okien, porównań ani przelicznika na 1%. Tokeny, koszty, modele i zdarzenia są liczone normalnie: zobacz Przegląd, Modele albo Zużycie › Zdarzenia.")}
             />
           )}
           {screenProps && isGrok && gaugeScreenUnavailable && !genericWindowScreen && (
             <EmptyState
-              title={t("{0} has no cycle history. xAI does not publish a limit counter.", `${account} nie ma cykli — xAI nie publikuje licznika`, [account])}
-              detail={t("Cycle history, comparisons, and tokens/% calibration require a percentage and a reset anchor. xAI provides neither, and its weekly pool is also shared with grok.com chat. Indexed tokens, cost, models, and projects remain available. Check Overview, Models, Usage events, or Projects.", "Historia cykli, porównania i kalibracja tokens/% stoją na procencie i na kotwicy resetu. xAI nie zwraca ani jednego, ani drugiego, a tygodniowy pool jest dodatkowo dzielony z czatem grok.com. Tokeny, koszt, modele i projekty są zindeksowane i działają — sprawdź Overview, Models, Usage events albo Projects.")}
+              title={t("{0} has no cycle history. xAI does not publish a limit counter.", `${account} nie ma historii okien: xAI nie publikuje licznika`, [account])}
+              detail={t("Window history, comparisons and the per-1% conversion need a limit percentage and a reset time. xAI publishes neither, and its weekly pool is shared with the grok.com chat. Tokens, costs, models and projects are counted as usual: see Overview, Models, Usage › Events or Projects.", "Historia okien, porównania i przelicznik na 1% wymagają procentu limitu i czasu resetu. xAI nie podaje żadnego z nich, a tygodniowa pula jest wspólna z czatem grok.com. Tokeny, koszty, modele i projekty są liczone normalnie: zobacz Przegląd, Modele, Zużycie › Zdarzenia albo Projekty.")}
             />
           )}
           {screenProps && isGlm && gaugeScreenUnavailable && !genericWindowScreen && (
             <EmptyState
-              title={t("{0} has a counter but no cycle history.", `${account} nie ma serii cykli — jest licznik, bez historii`, [account])}
-              detail={t("z.ai returns the current window state, including credit allowance, usage, and reset time, but no history. Cycle history, comparisons, and tokens/% calibration require samples that this reading does not provide. Calibration would not add a denominator because the limit percentage is already read from the account. Indexed tokens, cost, models, and events remain available. Check Overview, Models, or Usage events.", "z.ai zwraca stan bieżącego okna (przydział i zużycie w kredytach) oraz moment resetu, ale nie udostępnia przebiegu. Historia cykli, porównania i kalibracja tokens/% potrzebują serii próbek, której ten odczyt nie daje — a kalibracja i tak nie miałaby czego szukać, bo mianownik jest odczytany. Tokeny, koszt, modele i zdarzenia są zindeksowane i działają — sprawdź Overview, Models albo Usage events.")}
+              title={t("{0} has a counter but no cycle history.", `${account}: jest licznik, bez historii okien`, [account])}
+              detail={t("z.ai reports the current window: its credit allowance, the credits used and the reset time, but not how the window went. Window history and comparisons need that. Tokens, costs, models and events are counted as usual: see Overview, Models or Usage › Events.", "z.ai podaje stan bieżącego okna: przydział i zużycie w kredytach oraz czas resetu, ale nie jego przebieg. Bez niego nie ma historii okien ani porównań. Tokeny, koszty, modele i zdarzenia są liczone normalnie: zobacz Przegląd, Modele albo Zużycie › Zdarzenia.")}
             />
           )}
           {screenProps && isClaude && gaugeScreenUnavailable && !genericWindowScreen && !insightsNote && (
             <EmptyState
-              title={t("{0} has no cycle series for this screen.", `${account} nie ma serii cykli — ten ekran nie ma czego pokazać`, [account])}
-              detail={t("Claude's percentage comes from the account (GET /api/oauth/usage), but it is a single reading of current usage rather than window history. Reset cycles, tokens/% calibration, and cycle comparisons require samples that this reading does not provide. Indexed usage, costs, models, and projects remain available. Check Overview, Models, Usage events, or Projects.", "Procent Claude'a jest czytany z konta (GET /api/oauth/usage), ale to pojedynczy odczyt „ile zużyto teraz”, nie przebieg okna. Cykle resetu, kalibracja tokens/% i porównania między cyklami stoją na serii próbek, której ten odczyt nie daje. Zużycie, koszty, modele i projekty są zindeksowane i działają — sprawdź Overview, Models, Usage events albo Projects.")}
+              title={t("{0} has no cycle series for this screen.", `${account} nie ma historii okien dla tego widoku`, [account])}
+              detail={t("Claude's percentage is read from the account as one reading of the current usage, not as the course of a window. Reset cycles, the per-1% conversion and cycle comparisons need that course. Usage, costs, models and projects are counted as usual: see Overview, Models, Usage › Events or Projects.", "Procent Claude'a jest czytany z konta jako pojedynczy odczyt bieżącego zużycia, a nie przebieg okna. Cykle resetu, przelicznik na 1% i porównania cykli wymagają tego przebiegu. Zużycie, koszty, modele i projekty są liczone normalnie: zobacz Przegląd, Modele, Zużycie › Zdarzenia albo Projekty.")}
             />
           )}
           {screenProps && gaugeScreenUndeclared && !insightsNote && (
             <EmptyState
-              title={t("{0} has no declared gauge-series capability.", `${account} nie ma zadeklarowanej zdolności serii gauge`, [account])}
-              detail={t("The backend has not confirmed /api/usage-series for this account. This is missing knowledge rather than an empty dataset. Cycle screens stay unavailable until the provider declares this capability.", "Backend nie potwierdził, że dla tego konta istnieje /api/usage-series. To brak wiedzy, nie odpowiedź „brak danych”; ekran cykli pozostaje zablokowany, dopóki provider nie zadeklaruje tej zdolności.")}
+              title={t("It is not known yet whether {0} has a window history.", `Nie wiadomo jeszcze, czy ${account} ma historię okien`, [account])}
+              detail={t("The application has not confirmed a window history for this account yet. This is missing knowledge, not an empty result; the cycle screens stay closed until it is confirmed.", "Aplikacja nie potwierdziła jeszcze historii okien dla tego konta. To brak wiedzy, a nie pusty wynik; ekrany cykli pozostają zamknięte do czasu potwierdzenia.")}
             />
           )}
           {screenProps && windowCompare && <WindowCompare windows={railWindows} account={account} />}

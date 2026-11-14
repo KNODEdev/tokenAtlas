@@ -319,6 +319,10 @@ input[type="checkbox"]:disabled { opacity: .5; cursor: default; }
   pointer-events: none;
 }
 .ui-help-pop[hidden] { display: none; }
+.ui-kpi-label .ui-help { margin-left: var(--s-2); }
+/* Pinned by a click: the text can be selected and a long explanation scrolled. */
+.ui-help-dot[data-pinned] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.ui-help-dot[data-pinned] + .ui-help-pop { pointer-events: auto; user-select: text; max-height: calc(100vh - 32px); overflow-y: auto; }
 .ui-help-block { display: block; }
 .ui-help-block + .ui-help-block { margin-top: var(--s-3); }
 .ui-help-title { display: block; color: var(--text); font-weight: var(--fw-semibold); margin-bottom: var(--s-2); }

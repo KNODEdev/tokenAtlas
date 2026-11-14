@@ -23,6 +23,10 @@
 .subscription-month-sub { display: block; font-family: var(--font-sans); font-size: var(--fs-2); color: var(--muted); }
 /* Capacity vs usage of a period: the period choice and the note on cycles left out. */
 .subscription-month-summary-controls { margin-bottom: var(--s-4); }
+/* Seven figures in one row: a column is never narrower than its figure ("11 321 USD"), so amounts cannot run into
+   each other; the columns with room give it up. */
+.subscription-month-summary .ui-kpi-strip { grid-template-columns: repeat(var(--kpi-columns), minmax(min-content, 1fr)); }
+.subscription-month-summary .ui-kpi-value { white-space: nowrap; }
 .subscription-month-summary .ui-kpi-note .ui-bar { margin-bottom: var(--s-2); }
 .subscription-month-summary .ui-kpi-note > span { display: block; }
 .subscription-month-summary-note { margin: var(--s-3) 0 0; font-size: var(--fs-3); color: var(--muted); }

@@ -1,6 +1,7 @@
 import type { AppActivity as ActivitySnapshot, ActivityStage } from "../../shared/app-activity";
 import type { AnalysisRebuildJob, SyncStatus } from "../lib/api";
 import { getLocale, useI18n } from "../lib/i18n";
+import { polishPlural } from "../lib/format";
 import { progressStepLabel, vendorName, type BackgroundTask } from "../lib/progress";
 import { phaseLabel } from "./SyncActivity";
 import { Bar, HelpBlock, HelpDot, Pill, type Tone } from "./ui";
@@ -157,7 +158,7 @@ export function AppActivityDetails({ data, unavailable, sync, syncUnavailable, s
       {views.map(view => <p key={view.view} className="app-activity-row"><span>{viewName(view.view, t)}</span><span className="mono">
         {view.pending > 0 && `${data?.reports.truncated ? "≥" : ""}${view.pending} ${t("waiting", "oczekuje")}`}
         {view.pending > 0 && view.failed > 0 && " · "}
-        {view.failed > 0 && <span className="is-warn">{view.failed} {t("failed", "błąd")}</span>}</span></p>)}
+        {view.failed > 0 && <span className="is-warn">{view.failed} {t("failed", polishPlural(view.failed, "błąd", "błędy", "błędów"))}</span>}</span></p>)}
     </section>}
     {rebuild.unavailable && <p className="app-activity-warning">{t("Rebuild status unavailable", "Status przebudowy niedostępny")}</p>}
   </div>;

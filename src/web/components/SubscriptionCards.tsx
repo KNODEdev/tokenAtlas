@@ -3,7 +3,7 @@ import type { ProbeReadingState } from "../lib/api";
 import type { ProbeCopy } from "../lib/probe";
 import type { RosterCard } from "../lib/roster";
 import { groupRoster, providerColor, subscriptionName } from "../lib/roster";
-import { compact, duration, full, pct, usd } from "../lib/format";
+import { compact, duration, full, pct, polishPlural, usd } from "../lib/format";
 import { translate, useI18n } from "../lib/i18n";
 import { SUBS_RAIL_W } from "../lib/useBreakpoint";
 import { Dropdown, HelpDot } from "./ui";
@@ -253,7 +253,7 @@ function GroupedCards({
                 title={`${g.active.length} ${t("active windows from this provider. Click to collapse.", "aktywnych okien tego dostawcy. Kliknij, żeby zwinąć.")}`}>
                 <span className="rail-group-label">{g.label}</span>
                 <span className="rail-group-sub">{g.active.length > 0 ? g.active.length : ""}{isCollapsed ? " ›" : ""}</span>
-                {spent > 0 && <span className="rail-group-sub is-crit">{spent} {t("exhausted", "wyczerpanych")}</span>}
+                {spent > 0 && <span className="rail-group-sub is-crit">{spent} {t("exhausted", polishPlural(spent, "wyczerpany", "wyczerpane", "wyczerpanych"))}</span>}
                 {worst?.usedPercent != null && (
                   <span className={`rail-group-sub${worst.usedPercent >= 80 ? " is-warn" : ""}`}
                     title={`${t("Highest usage in this family", "Najwyższe zużycie w tej rodzinie")}: ${worst.id}. ${t("Percentages from different windows do not add up, so the header shows the worst one, not the sum.", "Procenty różnych okien się NIE sumują, więc nagłówek pokazuje najgorsze, nie sumę.")}`}>
@@ -447,7 +447,7 @@ function SubscriptionCard({
         <span
           title={
             isAll
-              ? t("Gross tokens from different vendors do not add up to one number. Codex counts cache reads inside input, Claude separately. The per-subscription breakdown is on the ALL screen.", "Tokeny brutto różnych vendorów nie sumują się do jednej liczby. Codex liczy odczyty cache wewnątrz inputu, Claude osobno. Zestawienie per subskrypcja jest na ekranie ALL.")
+              ? t("Gross tokens from different vendors do not add up to one number. Codex counts cache reads inside input, Claude separately. The per-subscription breakdown is on the ALL screen.", "Tokeny brutto różnych vendorów nie sumują się do jednej liczby. Codex liczy odczyty cache wewnątrz inputu, Claude osobno. Zestawienie według subskrypcji jest w Przeglądzie dla „Wszystkie subskrypcje”.")
               : card.tokensTotal != null
                 ? `${full(card.tokensTotal)} ${t("gross tokens in this window", "tokenów brutto w tym oknie")}`
                 : undefined

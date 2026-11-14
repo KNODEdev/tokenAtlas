@@ -3,6 +3,7 @@ import type { ClaudeLimitResponse } from "../lib/api";
 import { claudeReading } from "../lib/claude";
 import { compact, dayTime, duration, full, pct, polishPlural, relativeTime, usd } from "../lib/format";
 import { useI18n } from "../lib/i18n";
+import { useTrafficUpdating } from "../lib/traffic-updating";
 import { missingRateAmountTitle, missingRateIn, missingRateNote, useMissingRates } from "../lib/missing-rate";
 import { subscriptionPlan } from "../lib/subscription-plan";
 import type { WindowInsight } from "../lib/window-insights";
@@ -111,6 +112,7 @@ export function ClaudeStatusCard({ data, model, insights, account, selectedHisto
   chartOverride?: ReactNode;
 }) {
   const { t, locale } = useI18n();
+  const updating = useTrafficUpdating("claude");
   const { cur, active, used, weekly } = model;
   const reading = claudeReading(cur);
   const drop = cur.counter_reset ?? null;
@@ -152,6 +154,7 @@ export function ClaudeStatusCard({ data, model, insights, account, selectedHisto
       title={title}
       meta={active ? undefined : <span className="sub-card-plan">{plan}</span>}
       startIso={cur.window_start} endIso={cur.reset_at}
+      updating={updating}
       read={model.measured && model.readAt
         ? <span title={dayTime(model.readAt)}>{t("% read", "% odczyt")} {relativeTime(model.readAt)}</span>
         : model.manual && model.readAt ? <>{t("manual reading", "pomiar ręczny")} {dayTime(model.readAt)}</>

@@ -225,9 +225,9 @@ function SpeedSelectionList({ subs, loaded, slow, selection, inactive, onChange 
             {models.length > 0 && <div className="speed-drawer-models">
               {models.map(series => <label key={speedSeriesKey(series)} className="speed-drawer-row">
                 <Check state={modelSelected(selection, sub.id, speedSeriesKey(series), inactive) && modelSelected(selection, sub.id, series.model!, inactive) ? "all" : "none"}
-                  label={`${sub.label} · ${usageModelLabel(series.model!)}${executionSuffix(series, t("unknown", "nieznany"), t("mixed", "mieszany"), t("unknown effort", "effort nieznany"))}`}
+                  label={`${sub.label} · ${usageModelLabel(series.model!)}${executionSuffix(series, t("unknown", "nieznany"), t("mixed", "mieszany"), t("unknown effort", "nieznany poziom rozumowania"))}`}
                   onChange={() => onChange(toggleModel(selection, sub.id, speedSeriesKey(series), names, inactive))} />
-                <span className="speed-drawer-name">{usageModelLabel(series.model!)}{executionSuffix(series, t("unknown", "nieznany"), t("mixed", "mieszany"), t("unknown effort", "effort nieznany"))}</span>
+                <span className="speed-drawer-name">{usageModelLabel(series.model!)}{executionSuffix(series, t("unknown", "nieznany"), t("mixed", "mieszany"), t("unknown effort", "nieznany poziom rozumowania"))}</span>
                 <span className="mono speed-drawer-facts">{t("{0} calls", `${compact(series.total.calls)} wywołań`, [compact(series.total.calls)])}</span>
               </label>)}
             </div>}
@@ -271,7 +271,7 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
     const sorted = ranged.map(entry => {
       const accounts = subscriptions ? subscriptions(entry.accounts) : null;
       const name = usageModelLabel(entry.model) + (split && accounts?.[0] ? ` · ${accounts[0].name}` : "");
-      const model = usageModelLabel(entry.model) + executionSuffix(entry.series, t("unknown", "nieznany"), t("mixed", "mieszany"), t("unknown effort", "effort nieznany"));
+      const model = usageModelLabel(entry.model) + executionSuffix(entry.series, t("unknown", "nieznany"), t("mixed", "mieszany"), t("unknown effort", "nieznany poziom rozumowania"));
       return { key: entry.key, model: entry.model, series: entry.series, totals: modelTotals(entry.series), accounts, name,
         label: split && accounts?.[0] ? `${model} · ${accounts[0].name}` : model };
     }).sort((a, b) => activity(b.totals) - activity(a.totals));
@@ -426,7 +426,7 @@ function SpeedReport({ entries, hiddenScope, longOutMin, controls, split = false
             options={choices.models.map(name => ({ value: name, label: name }))} />}
           {compare === "effort" && choices.efforts.length > 0 && <Tabs value={effort} onChange={setCompareEffort}
             options={choices.efforts.map(column => ({ value: column, label: column === UNKNOWN_EFFORT ? "?" : column === NO_EXECUTION ? "—" : column,
-              title: column === UNKNOWN_EFFORT ? t("unknown effort", "effort nieznany") : column === NO_EXECUTION ? t("No reasoning setting recorded", "Brak zapisanego poziomu rozumowania") : undefined }))} />}
+              title: column === UNKNOWN_EFFORT ? t("unknown effort", "nieznany poziom rozumowania") : column === NO_EXECUTION ? t("No reasoning setting recorded", "Brak zapisanego poziomu rozumowania") : undefined }))} />}
           {compare !== "custom" && <label className="speed-split"><input type="checkbox" checked={withFast} onChange={event => setWithFast(event.target.checked)} />
             {t("with fast", "z fast")}</label>}
           <GhostButton onClick={openDrawer}>{t("Series · {0}", `Serie · ${shownRows.length}`, [shownRows.length])}</GhostButton>

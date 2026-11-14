@@ -125,7 +125,7 @@ function CycleArchive(props: ScreenProps) {
           </button>
         )}
         <div className="archive-note">
-          {account} · {t("allowance is inferred from the gauge, not returned by the API", "allowance jest inferowany z gauge, nie zwracany przez API")}
+          {account} · {t("allowance is inferred from the gauge, not returned by the API", "limit jest wyliczany z odczytów licznika, API go nie podaje")}
         </div>
       </Card>
     </div>

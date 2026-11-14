@@ -902,7 +902,8 @@ describe("ProjectDrawer views", () => {
     const html = renderDrawer(cost);
     // Wall-clock time arrives with the history; until then neither the sentence nor the KPI shows the session sum as work.
     expect(html).toMatch(/data-summary=""[^>]*>Last \d+ days: 100 tokens across 1 subscription\.</);
-    expect(html).toMatch(/Active time<\/div><div class="ui-figure ui-kpi-value">…<\/div>/);
+    // The label may carry its "?" explanation before the figure.
+    expect(html).toMatch(/Active time(?:<span class="ui-help">.*?<\/span><\/span>)?<\/div><div class="ui-figure ui-kpi-value">…<\/div>/);
     expect(html).toContain("sessions summed ≈ 1h 00m");
     expect(html).toContain("Cost from your subscriptions");
     expect(html).toMatch(/data-main-figure=""[^>]*>\$5\.50</);

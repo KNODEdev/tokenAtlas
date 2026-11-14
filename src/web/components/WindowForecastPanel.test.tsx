@@ -17,6 +17,20 @@ describe("window forecast panel", () => {
     expect(html).toContain("≥ $43.18");
     expect(html).toContain("≥ $115.28 · ≥ $227.94");
   });
+  it("places the historical cap at its percentage and keeps every marker inside the track", () => {
+    const lefts = (html: string) => [...html.matchAll(/left:([\d.]+)%/g)].map((m) => Number(m[1]));
+    // 381M at 10M per point is 38.1% of the limit; the scale is 174% × 1.04.
+    const html = renderToStaticMarkup(<BudgetCard active usedPercent={32} typicalEnd={88} linearEnd={174} units={[
+      { key: "tokens", label: "tokens", rate: 10_000_000, used: 320_000_000, partial: false, cap: 381_000_000, format: (v) => compact(v) },
+    ]} />);
+    expect(html).toMatch(/title="historical cap"[^>]*left:21\.05\d*%/);
+    expect(Math.max(...lefts(html))).toBeLessThanOrEqual(100);
+    // A cap and a pace far beyond the 250% ceiling stay at the edge.
+    const far = renderToStaticMarkup(<BudgetCard active usedPercent={32} typicalEnd={null} linearEnd={900} units={[
+      { key: "tokens", label: "tokens", rate: 10_000_000, used: 320_000_000, partial: false, cap: 51_000_000_000, format: (v) => compact(v) },
+    ]} />);
+    expect(Math.max(...lefts(far))).toBeLessThanOrEqual(100);
+  });
   it("shows a closed window's result instead of forecasts", () => {
     const html = renderToStaticMarkup(<BudgetCard active={false} usedPercent={100} typicalEnd={null} linearEnd={null} units={[percentUnit("%", 100)]} />);
     expect(html).toContain("window result");

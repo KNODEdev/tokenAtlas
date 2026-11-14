@@ -11,7 +11,7 @@ import { cyclePlanLabel, historyThroughCycle, modelThroughCycle, withWindowTraff
 import { CodexWindowStats } from "../components/CodexWindowStats";
 import { WindowStatusCard } from "../components/WindowStatusCard";
 import type { WindowInsight } from "./window-insights";
-import { windowTrafficSummary, medianDailyTraffic } from "./codex-window-stats";
+import { windowTrafficSummary, windowTrafficUnindexed, medianDailyTraffic } from "./codex-window-stats";
 import { api } from "./api";
 import { installTestDom } from "./test-dom-harness";
 
@@ -391,5 +391,20 @@ describe("selected window dates", () => {
     expect(updated.raw.tokens.total).toBe(4000);
     expect(updated.raw.model_usage).toEqual([{ name: "astra", calls: 50, tokens: 4000, fresh: 1000, usd: 400 }]);
     expect(updated.raw.usd_per_percent).toBeCloseTo(400 / 60);
+  });
+});
+
+describe("window traffic missing from the index", () => {
+  const totals = (calls: number) => ({ totals: { calls, tokens: calls * 100, tokens_fresh: 0, usd: 0 } });
+  it("is missing, not zero, when the meter moved without an indexed call", () => {
+    expect(windowTrafficUnindexed(15, totals(0))).toBe(true);
+  });
+  it("keeps a real zero for an unused window and real totals once calls exist", () => {
+    expect(windowTrafficUnindexed(0, totals(0))).toBe(false);
+    expect(windowTrafficUnindexed(null, totals(0))).toBe(false);
+    expect(windowTrafficUnindexed(15, totals(3))).toBe(false);
+  });
+  it("leaves an unanswered read to the loading state", () => {
+    expect(windowTrafficUnindexed(15, null)).toBe(false);
   });
 });

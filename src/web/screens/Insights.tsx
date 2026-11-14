@@ -43,7 +43,7 @@ export function Insights(props: ScreenProps & { tab: InsightsTab; cards: RosterC
         {scope === "claude" ? (
           <div className="insights-note">
             <b>{t("Analytics and patterns cover Codex cycles for now.", "Analityka i wzorce obejmują na razie cykle Codexa.")}</b>{" "}
-            {t("Claude's limit windows need their own data source here. Until then they are in History and Compare.", "Okna limitu Claude'a potrzebują tu własnego źródła danych. Do tego czasu są w Historii i Porównaniu.")}
+            {t("Claude's limit windows need their own data source here. Until then they are in List and Compare.", "Okna limitu Claude'a potrzebują tu własnego źródła danych. Do tego czasu znajdziesz je w widokach Lista i Porównaj.")}
           </div>
         ) : scope === "credits" ? (
           <div className="insights-note">

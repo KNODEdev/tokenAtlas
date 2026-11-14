@@ -97,8 +97,9 @@ export function KpiStrip({ items, columns }: { items: KpiSpec[]; columns?: numbe
   return (
     <section className="ui-kpi-strip" style={{ "--kpi-columns": cols } as CSSProperties}>
       {items.map((k, i) => (
-        <div key={i} className={`ui-kpi-cell${k.absent ? " ui-kpi-absent" : ""}`} title={k.title} style={k.comparison ? { position: "relative", paddingBottom: 23 } : undefined}>
-          <div className="ui-kpi-label">{k.label}</div>
+        <div key={i} className={`ui-kpi-cell${k.absent ? " ui-kpi-absent" : ""}`} style={k.comparison ? { position: "relative", paddingBottom: 23 } : undefined}>
+          {/* The explanation sits behind a visible "?" (keyboard and pin), not in a native tooltip nobody finds. */}
+          <div className="ui-kpi-label">{k.label}{k.title && <HelpDot label={k.label}>{k.title}</HelpDot>}</div>
           {k.comparison && <span className="mono ui-kpi-comparison" title={k.comparison.title}>{k.comparison.value}</span>}
           <div className="ui-figure ui-kpi-value" style={!k.absent && k.color ? { color: k.color } : undefined}>
             {k.value}
@@ -517,6 +518,21 @@ export function HelpDot({ label, children }: { label?: string; children?: ReactN
   const dot = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLSpanElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  // A click pins the explanation open, so it can be read, selected and scrolled; Escape or a click elsewhere closes it.
+  const [pinned, setPinned] = useState(false);
+  const pinnedNow = useRef(false);
+  pinnedNow.current = pinned;
+  useEffect(() => {
+    if (!pinned) return;
+    const onDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && (dot.current?.contains(target) || pop.current?.contains(target))) return;
+      setPinned(false);
+      setPosition(null);
+    };
+    window.addEventListener("pointerdown", onDown);
+    return () => window.removeEventListener("pointerdown", onDown);
+  }, [pinned]);
   useLayoutEffect(() => {
     if (!position || !dot.current || !pop.current) return;
     const rect = dot.current.getBoundingClientRect();
@@ -531,11 +547,14 @@ export function HelpDot({ label, children }: { label?: string; children?: ReactN
     const width = Math.min(352, window.innerWidth - 16);
     setPosition({ left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 12)), top: rect.bottom + 8 });
   };
-  const hide = () => setPosition(null);
-  const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") hide(); };
+  const hide = () => { if (!pinnedNow.current) setPosition(null); };
+  const close = () => { setPinned(false); setPosition(null); };
+  const toggle = () => { if (pinnedNow.current) close(); else { setPinned(true); show(); } };
+  const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
   return (
     <span className="ui-help">
       <button ref={dot} type="button" className="ui-help-dot" aria-label={label ?? t("More information", "Więcej informacji")} aria-describedby={id} aria-expanded={!!position}
+        data-pinned={pinned ? "" : undefined} onClick={toggle}
         onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide} onKeyDown={onKeyDown}>?</button>
       <span ref={pop} id={id} role="tooltip" className="ui-help-pop" hidden={!position} style={position ?? undefined}>{children}</span>
     </span>

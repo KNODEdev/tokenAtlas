@@ -4,7 +4,7 @@ import type { AppActivity as ActivitySnapshot } from "../../shared/app-activity"
 import type { AnalysisRebuildJob, SyncStatus } from "../lib/api";
 import { browserSafeDiagnostic } from "../lib/browserDiagnostic";
 import { getLocale, useI18n, type MessageTranslator } from "../lib/i18n";
-import { dayTime } from "../lib/format";
+import { dayTime, polishPlural } from "../lib/format";
 import { useStaleReportTime } from "../lib/report-freshness";
 import { useAppActivity } from "../lib/useAppActivity";
 import { backgroundTasks, isSyncScope, overallFraction, vendorName, type BackgroundTask } from "../lib/progress";
@@ -121,7 +121,7 @@ export function statusLine({ sync, syncUnavailable, rebuild, waitingForSubscript
       overall !== null && tasks.length ? `~${Math.floor(overall * 100)}%` : "",
       preparing.length && !tasks.length ? `${t("prices", "ceny")}: ${preparing.map(vendorName).join(", ")}` : "",
       views ? `${views} ${t("views queued", "widoków w kolejce")}` : "",
-      ...failed.map(view => `${viewName(view.view, t)}: ${view.failed} ${t("failed", "błąd")}`)].filter(Boolean);
+      ...failed.map(view => `${viewName(view.view, t)}: ${view.failed} ${t("failed", polishPlural(view.failed, "błąd", "błędy", "błędów"))}`)].filter(Boolean);
     return { tone: "busy", title: t("Preparing data in the background", "Przygotowuję dane w tle"),
       detail: parts.join(" · ") || t("the visible data will refresh automatically", "widoczne dane odświeżą się automatycznie"),
       progress: overall !== null && tasks.length ? { completed: Math.floor(overall * 100), total: 100 } : "indeterminate" };

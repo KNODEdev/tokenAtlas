@@ -11,7 +11,7 @@ import { WindowStatusCard } from "./WindowStatusCard";
 import { accountCreditsOfCycles } from "../lib/credit-pools-view";
 import { buildWindowInsights } from "../lib/window-insights";
 import { railWindowsFromCycles } from "../lib/windows";
-import { comparableStatWindows, cyclePlanDescription, cyclePlanLabel, historyThroughCycle, modelThroughCycle, withWindowTraffic, observationOf, observedRates, usageAtSameTime, windowForecast, trafficRangeOf, windowRates, windowTrafficSummary, medianDailyTraffic } from "../lib/codex-window-stats";
+import { comparableStatWindows, cyclePlanDescription, cyclePlanLabel, historyThroughCycle, modelThroughCycle, withWindowTraffic, observationOf, observedRates, usageAtSameTime, windowForecast, trafficRangeOf, windowRates, windowTrafficSummary, windowTrafficUnindexed, medianDailyTraffic } from "../lib/codex-window-stats";
 import { CycleBreakdown } from "../components/CycleBreakdown";
 import { CycleMilestones, TokenComposition } from "../components/CycleComposition";
 import { BudgetCard, PaceCard, VersusCard, percentUnit, type BudgetUnit } from "./WindowForecastPanel";
@@ -266,8 +266,9 @@ export function useCodexSections(props: ScreenProps): VendorOverviewSections {
       ownershipGap={ownershipGap ? { samples: model.series.ownership.unowned_samples, text: ownershipGap } : null}
       observations={insights} accountCredit={accountCredit} />
   );
-  const burnRows = burnWindows.filter(w => w.hours > 0 && w.hours < cur.windowHours)
-    .map(w => ({ label: w.label, perDay: w.tokens / w.hours * 24 }));
+  // No burn rows of 0/d while the window's traffic is missing from the index.
+  const burnRows = windowTrafficUnindexed(observationOf(cur).percent, breakdown.data) ? []
+    : burnWindows.filter(w => w.hours > 0 && w.hours < cur.windowHours).map(w => ({ label: w.label, perDay: w.tokens / w.hours * 24 }));
   const credit = credits?.value ?? (credits && credits.priced_credits > 0 ? credits.priced_credits : null);
   const budgetUnits: BudgetUnit[] = [
     percentUnit("%", observationOf(cur).percent),
@@ -327,7 +328,7 @@ export function useCodexSections(props: ScreenProps): VendorOverviewSections {
               "mediana " + (median.peakPercent != null ? localizedNumber(median.peakPercent) + "%" : "—") + " z " + localizedNumber(pricedHistory.length) + " wcześniejszych zamkniętych cykli", [(median.peakPercent != null ? localizedNumber(median.peakPercent) + "%" : "—"), localizedNumber(pricedHistory.length)]
             )}
           </span>
-          <span style={{ marginLeft: "auto" }}>{t("allowance is inferred from the gauge, not returned by the API", "allowance jest inferowany z gauge, nie zwracany przez API")}</span>
+          <span style={{ marginLeft: "auto" }}>{t("allowance is inferred from the gauge, not returned by the API", "limit jest wyliczany z odczytów licznika, API go nie podaje")}</span>
           <FullHistoryLink count={model.cycles.length} onOpen={() => goto("history")} />
         </div>
       </Card>
@@ -526,10 +527,10 @@ function buildInsights(model: ReturnType<typeof import("../lib/cycle").buildMode
     const d = (last / model.median.allowanceTokens - 1) * 100;
     if (Math.abs(d) > 8) {
       out.push({
-        title: translate("Observed allowance changed", "Zmiana observed allowance"),
+        title: translate("Observed allowance changed", "Zmiana obserwowanego limitu"),
         body: translate(
           "The last observed allowance is {0}% {1} the median. The value is inferred from the gauge, not returned by the API.",
-          `Ostatni obserwowany allowance jest o ${Math.abs(Math.round(d))}% ${d < 0 ? "niższy" : "wyższy"} od mediany. Wartość jest inferowana z gauge, nie zwracana przez API.`, [Math.abs(Math.round(d)), d < 0 ? "below" : "above"],
+          `Ostatni obserwowany limit jest o ${Math.abs(Math.round(d))}% ${d < 0 ? "niższy" : "wyższy"} od mediany. Wartość jest wyliczana z odczytów licznika, API jej nie podaje.`, [Math.abs(Math.round(d)), d < 0 ? "below" : "above"],
         ),
         tone: "var(--violet)",
       });
