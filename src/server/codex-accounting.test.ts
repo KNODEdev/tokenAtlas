@@ -31,6 +31,9 @@ import { buildProbeLimitWindows } from "./probe-limit-windows";
 import type { DatedPeriod } from "./account-periods";
 import { createAnalysisSourceRevisions } from "../db/analysis-source-revisions.fixture";
 import { WindowUsagePreparing } from "./window-usage";
+import { database as codexWindowDatabase, card as codexWindowCard, sources as codexWindowSources, opened as codexWindowOpened,
+  publishLedger as publishCodexWindowLedger, storeWindows as storeCodexWindows, settle as settleCodexWindows } from "./window-usage-codex.fixture";
+import { spyOn } from "bun:test";
 
 test("prepared pricing preserves all rule boundaries, long-context decisions and missing evidence", () => {
   const original = resolveCodexAccountingConfig(card);
@@ -924,4 +927,58 @@ test("per-event Business billing overrides a shared Pro profile without losing t
     expect(personal.events).toBe(2);
     expect(personal.events + business.events).toBe(all.events);
   } finally { db.close(); }
+});
+
+test("a report's boundary days read the ledger hour sums once, not once per day, with exact period and project totals", () => {
+  const db = codexWindowDatabase();
+  try {
+    db.exec("DELETE FROM events; ALTER TABLE events ADD COLUMN project_id TEXT");
+    const DAY = 86_400_000, HOUR = 3_600_000, first = Date.parse("2026-07-06T05:17:00.000Z");
+    // A meter resetting every day at 05:17: each day of the range is a boundary day of the report.
+    const resets = Array.from({ length: 24 }, (_, i) => first + (i + 1) * DAY);
+    const readings = resets.flatMap(reset => ([[reset - DAY + 3 * HOUR, 2], [reset - 12 * HOUR, 30], [reset - 2 * HOUR, 60]] as const)
+      .map(([at, used]) => [new Date(at).toISOString(), used, new Date(reset).toISOString()] as [string, number, string]));
+    const insert = db.query(`INSERT INTO events(home,path,ts,model,in_tok,cached_in,cache_write,out_tok,reasoning_out,speed,project_id)
+      VALUES('/archive',?,?,'gpt-6-astra',?,200,0,100,0,'standard',?)`);
+    const events: Array<{ at: number; project: string; tokens: number }> = [];
+    for (let day = Date.parse("2026-07-05"); day < resets.at(-1)!; day += DAY)
+      for (const [hour, minute] of [[3, 0], [5, 5], [5, 40], [11, 0], [19, 30]] as const) {
+        const at = day + hour * HOUR + minute * 60_000, project = events.length % 3 ? "alpha" : "beta", input = 1000 + events.length;
+        insert.run(`/archive/rollout-${new Date(day).toISOString().slice(0, 10)}.jsonl`, new Date(at).toISOString(), input, project);
+        events.push({ at, project, tokens: input + 100 });
+      }
+    publishCodexWindowLedger(db, codexWindowCard);
+    storeCodexWindows(db, readings);
+    settleCodexWindows(db);
+    const resolver = loadAccountResolver(db);
+    const report = (project?: string) => {
+      const query = spyOn(db, "query");
+      try {
+        const body = readPreparedCodexAccountingReport(db, codexWindowCard, { since: "2026-07-06", until: "2026-07-28", account: "codex1",
+          ...(project ? { project } : {}) }, new Map(), undefined, true, undefined, {}, { provider_groups: [] }, resolver, codexWindowSources);
+        // The hour-grain ledger group read (readCodexLedgerGroups); pieces and whole days are other statements.
+        return { body, hourReads: query.mock.calls.filter(([sql]) => /^\s*SELECT g\.hour,/.test(String(sql))).length };
+      } finally { query.mockRestore(); }
+    };
+    const inside = (from: string, until: string, project?: string) => events.filter(e => e.at >= Date.parse(from) && e.at < Date.parse(until)
+      && (!project || e.project === project));
+    const all = report();
+    const edgeDays = new Set(all.body.traffic_periods.flatMap(p => [p.start, p.end]).filter(t => !t.endsWith("T00:00:00.000Z")).map(t => t.slice(0, 10)));
+    expect(edgeDays.size).toBeGreaterThanOrEqual(20);
+    expect(all.hourReads).toBe(1);
+    expect(all.body.traffic_periods.reduce((n, p) => n + p.events, 0)).toBeGreaterThan(100);
+    for (const period of all.body.traffic_periods) {
+      const calls = inside(period.start, period.end);
+      expect([period.start, period.events, period.tokens]).toEqual([period.start, calls.length, calls.reduce((n, e) => n + e.tokens, 0)]);
+    }
+    // A project report also reads the hours its cycles reach before and after the range: one read for each side at most.
+    const scoped = report("alpha");
+    expect(scoped.hourReads).toBeLessThanOrEqual(3);
+    expect(scoped.body.windows!.length).toBeGreaterThanOrEqual(20);
+    for (const window of scoped.body.windows!) {
+      const calls = inside(window.cycle_start ?? window.start, window.cycle_end ?? window.reset, "alpha");
+      expect([window.id, window.project_usage?.events, window.project_usage?.tokens]).toEqual([window.id, calls.length, calls.reduce((n, e) => n + e.tokens, 0)]);
+    }
+    for (const period of scoped.body.traffic_periods) expect(period.events).toBe(inside(period.start, period.end, "alpha").length);
+  } finally { codexWindowOpened.splice(codexWindowOpened.indexOf(db), 1); db.close(); }
 });

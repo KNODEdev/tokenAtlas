@@ -6,7 +6,7 @@ import { DATA_VIEWS, readsWindowSums } from "./data-views";
 import { contextRequested, contextProjectionStamp } from "./codex-context-preview";
 import path from "path";
 import { ResponseMemoryBudget } from "./response-memory";
-import { ResponseCache, readingsRevision, cacheKey, CLOCK_CACHEABLE_ROUTES, CACHEABLE_ROUTES } from "./cache";
+import { ResponseCache, cacheKey, CLOCK_CACHEABLE_ROUTES, CACHEABLE_ROUTES } from "./cache";
 import { ratesWithoutAuthoritativeCodexPolicy, codexLedgerRequestStamp } from "./codex-ledger-request";
 import { vendorDiscoveryIdentity } from "./vendor-discovery";
 import { handleWindowEndOverrides } from "./window-end-overrides";
@@ -43,7 +43,7 @@ import { handleCodexPricingSettings } from "./codex-pricing-settings";
 import { handleCodexLedgerSettings } from "./codex-ledger-settings-http";
 import { isVendorId } from "../sync/contracts";
 import { readProgress, progressDirectory } from "../sync/progress";
-import { readRefreshCheck } from "./read-refresh";
+import { readSyncRows, syncOutbox } from "./read-refresh";
 import { buildSetupStatus } from "./setup";
 import { handleSourceFolders } from "./source-folders";
 import { buildSourceInventory } from "./source-health";
@@ -114,9 +114,9 @@ export function createFetchHandler(ctx: AppContext) {
   const cache = new ResponseCache((includeReadings)=>[ratesWithoutAuthoritativeCodexPolicy(ctx.rateCards),ctx.accounts,ctx.claudeGauge,ctx.grokGauge,ctx.cycles,ctx.plans,ctx.plansCatalog,
     [...ctx.homeToSubId??[]],[...ctx.subIdToHomes??[]],ctx.eras?.fingerprint,includeReadings ? [ctx.codexDiscovery,vendorDiscoveryIdentity(ctx.vendorDiscovery),ctx.identityRevision,manualCapacityStamp()] : null], memory);
   const reads = new CoalescedReads();
-  const readData = createDataRead(undefined, { memory });
-  ctx.analysisReader=readData;
   const directRead = ctx.directReader = createDirectRead();
+  const readData = createDataRead(undefined, { memory, light: directRead.light });
+  ctx.analysisReader=readData;
   const rosterFallback = createRosterFallback();
   ctx.responseCache = cache;
   async function serve(req: Request, url: URL): Promise<Response> {
@@ -351,20 +351,23 @@ export function createFetchHandler(ctx: AppContext) {
           outbox: gaugeJournalOutbox(ctx),
         });
       }
+      // The stored rows every tab polls are read off the HTTP thread (read-refresh.ts).
+      const rows = await readSyncRows(ctx, url, directRead.light, req.signal);
+      if (!rows) return cancelledRead();
       return Response.json({
         ...currentSyncState(ctx),
         // Every running stage and background producer, from the one progress register.
         progress: readProgress(progressDirectory(ctx.sqlite.filename)),
         identity_revision: ctx.identityRevision ?? 0,
-        readings_revision: readingsRevision(ctx.sqlite),
-        read_changes: readRefreshCheck(ctx, url),
+        readings_revision: rows.readings_revision,
+        read_changes: rows.read_changes,
         first_import: ctx.firstImport ?? null,
         paused: importPaused(),
         remap: getRemapState(),
         watch: ctx.syncWatcher?.status() ?? null,
         bootstrap: getAtlasBootstrapState(),
         snapshot: getAtlasSnapshotPublicationState(),
-        outbox: gaugeJournalOutbox(ctx),
+        outbox: syncOutbox(rows.outbox),
       });
     }
     if (req.method !== "GET") {

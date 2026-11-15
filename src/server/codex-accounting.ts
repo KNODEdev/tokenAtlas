@@ -426,11 +426,20 @@ function computeCodexAccountingReport(
         const pieceGroups=deriveCodexLedgerGroups<typeof CODEX_LEDGER_VARIANTS>(sqlite,ledger.policy,pieceRows);
         const byPiece=new Map<number,Array<{row:typeof pieceRows[number];group:typeof pieceGroups[number]}>>();
         pieceRows.forEach((row,index)=>byPiece.set(row.piece,[...byPiece.get(row.piece)??[],{row,group:pieceGroups[index]!}]));
+        // Hour sums of the pricing days not read yet (UTC hour of each call's instant; a call without one is in no period): one read
+        // per range of those days with holes of at most one day. A read per day repeated its readiness checks and ~27 statements;
+        // one read over a sparse span reads many days no boundary cuts (slower on dense history). Each day keeps its groups' order.
+        const missing=[...days].filter(day=>day>=since&&day<until&&!hoursOf.has(day)).sort();
+        for(let start=0,end=0;start<missing.length;start=end) {
+          while(++end<missing.length && Date.parse(missing[end]!)-Date.parse(missing[end-1]!)<=2*86400000);
+          const fresh=new Map<string,OwnedGroup[]>(missing.slice(start,end).map(day=>[day,[]]));
+          for(const owned of readCodexLedgerOwnedSeries<typeof CODEX_LEDGER_VARIANTS>(sqlite,{since:missing[start]!,until:missing[end-1]!,grain:"hour",...sources},resolver,ledger,undefined,{coarse:true}))
+            fresh.get(owned.group.stored.day)?.push(owned);
+          for(const [day,hours] of fresh) hoursOf.set(day,hours);
+        }
         for(const day of days) {
           if(day<since||day>=until) continue;
-          // Hour sums of the pricing day (UTC hour of each call's instant; a call without one is in no period).
-          let hours=hoursOf.get(day);
-          if(!hours) { hours=readCodexLedgerOwnedSeries<typeof CODEX_LEDGER_VARIANTS>(sqlite,{since:day,until:day,grain:"hour",...sources},resolver,ledger,undefined,{coarse:true}); hoursOf.set(day,hours); }
+          const hours=hoursOf.get(day)!;
           const cut=new Set<number>();
           const own=hours.filter(({group,account:owner})=>owner===account && group.selected && group.stored.model!==SPARK_MODEL
             && (!options.project || group.stored.subject==="p:"+options.project));
