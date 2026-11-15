@@ -15,6 +15,8 @@ const retainedViews = new Map<string, unknown>();
  */
 const lastSeen = new Map<string, unknown>();
 const LAST_SEEN_MAX = 96;
+const STALE_REFRESH_FIRST_MS = 2000;
+const STALE_REFRESH_MAX_MS = 30000;
 const objectIds = new WeakMap<object, number>();
 let nextObjectId = 0;
 /** Primitives by value, objects by identity: a key costs nothing even for a dependency holding a whole model. */
@@ -83,12 +85,25 @@ export function useAsync<T>(fn: (signal:AbortSignal) => Promise<T>, deps: unknow
   // Preserve a ready report on refresh, but never label another account/filter's data as current.
   const sameScope=result.retainKey===retainKey && sameDependencies(result.deps,deps);
   const staleAt=sameScope ? staleReportTime(result.data) : null;
+  const staleDelay=useRef(STALE_REFRESH_FIRST_MS);
   useEffect(()=>{
     visibleReportFreshness(id,staleAt);
     if(staleAt===null)return;
-    const timer=setInterval(()=>setNonce(n=>n+1),2000);
-    return()=>{clearInterval(timer);visibleReportFreshness(id,null);};
+    return()=>visibleReportFreshness(id,null);
   },[id,staleAt]);
+  // One stale refresh at a time, scheduled only after the previous read settled. A newer prepared-at
+  // time keeps the backoff (the server is still preparing); a fresh answer or another scope restarts it.
+  const staleRefresh=staleAt!==null;
+  useEffect(()=>{
+    if(!staleRefresh){staleDelay.current=STALE_REFRESH_FIRST_MS;return;}
+    if(loading)return;
+    const delay=staleDelay.current;
+    const timer=setTimeout(()=>{
+      staleDelay.current=Math.min(delay*2,STALE_REFRESH_MAX_MS);
+      setNonce(n=>n+1);
+    },delay);
+    return()=>clearTimeout(timer);
+  },[staleRefresh,loading]);
   // Back on a scope read before: its last data stays visible until the new request answers.
   const seen=!sameScope ? lastSeen.get(scopeKey) as T | undefined : undefined;
   const raw = sameScope ? result.data : seen ?? null;
