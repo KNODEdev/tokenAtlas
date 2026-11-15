@@ -30,6 +30,27 @@ class FakeWorker {
 const envelope = (body: unknown, status = 200): DataEnvelope => ({ status, body, headers: [] });
 const settle = () => Bun.sleep(0);
 
+class LookupWorker {
+  onmessage: ((event: { data: unknown }) => void) | null = null;
+  onerror: ((event: { message: string }) => void) | null = null;
+  work: DirectReadWork[] = [];
+  ref() {} unref() {} terminate() {}
+  postMessage(work: DirectReadWork | { close: true }) {
+    if ("close" in work) queueMicrotask(() => this.reply({ closed: true })); else this.work.push(work);
+  }
+  reply(data: unknown) { this.onmessage?.({ data }); }
+}
+function lookupPool(throwsAt: number[] = [], options: Parameters<typeof createDirectRead>[1] = {}) {
+  const workers: LookupWorker[] = [];
+  let attempts = 0;
+  const read = createDirectRead(() => {
+    if (throwsAt.includes(++attempts)) throw new Error("synthetic worker creation failure");
+    const worker = new LookupWorker(); workers.push(worker); return worker as unknown as Worker;
+  }, options);
+  cleanups.push(async () => { await read.close(); for (const worker of workers) worker.reply({ value: null }); });
+  return { read, workers };
+}
+
 function fixture() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-read-lane-")), dbPath = path.join(dir, "data.sqlite");
   const sqlite = new Database(dbPath);
@@ -196,3 +217,56 @@ test("the light lane answers while every screen worker and the data worker run l
   expect(dataWorker.work).toHaveLength(1);
   void screens;
 }, 30_000);
+
+for (const change of ["rates", "context", "homes"] as const) test(`identical lookups share only the same captured configuration: ${change}`, async () => {
+  const { ctx } = fixture(), { read, workers } = lookupPool();
+  const request = { kind: "sync", url: "/api/sync" } as const;
+  const first = read.light(ctx, request), shared = read.light(ctx, request);
+  await settle();
+  expect(workers[0]!.work).toHaveLength(1);
+  if (change === "rates") ctx.rateCards = { ...ctx.rateCards, version: ctx.rateCards.version + 1 };
+  else if (change === "context") ctx.rootDir += "/updated";
+  else ctx.homeToSubId.set("/synthetic/codex", "codex-seat");
+  const changed = read.light(ctx, request);
+  workers[0]!.reply({ value: "old configuration" });
+  expect(await first).toEqual({ value: "old configuration" });
+  expect(await shared).toEqual({ value: "old configuration" });
+  await settle();
+  expect(workers[0]!.work).toHaveLength(2);
+  workers[0]!.reply({ value: "new configuration" });
+  expect(await changed).toEqual({ value: "new configuration" });
+});
+
+test("a lookup worker creation failure returns an error and restores the slot for the next lookup", async () => {
+  const { ctx } = fixture(), { read, workers } = lookupPool([1]);
+  expect(await read.light(ctx, { kind: "sync", url: "/api/sync?first" })).toEqual({ error: "Error: synthetic worker creation failure" });
+  const next = read.light(ctx, { kind: "sync", url: "/api/sync?next" });
+  await settle();
+  expect(workers).toHaveLength(1);
+  workers[0]!.reply({ value: "recovered" });
+  expect(await next).toEqual({ value: "recovered" });
+});
+
+test("a replacement lookup worker creation failure settles its waiter and dispatches the next waiter", async () => {
+  const { ctx } = fixture(), { read, workers } = lookupPool([2]);
+  const first = read.light(ctx, { kind: "sync", url: "/api/sync?first" });
+  const failed = read.light(ctx, { kind: "sync", url: "/api/sync?failed" });
+  const next = read.light(ctx, { kind: "sync", url: "/api/sync?next" });
+  await settle();
+  workers[0]!.onerror?.({ message: "synthetic worker lost" });
+  expect(await first).toEqual({ error: "synthetic worker lost" });
+  expect(await failed).toEqual({ error: "Error: synthetic worker creation failure" });
+  await settle();
+  expect(workers).toHaveLength(2);
+  workers[1]!.reply({ value: "recovered" });
+  expect(await next).toEqual({ value: "recovered" });
+});
+
+test("a queued lookup expires from submission while a worker never answers", async () => {
+  const { ctx } = fixture(), { read } = lookupPool([], { lightTimeoutMs: 100 });
+  const first = read.light(ctx, { kind: "sync", url: "/api/sync?first" });
+  const queued = read.light(ctx, { kind: "sync", url: "/api/sync?queued" });
+  expect(await Promise.race([queued, Bun.sleep(160).then(() => "missed submission deadline")]))
+    .toEqual({ error: "The screen took too long to read" });
+  expect(await first).toEqual({ error: "The screen took too long to read" });
+});

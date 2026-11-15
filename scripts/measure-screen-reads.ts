@@ -19,6 +19,18 @@ import { createHash } from "node:crypto";
 const [command, ...rest] = process.argv.slice(2);
 const args = new Map<string, string>();
 for (let i = 0; i < rest.length; i += 2) args.set(rest[i]!.replace(/^--/, ""), rest[i + 1] ?? "");
+function simpleName(name: string, option: string): string {
+  if (!/^[A-Za-z0-9._-]+$/.test(name) || name === "." || name === "..")
+    throw new Error(`--${option} must be a simple name using letters, digits, '.', '_' or '-', excluding '.' and '..'`);
+  return name;
+}
+function namedPath(directory: string, name: string, option: string): string {
+  const resolved = path.resolve(directory, simpleName(name, option)), relative = path.relative(directory, resolved);
+  if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+    throw new Error(`--${option} must resolve inside ${directory}`);
+  return resolved;
+}
+for (const option of ["label", "golden"]) if (args.has(option)) simpleName(args.get(option)!, option);
 const ROOT = path.resolve(args.get("root") ?? "");
 if (!args.get("root") || !path.isAbsolute(args.get("root")!)) throw new Error("--root <absolute dir> is required");
 // Only an empty folder or one this script built: never a folder holding an installation's data.
@@ -361,10 +373,10 @@ function tableCounts(db: any) {
 /* measure                                                                                  */
 /* ======================================================================================= */
 async function measure(label: string, samples: number, walTargets: number[]) {
+  const goldenDir = namedPath(P.golden, label, "label"), out = namedPath(P.results, `${label}.json`, "label");
   if (!fs.existsSync(P.fixture)) throw new Error("Build the fixture first");
   const meta = JSON.parse(fs.readFileSync(P.meta, "utf8"));
   fs.copyFileSync(P.fixture, RUN_DB);
-  const goldenDir = path.join(P.golden, label);
   fs.rmSync(goldenDir, { recursive: true, force: true }); fs.mkdirSync(goldenDir, { recursive: true });
   const report: Record<string, unknown> = { label, fixture: { file_bytes: meta.file_bytes, counts: meta.counts, history: meta.history, params: meta.params },
     bun: Bun.version, platform: `${process.platform}/${process.arch}`, cpus: os.cpus().length, samples };
@@ -831,14 +843,13 @@ async function measure(label: string, samples: number, walTargets: number[]) {
     for (const db of opened) try { db.close(); } catch { /* already closed */ }
     for (const suffix of ["", "-wal", "-shm"]) try { fs.rmSync(RUN_DB + suffix, { force: true }); } catch (error) { console.error(String(error)); }
   }
-  const out = path.join(P.results, `${label}.json`);
   fs.writeFileSync(out, JSON.stringify(report, null, 2) + "\n");
   console.log(`[measure] results: ${out}\n[measure] golden bodies: ${goldenDir}`);
 }
 
 /* ---------- compare: whole bodies of a run against a golden run ---------- */
 function compare(label: string, golden: string) {
-  const left = path.join(P.golden, golden), right = path.join(P.golden, label);
+  const left = namedPath(P.golden, golden, "golden"), right = namedPath(P.golden, label, "label");
   const firstDifference = (a: unknown, b: unknown, at = ""): string | null => {
     if (Object.is(a, b)) return null;
     if (typeof a !== "object" || typeof b !== "object" || a === null || b === null || Array.isArray(a) !== Array.isArray(b)) return at || "/";

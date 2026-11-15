@@ -62,29 +62,38 @@ export function createDirectReadWorker(): Worker {
   });
 }
 
-export function createDirectRead(workerFactory = createDirectReadWorker, options: { idleMs?: number } = {}) {
+export function createDirectRead(workerFactory = createDirectReadWorker, options: { idleMs?: number; lightTimeoutMs?: number } = {}) {
   let stopped = false;
   /** A lane of workers: screens, or the light lookups. */
-  const lane = (size: number, timeoutMs: number) => {
-    const waiting: Array<(worker: Worker | null) => void> = [];
+  const lane = (size: number, timeoutMs: number, submissionDeadline = false) => {
+    type Slot = Worker | { error: string } | null;
+    const waiting: Array<(worker: Slot) => void> = [];
     let started = 0;
     const idle = new IdleReadWorkers(() => { started--; }, options.idleMs);
-    const acquire = (signal?: AbortSignal): Promise<Worker | null> => {
+    const create = (): Worker | { error: string } => {
+      started++;
+      try { return workerFactory(); } catch (error) { started--; return { error: String(error) }; }
+    };
+    const timeoutAnswer = () => ({ error: "The screen took too long to read" });
+    const acquire = (signal?: AbortSignal, deadline?: number): Promise<Slot> => {
       if (stopped || signal?.aborted) return Promise.resolve(null);
       const free = idle.pop();
       if (free) { held(free).ref(); return Promise.resolve(free); }
-      if (started < size) { started++; return Promise.resolve(workerFactory()); }
+      if (started < size) return Promise.resolve(create());
       return new Promise(resolve => {
-        const take = (worker: Worker | null) => {
+        const take = (worker: Slot) => {
+          clearTimeout(timeout);
           signal?.removeEventListener("abort", abort);
           resolve(worker);
         };
-        const abort = () => {
+        const remove = (answer: Slot) => {
           const index = waiting.indexOf(take);
           if (index < 0) return;
           waiting.splice(index, 1);
-          take(null);
+          take(answer);
         };
+        const abort = () => remove(null);
+        const timeout = deadline === undefined ? undefined : setTimeout(() => remove(timeoutAnswer()), Math.max(0, deadline - Date.now()));
         waiting.push(take);
         signal?.addEventListener("abort", abort, { once: true });
         if (signal?.aborted) abort();
@@ -92,40 +101,48 @@ export function createDirectRead(workerFactory = createDirectReadWorker, options
     };
     const release = (worker: Worker | null) => {
       if (!worker) started--;
-      const next = waiting.shift();
-      if (next) { if (worker) next(worker); else if (!stopped) { started++; next(workerFactory()); } }
+      let next;
+      while ((next = waiting.shift())) {
+        if (worker) { next(worker); return; }
+        if (stopped) { next(null); continue; }
+        const created = create();
+        next(created);
+        if (!("error" in created)) return;
+      }
       // An idle worker does not keep the process alive.
-      else if (worker) { held(worker).unref(); idle.push(worker); }
+      if (worker) { held(worker).unref(); idle.push(worker); }
     };
-    const run = (worker: Worker, work: DirectReadWork) => new Promise<DirectReadAnswer>(resolve => {
+    const run = (worker: Worker, work: DirectReadWork, remainingMs: number) => new Promise<DirectReadAnswer>(resolve => {
       const finish = (answer: DirectReadAnswer, broken: boolean) => {
         clearTimeout(timeout); worker.onmessage = null; worker.onerror = null;
         if (broken || stopped) worker.terminate();
         release(broken || stopped ? null : worker);
         resolve(answer);
       };
-      const timeout = setTimeout(() => finish({ error: "The screen took too long to read" }, true), timeoutMs);
+      const timeout = setTimeout(() => finish(timeoutAnswer(), true), remainingMs);
       worker.onmessage = (event: MessageEvent<DirectReadAnswer>) => finish(event.data, false);
       worker.onerror = (event) => finish({ error: event.message || "The screen worker failed" }, true);
       try { worker.postMessage(work); } catch (error) { finish({ error: String(error) }, true); }
     });
     /** The worker's answer, or null when the caller left (or the pool stopped) before the work was posted. */
     const perform = async (work: DirectReadWork, signal?: AbortSignal): Promise<DirectReadAnswer | null> => {
-      const worker = await acquire(signal);
-      if (!worker) return null;
+      const deadline = submissionDeadline ? Date.now() + timeoutMs : undefined;
+      const worker = await acquire(signal, deadline);
+      if (!worker || "error" in worker) return worker;
       // A granted slot can be abandoned before this continuation posts its work.
       if (signal?.aborted || stopped) {
         if (stopped) worker.terminate();
         release(stopped ? null : worker);
         return null;
       }
+      if (deadline !== undefined && Date.now() >= deadline) { release(worker); return timeoutAnswer(); }
       // Once started, a snapshot finishes normally; cancellation never terminates a reader.
-      return run(worker, work);
+      return run(worker, work, deadline === undefined ? timeoutMs : deadline - Date.now());
     };
     const close = () => { waiting.splice(0).forEach(take => take(null)); return idle.close(); };
     return { perform, close };
   };
-  const screens = lane(WORKERS, TIMEOUT_MS), lookups = lane(LIGHT_WORKERS, LIGHT_TIMEOUT_MS);
+  const screens = lane(WORKERS, TIMEOUT_MS), lookups = lane(LIGHT_WORKERS, options.lightTimeoutMs ?? LIGHT_TIMEOUT_MS, true);
   const workOf = (ctx: AppContext, url: string, light?: LightRead): DirectReadWork => ({ dbPath: ctx.dbPath!, url, context: snapshotDataContext(ctx),
     rates: ctx.rateCards, homes: [...ctx.homeToSubId], sourceHomes: codexSourceHomes(ctx.homeToSubId), ...(light ? { light } : {}) });
   const read = async (ctx: AppContext, url: URL, signal?: AbortSignal): Promise<Response> => {
@@ -141,14 +158,20 @@ export function createDirectRead(workerFactory = createDirectReadWorker, options
   };
   /** Identical lookups in flight share one worker read; it is abandoned only when its last caller leaves. */
   const sharing = new Map<string, { waiters: number; controller: AbortController; promise: Promise<DirectReadAnswer | null> }>();
+  const rateIds = new WeakMap<RateCard, number>();
+  let nextRateId = 0;
   const light: LightReader = (ctx, request, signal) => {
     if (signal?.aborted) return Promise.resolve(null);
     if (stopped || !ctx.dbPath || ctx.dbPath === ":memory:") return Promise.resolve({ error: "No read worker" });
-    const key = JSON.stringify([ctx.dbPath, request]);
+    const work = workOf(ctx, request.kind === "sync" ? request.url : "/api/cycle-breakdowns", request);
+    // Pricing edits replace the card; avoid serializing its large contents on every poll.
+    let rateId = rateIds.get(work.rates);
+    if (rateId === undefined) { rateId = ++nextRateId; rateIds.set(work.rates, rateId); }
+    const key = JSON.stringify({ ...work, rates: rateId });
     let entry = sharing.get(key);
     if (!entry) {
       const controller = new AbortController();
-      const created = { waiters: 0, controller, promise: lookups.perform(workOf(ctx, request.kind === "sync" ? request.url : "/api/cycle-breakdowns", request), controller.signal)
+      const created = { waiters: 0, controller, promise: lookups.perform(work, controller.signal)
         .finally(() => { if (sharing.get(key) === created) sharing.delete(key); }) };
       sharing.set(key, entry = created);
     }
