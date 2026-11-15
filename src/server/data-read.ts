@@ -22,6 +22,7 @@ import { CLAUDE_CODE_CAPACITY_ALGORITHM } from "../shared/claude-code-capacity";
 import { IdleReadWorkers } from "./idle-read-workers";
 import { ResponseMemoryBudget, ResponseMemoryCache, stringMemoryBytes } from "./response-memory";
 import { contextRequested, contextProjectionStamp } from "./codex-context-preview";
+import type { LightRead, LightReader } from "./direct-read";
 
 /**
  * The exception list of plan U4.4: views that still need more than the stored rows give in a second
@@ -79,11 +80,31 @@ export function currentStoredBody(ctx: AppContext, url: URL, nowMs = Date.now())
   return WINDOW_SCREENS[url.pathname]?.clock && nowMs !== built ? presentClockFields(body, nowMs, built) : body;
 }
 
-function refreshPeriodIndex(ctx: AppContext) {
-  const declarations = periodEras(ctx.sqlite, ctx.accounts);
+type Periods = ReturnType<typeof periodEras>;
+/** `declarations`: read in the light lane's snapshot, so the HTTP thread does not query them. */
+function refreshPeriodIndex(ctx: AppContext, declarations: Periods = periodEras(ctx.sqlite, ctx.accounts)) {
   const index = buildEraIndex(declarations, "instant");
   if (ctx.eras?.fingerprint !== index.fingerprint) ctx.eras = index;
   return declarations;
+}
+
+/** Everything a cycle batch decides from, read in one snapshot of the light lane (direct-read-worker.ts). */
+export interface CycleBatchRows {
+  periods: Periods;
+  items: Array<{ answer: WindowAnswer | null; marked: boolean; configuration: string; family: WindowAnswer | null; failureMarked?: boolean }>;
+}
+export function cycleBatchRows(ctx: AppContext, read: Extract<LightRead, { kind: "cycle-batch" }>, periods = periodEras(ctx.sqlite, ctx.accounts)): CycleBatchRows {
+  const urls = read.urls.map(path => new URL(path, "http://local")), keys = urls.map(cacheKey);
+  const rows = readWindowAnswerBatch(ctx.sqlite, "/api/cycle-breakdown", keys);
+  let latest: ReturnType<typeof latestAccountState> | undefined;
+  const readLatest = () => latest ??= latestAccountState(ctx);
+  return { periods, items: urls.map((url, index) => {
+    const { answer, marked } = rows.get(keys[index]!) ?? { answer: null, marked: false };
+    const scope = storedScopeOf(ctx, url), failure = read.failures[keys[index]!];
+    return { answer, marked, configuration: storedAnswerConfiguration(ctx, url, readLatest),
+      family: !answer && scope ? readFamilyAnswer(ctx.sqlite, url.pathname, scope.family) : null,
+      ...(!answer && failure ? { failureMarked: windowAnswerMarkedSince(ctx.sqlite, failure.scope, failure.checked) } : {}) };
+  }) };
 }
 
 export function createDataReadWorker(): Worker {
@@ -129,7 +150,9 @@ const WORKERS = 3;
  */
 const REFRESH_SPACING_MS = 15_000;
 
-export function createDataRead(workerFactory = createDataReadWorker, options: { workers?: number; idleMs?: number; memory?: ResponseMemoryBudget } = {}) {
+/** `light`: the lookup lane (direct-read.ts) the cycle batch reads its rows from, off the HTTP thread. */
+export function createDataRead(workerFactory = createDataReadWorker,
+  options: { workers?: number; idleMs?: number; memory?: ResponseMemoryBudget; light?: LightReader } = {}) {
   const memory = options.memory ?? new ResponseMemoryBudget();
   const answers = new ResponseMemoryCache<Answer>(memory, answer => stringMemoryBytes(answer.version)
     + ("body" in answer ? stringMemoryBytes(answer.body) + stringMemoryBytes(JSON.stringify(answer.headers)) : 0), MAX_ANSWERS);
@@ -148,6 +171,8 @@ export function createDataRead(workerFactory = createDataReadWorker, options: { 
   const idle = new IdleReadWorkers(() => { started--; }, options.idleMs);
   /** When each answer was last computed and how long it took. */
   const computed = new Map<string, { finished: number; ms: number }>();
+  /** Stored screens whose last build lost its worker. */
+  const unanswered = new Set<string>();
   const refreshAllowed = (key: string, now = Date.now()) => {
     const last = computed.get(key);
     return !last || now - last.finished >= Math.max(REFRESH_SPACING_MS, 3 * last.ms);
@@ -184,7 +209,7 @@ export function createDataRead(workerFactory = createDataReadWorker, options: { 
   };
   /** Queues one computation of `key`; requests asking for the same key share it. */
   const enqueue = (ctx: AppContext, request: AnalysisRequest, key: string, background: boolean, done: (message: WorkerMessage | null) => Answer | void,
-    prefill = false): boolean => {
+    prefill = false, knownPeriods?: Periods): boolean => {
     const current = running.get(key);
     if (current) {
       // A screen now waits on a queued refresh or prefill: it goes ahead of them.
@@ -195,7 +220,7 @@ export function createDataRead(workerFactory = createDataReadWorker, options: { 
       }
       return false;
     }
-    const periods = refreshPeriodIndex(ctx);
+    const periods = refreshPeriodIndex(ctx, knownPeriods);
     const work: DataWork = { context: snapshotDataContext(ctx), dbPath: ctx.dbPath!, rates: ctx.rateCards, request,
       plans: ctx.plans, catalog: ctx.plansCatalog, cycles: ctx.cycles, homes: [...ctx.homeToSubId], sourceHomes: codexSourceHomes(ctx.homeToSubId),
       subscriptions: ctx.accounts.subscriptions, sources: ctx.accounts.sources, eras: periods };
@@ -272,12 +297,16 @@ export function createDataRead(workerFactory = createDataReadWorker, options: { 
   /** Builds one stored answer in a worker and hands it to the background writer. */
   /** `prefill`: queued behind every other job, and called once it ended; returns whether a computation was queued. */
   const computeStored = (ctx: AppContext, url: URL, key: string, scope: StoredScope, background: boolean, prefill?: () => void,
-    knownConfiguration?: string): boolean => {
-    if (!prefill && (background || prepared.get(key)) && !refreshAllowed(key)) return false;
+    knownConfiguration?: string, knownPeriods?: Periods): boolean => {
+    // A build whose worker was lost or timed out is spaced too: the receipt's polls would restart it at once.
+    // A preparing register is asked again at once: it answers before any read and can become ready without a mark.
+    if (!prefill && (background || prepared.get(key) || unanswered.has(key)) && !refreshAllowed(key)) return false;
     const request: AnalysisRequest = { kind: "screen", url: key };
     const configuration = knownConfiguration ?? configurationOf(ctx, url);
     const keep = (message: WorkerMessage | null) => {
-      if (!message || isPending(request, message)) return;
+      if (!message) { unanswered.add(key); return; }
+      unanswered.delete(key);
+      if (isPending(request, message)) return;
       const envelope = envelopeOf(request, message), checked = message.snapshot?.checked ?? 0;
       const { family, ...answerScope } = scope;
       if (envelope.status !== 200 || !message.snapshot) {
@@ -299,7 +328,7 @@ export function createDataRead(workerFactory = createDataReadWorker, options: { 
       // Without a writer taking them (tests, a borrowed context) the queue keeps only the newest.
       if (toStore.length > MAX_ANSWERS) toStore.splice(0, toStore.length - MAX_ANSWERS);
     };
-    return enqueue(ctx, request, key, background, message => { try { keep(message); } finally { prefill?.(); } }, !!prefill);
+    return enqueue(ctx, request, key, background, message => { try { keep(message); } finally { prefill?.(); } }, !!prefill, knownPeriods);
   };
   /** A stored answer, its ages and countdowns presented now when its screen declares a clock. */
   const respondStored = (url: URL, answer: WindowAnswer, state: "stored" | "stale") => {
@@ -313,8 +342,10 @@ export function createDataRead(workerFactory = createDataReadWorker, options: { 
     return response;
   };
 
+  /** `loaded`: what a batch read in its snapshot; with `family`, `failureMarked` and `periods` the decision queries nothing. */
   const readStored = (ctx: AppContext, url: URL, key: string, scope: StoredScope,
-    loaded?: { answer: WindowAnswer | null; marked: boolean; configuration?: string }): Response => {
+    loaded?: { answer: WindowAnswer | null; marked: boolean; configuration?: string; family?: WindowAnswer | null;
+      failureMarked?: (failure: Failure) => boolean; periods?: Periods }): Response => {
     lastContext = ctx;
     recent.delete(key); recent.set(key, { at: Date.now(), url, scope });
     const configuration = loaded?.configuration ?? configurationOf(ctx, url);
@@ -325,12 +356,13 @@ export function createDataRead(workerFactory = createDataReadWorker, options: { 
       : windowAnswerIsCurrent(ctx.sqlite, answer, configuration));
     if (answer && current) return respondStored(url, answer, "stored");
     const failure = failures.get(key);
-    if (!answer && failure && failure.configuration === configuration && !windowAnswerMarkedSince(ctx.sqlite, failure.scope, failure.checked))
+    if (!answer && failure && failure.configuration === configuration
+      && !(loaded?.failureMarked ? loaded.failureMarked(failure) : windowAnswerMarkedSince(ctx.sqlite, failure.scope, failure.checked)))
       return respondBody(url, failure.body, failure.status, [], "", "memory", 0);
     // The last answer, or the newest of its family, stays on screen while the current one is computed.
-    computeStored(ctx, url, key, scope, !!answer, undefined, configuration);
+    computeStored(ctx, url, key, scope, !!answer, undefined, configuration, loaded?.periods);
     if (answer) return respondStored(url, answer, "stale");
-    const family = readFamilyAnswer(ctx.sqlite, url.pathname, scope.family);
+    const family = loaded?.family !== undefined ? loaded.family : readFamilyAnswer(ctx.sqlite, url.pathname, scope.family);
     return family ? respondStored(url, family, "stale") : preparingRows();
   };
 
@@ -466,6 +498,23 @@ export function createDataRead(workerFactory = createDataReadWorker, options: { 
       if (signal?.aborted) return Promise.resolve(urls.map(() => new Response(null, { status: 499 })));
       const scopes = urls.map(url => storedScopeOf(ctx, url));
       if (!stopped && ctx.dbPath && ctx.dbPath !== ":memory:" && scopes.every(Boolean)) {
+        const keys = urls.map(cacheKey);
+        // Rows, marks, configuration, family answers and periods from the lookup lane's one snapshot: deciding
+        // here is in-memory work, and a long screen build or a pinned WAL never holds the HTTP thread.
+        if (options.light) {
+          const sent = keys.map(key => failures.get(key));
+          const known = Object.fromEntries(sent.flatMap((failure, index) => failure ? [[keys[index]!, { scope: failure.scope, checked: failure.checked }]] : []));
+          return options.light(ctx, { kind: "cycle-batch", urls: urls.map(url => `${url.pathname}${url.search}`), failures: known }, signal)
+            .then(answer => {
+              if (!answer || signal?.aborted) return urls.map(() => new Response(null, { status: 499 }));
+              if (stopped) return Promise.all(urls.map(url => read(ctx, new Request(url, { signal }))));
+              if ("error" in answer) return urls.map(() => Response.json({ error: answer.error }, { status: 503 }));
+              const { periods, items } = answer.value as CycleBatchRows;
+              return urls.map((url, index) => readStored(ctx, url, keys[index]!, scopes[index]!, { ...items[index]!, periods,
+                // A failure kept after the snapshot was read has seen no mark since.
+                failureMarked: failure => failure === sent[index] && !!items[index]!.failureMarked }));
+            });
+        }
         return Promise.resolve(withReadSnapshot(ctx.sqlite, () => {
           const rows = readWindowAnswerBatch(ctx.sqlite, "/api/cycle-breakdown", urls.map(cacheKey));
           let latest: ReturnType<typeof import("./account-probes").latestAccountState> | undefined;

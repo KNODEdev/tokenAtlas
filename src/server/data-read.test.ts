@@ -719,3 +719,40 @@ test("a configuration changed while a worker computes cannot make its captured a
     expect((await read(ctx, new Request(closed))).headers.get("X-Analysis")).toBe("stored");
   } finally { await read.close(); close(); }
 });
+
+test("identical codex-accounting reads share one build; a lost or answered build is not started again inside the refresh spacing", async () => {
+  const { ctx, sqlite, close, reply } = storedFixture(), worker = new FakeWorker(), read = reader(worker);
+  const accounting = "http://local/api/codex-accounting?account=codex1&since=2026-09-01&until=2026-09-30";
+  const start = Date.parse("2026-10-01T12:00:00.000Z"), clock = spyOn(Date, "now").mockReturnValue(start);
+  const poll = async (times: number) => { const states: unknown[] = [];
+    for (let i = 0; i < times; i++) { const r = await read(ctx, new Request(accounting)); states.push([r.status, r.headers.get("X-Analysis")]); await settle(); }
+    return states; };
+  try {
+    // Requests of every tab while the build runs: one job, each caller gets the receipt.
+    const receipts = await Promise.all(Array.from({ length: 5 }, () => read(ctx, new Request(accounting))));
+    expect(receipts.map(r => [r.status, r.headers.get("X-Analysis")])).toEqual(Array(5).fill([202, "preparing"]));
+    await settle();
+    expect(worker.work.map(work => work.request)).toEqual([{ kind: "screen", url: "/api/codex-accounting?account=codex1&since=2026-09-01&until=2026-09-30" }]);
+    // The ledger is still being prepared: the receipt's polls ask once more, sharing that build.
+    worker.reply({ error: "Codex usage prices are awaiting background preparation", pending: true }); await read.whenIdle();
+    expect(await poll(3)).toEqual(Array(3).fill([202, "preparing"]));
+    expect(worker.work).toHaveLength(2);
+    // A worker that died (no answer) is not restarted by the polls inside the refresh spacing.
+    (worker.onerror as () => void)(); await read.whenIdle();
+    expect(await poll(3)).toEqual(Array(3).fill([202, "preparing"]));
+    expect(worker.work).toHaveLength(2);
+    clock.mockReturnValue(start + 20_000);
+    await poll(3);
+    expect(worker.work).toHaveLength(3);
+    reply(worker, { windows: [] }); await read.whenIdle();
+    // Answered: an immediate repeat starts nothing, before and after the writer publishes it.
+    await poll(2);
+    expect(worker.work).toHaveLength(3);
+    expect(publish(read, sqlite)).toBe(1);
+    const stored = await read(ctx, new Request(accounting));
+    expect(stored.headers.get("X-Analysis")).toBe("stored");
+    expect(await stored.json()).toEqual({ windows: [] });
+    await settle();
+    expect(worker.work).toHaveLength(3);
+  } finally { clock.mockRestore(); read.close(); close(); }
+});

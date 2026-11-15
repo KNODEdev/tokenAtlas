@@ -8,6 +8,7 @@ import { codexSourceHomes } from "./capacity-equivalents";
 import type { RateCard } from "./pricing";
 import { cancelledRead } from "./coalesced-read";
 import { IdleReadWorkers } from "./idle-read-workers";
+import type { AnswerScope } from "../db/window-answers";
 
 /**
  * Stored-row screens whose cold read still takes a noticeable time (plan U1.3/U1.4): built on each request
@@ -29,17 +30,31 @@ export const DIRECT_READ_HANDLERS: Readonly<Record<string, (ctx: AppContext, url
 export function directReadHandler(pathname: string): ((ctx: AppContext, url: URL) => Promise<Response>) | undefined {
   return DIRECT_READ_HANDLERS[pathname] ?? (DATA_VIEWS[pathname]?.direct ? (ctx, url) => serveDataView(ctx, url) : undefined);
 }
+/**
+ * A stored-row lookup every tab polls (the cycle batch, the sync check), read in the worker's one snapshot:
+ * `cycleBatchRows` (data-read.ts) and `syncReadRows` (read-refresh.ts).
+ */
+export type LightRead = { kind: "cycle-batch"; urls: string[]; failures: Record<string, { scope: AnswerScope; checked: number }> }
+  | { kind: "sync"; url: string };
+/** The lookup's value, its failure, or null when its caller left. */
+export type LightAnswer = { value: unknown } | { error: string } | null;
+export type LightReader = (ctx: AppContext, read: LightRead, signal?: AbortSignal) => Promise<LightAnswer>;
 export interface DirectReadWork {
   close?: undefined; dbPath: string; url: string; context: DataContext; rates: RateCard;
-  homes: Array<[string, string]>; sourceHomes: string[];
+  homes: Array<[string, string]>; sourceHomes: string[]; light?: LightRead;
 }
-export type DirectReadAnswer = { status: number; headers: Array<[string, string]>; body: string } | { error: string };
+export type DirectReadAnswer = { status: number; headers: Array<[string, string]>; body: string } | { value: unknown } | { error: string };
 
 /** Workers build at most this many screens at once; more requests wait for a free one. */
 const WORKERS = 2;
+/**
+ * Lookups get a worker of their own (golden rule 9): a screen build of seconds on the screen workers never
+ * holds them. They take milliseconds, so one worker (one more read-only connection) serves every tab.
+ */
+const LIGHT_WORKERS = 1;
 /** Bun's Worker can stop keeping the process alive; the DOM type does not declare it. */
 const held = (worker: Worker) => worker as Worker & { ref(): void; unref(): void };
-const TIMEOUT_MS = 120_000;
+const TIMEOUT_MS = 120_000, LIGHT_TIMEOUT_MS = 30_000;
 
 export function createDirectReadWorker(): Worker {
   return new Worker(new URL("./direct-read-worker.ts", import.meta.url).href, {
@@ -48,76 +63,118 @@ export function createDirectReadWorker(): Worker {
 }
 
 export function createDirectRead(workerFactory = createDirectReadWorker, options: { idleMs?: number } = {}) {
-  const waiting: Array<(worker: Worker | null) => void> = [];
-  let started = 0, stopped = false;
-  const idle = new IdleReadWorkers(() => { started--; }, options.idleMs);
-  const acquire = (signal?: AbortSignal): Promise<Worker | null> => {
-    if (stopped || signal?.aborted) return Promise.resolve(null);
-    const free = idle.pop();
-    if (free) { held(free).ref(); return Promise.resolve(free); }
-    if (started < WORKERS) { started++; return Promise.resolve(workerFactory()); }
-    return new Promise(resolve => {
-      const take = (worker: Worker | null) => {
-        signal?.removeEventListener("abort", abort);
-        resolve(worker);
-      };
-      const abort = () => {
-        const index = waiting.indexOf(take);
-        if (index < 0) return;
-        waiting.splice(index, 1);
-        take(null);
-      };
-      waiting.push(take);
-      signal?.addEventListener("abort", abort, { once: true });
-      if (signal?.aborted) abort();
-    });
-  };
-  const release = (worker: Worker | null) => {
-    if (!worker) started--;
-    const next = waiting.shift();
-    if (next) { if (worker) next(worker); else if (!stopped) { started++; next(workerFactory()); } }
-    // An idle worker does not keep the process alive.
-    else if (worker) { held(worker).unref(); idle.push(worker); }
-  };
-  const run = (worker: Worker, work: DirectReadWork) => new Promise<DirectReadAnswer>(resolve => {
-    const finish = (answer: DirectReadAnswer, broken: boolean) => {
-      clearTimeout(timeout); worker.onmessage = null; worker.onerror = null;
-      if (broken || stopped) worker.terminate();
-      release(broken || stopped ? null : worker);
-      resolve(answer);
+  let stopped = false;
+  /** A lane of workers: screens, or the light lookups. */
+  const lane = (size: number, timeoutMs: number) => {
+    const waiting: Array<(worker: Worker | null) => void> = [];
+    let started = 0;
+    const idle = new IdleReadWorkers(() => { started--; }, options.idleMs);
+    const acquire = (signal?: AbortSignal): Promise<Worker | null> => {
+      if (stopped || signal?.aborted) return Promise.resolve(null);
+      const free = idle.pop();
+      if (free) { held(free).ref(); return Promise.resolve(free); }
+      if (started < size) { started++; return Promise.resolve(workerFactory()); }
+      return new Promise(resolve => {
+        const take = (worker: Worker | null) => {
+          signal?.removeEventListener("abort", abort);
+          resolve(worker);
+        };
+        const abort = () => {
+          const index = waiting.indexOf(take);
+          if (index < 0) return;
+          waiting.splice(index, 1);
+          take(null);
+        };
+        waiting.push(take);
+        signal?.addEventListener("abort", abort, { once: true });
+        if (signal?.aborted) abort();
+      });
     };
-    const timeout = setTimeout(() => finish({ error: "The screen took too long to read" }, true), TIMEOUT_MS);
-    worker.onmessage = (event: MessageEvent<DirectReadAnswer>) => finish(event.data, false);
-    worker.onerror = (event) => finish({ error: event.message || "The screen worker failed" }, true);
-    try { worker.postMessage(work); } catch (error) { finish({ error: String(error) }, true); }
-  });
+    const release = (worker: Worker | null) => {
+      if (!worker) started--;
+      const next = waiting.shift();
+      if (next) { if (worker) next(worker); else if (!stopped) { started++; next(workerFactory()); } }
+      // An idle worker does not keep the process alive.
+      else if (worker) { held(worker).unref(); idle.push(worker); }
+    };
+    const run = (worker: Worker, work: DirectReadWork) => new Promise<DirectReadAnswer>(resolve => {
+      const finish = (answer: DirectReadAnswer, broken: boolean) => {
+        clearTimeout(timeout); worker.onmessage = null; worker.onerror = null;
+        if (broken || stopped) worker.terminate();
+        release(broken || stopped ? null : worker);
+        resolve(answer);
+      };
+      const timeout = setTimeout(() => finish({ error: "The screen took too long to read" }, true), timeoutMs);
+      worker.onmessage = (event: MessageEvent<DirectReadAnswer>) => finish(event.data, false);
+      worker.onerror = (event) => finish({ error: event.message || "The screen worker failed" }, true);
+      try { worker.postMessage(work); } catch (error) { finish({ error: String(error) }, true); }
+    });
+    /** The worker's answer, or null when the caller left (or the pool stopped) before the work was posted. */
+    const perform = async (work: DirectReadWork, signal?: AbortSignal): Promise<DirectReadAnswer | null> => {
+      const worker = await acquire(signal);
+      if (!worker) return null;
+      // A granted slot can be abandoned before this continuation posts its work.
+      if (signal?.aborted || stopped) {
+        if (stopped) worker.terminate();
+        release(stopped ? null : worker);
+        return null;
+      }
+      // Once started, a snapshot finishes normally; cancellation never terminates a reader.
+      return run(worker, work);
+    };
+    const close = () => { waiting.splice(0).forEach(take => take(null)); return idle.close(); };
+    return { perform, close };
+  };
+  const screens = lane(WORKERS, TIMEOUT_MS), lookups = lane(LIGHT_WORKERS, LIGHT_TIMEOUT_MS);
+  const workOf = (ctx: AppContext, url: string, light?: LightRead): DirectReadWork => ({ dbPath: ctx.dbPath!, url, context: snapshotDataContext(ctx),
+    rates: ctx.rateCards, homes: [...ctx.homeToSubId], sourceHomes: codexSourceHomes(ctx.homeToSubId), ...(light ? { light } : {}) });
   const read = async (ctx: AppContext, url: URL, signal?: AbortSignal): Promise<Response> => {
     if (signal?.aborted) return cancelledRead();
     const handler = directReadHandler(url.pathname);
     if (!handler) return Response.json({ error: "Not a direct read" }, { status: 404 });
     // A database without a file has no worker connection (tests): the screen is built in place.
     if (stopped || !ctx.dbPath || ctx.dbPath === ":memory:") return handler(ctx, url);
-    const work: DirectReadWork = { dbPath: ctx.dbPath, url: `${url.pathname}${url.search}`, context: snapshotDataContext(ctx),
-      rates: ctx.rateCards, homes: [...ctx.homeToSubId], sourceHomes: codexSourceHomes(ctx.homeToSubId) };
-    const worker = await acquire(signal);
-    if (!worker) return cancelledRead();
-    // A granted slot can be abandoned before this continuation posts its work.
-    if (signal?.aborted || stopped) {
-      if (stopped) worker.terminate();
-      release(stopped ? null : worker);
-      return cancelledRead();
-    }
-    // Once started, a snapshot finishes normally; cancellation never terminates a reader.
-    const answer = await run(worker, work);
-    if ("error" in answer) return Response.json({ error: answer.error }, { status: 503 });
+    const answer = await screens.perform(workOf(ctx, `${url.pathname}${url.search}`), signal);
+    if (!answer) return cancelledRead();
+    if (!("body" in answer)) return Response.json({ error: "error" in answer ? answer.error : "Not a screen" }, { status: 503 });
     return new Response(answer.body, { status: answer.status, headers: answer.headers });
   };
+  /** Identical lookups in flight share one worker read; it is abandoned only when its last caller leaves. */
+  const sharing = new Map<string, { waiters: number; controller: AbortController; promise: Promise<DirectReadAnswer | null> }>();
+  const light: LightReader = (ctx, request, signal) => {
+    if (signal?.aborted) return Promise.resolve(null);
+    if (stopped || !ctx.dbPath || ctx.dbPath === ":memory:") return Promise.resolve({ error: "No read worker" });
+    const key = JSON.stringify([ctx.dbPath, request]);
+    let entry = sharing.get(key);
+    if (!entry) {
+      const controller = new AbortController();
+      const created = { waiters: 0, controller, promise: lookups.perform(workOf(ctx, request.kind === "sync" ? request.url : "/api/cycle-breakdowns", request), controller.signal)
+        .finally(() => { if (sharing.get(key) === created) sharing.delete(key); }) };
+      sharing.set(key, entry = created);
+    }
+    const current = entry;
+    current.waiters++;
+    return new Promise<LightAnswer>(resolve => {
+      let done = false;
+      const leave = (answer: LightAnswer) => {
+        if (done) return;
+        done = true; signal?.removeEventListener("abort", abort);
+        if (--current.waiters === 0) { if (sharing.get(key) === current) sharing.delete(key); current.controller.abort(); }
+        resolve(answer);
+      };
+      const abort = () => leave(null);
+      signal?.addEventListener("abort", abort, { once: true });
+      current.promise.then(answer => leave(!answer ? { error: "The read workers are stopped" }
+        : "value" in answer ? { value: answer.value } : { error: "error" in answer ? answer.error : "Not a lookup" }),
+      error => leave({ error: String(error) }));
+    });
+  };
   return Object.assign(read, {
+    light,
     /** Idle workers close their connection first, so the database file is released when this resolves. */
     async close() {
       stopped = true;
-      waiting.splice(0).forEach(take => take(null));
-      await idle.close();
+      await Promise.all([screens.close(), lookups.close()]);
     },
   });
 }

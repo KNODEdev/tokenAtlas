@@ -8,10 +8,12 @@ import { buildEraIndex } from "./eras";
 import { dataVersion, DATA_VERSION_HEADER } from "./data-version";
 import { contextRequested } from "./codex-context-preview";
 import { directReadHandler, type DirectReadAnswer, type DirectReadWork } from "./direct-read";
+import { cycleBatchRows } from "./data-read";
+import { syncReadRows } from "./read-refresh";
 
 
 /**
- * Builds one stored-row screen (`DIRECT_READ_HANDLERS`) off the HTTP thread, from one read snapshot of
+ * Builds one stored-row screen (`DIRECT_READ_HANDLERS`) or one lookup (`LightRead`) off the HTTP thread, from one read snapshot of
  * its own read-only connection. The connection stays open between requests so its page cache is reused;
  * every request still reads in a new snapshot, so it sees everything published before it.
  */
@@ -32,17 +34,19 @@ worker.onmessage = async (message: MessageEvent<DirectReadWork | { close: true }
   try {
     const url = new URL(work.url, "http://local");
     setTransactionContext(`${url.pathname}${url.search}`.slice(0, 240));
-    const handler = directReadHandler(url.pathname);
-    if (!handler) throw new Error(`Not a direct read: ${url.pathname}`);
+    const handler = work.light ? null : directReadHandler(url.pathname);
+    if (!work.light && !handler) throw new Error(`Not a direct read: ${url.pathname}`);
     const db = connection(work.dbPath);
     const { subHomes, ...context } = work.context;
     answer = await withReadSnapshotAsync(db, async () => {
       // Account eras and the resolver come from the same snapshot as the rows.
+      const periods = periodEras(db, context.accounts);
       const ctx: AppContext = { ...context, sqlite: db, dbPath: work.dbPath, rateCards: work.rates,
         homeToSubId: restoreSubscriptionHomes(work.homes, work.sourceHomes, context.accounts.sources ?? []),
-        subIdToHomes: new Map(subHomes), eras: buildEraIndex(periodEras(db, context.accounts), "instant"),
+        subIdToHomes: new Map(subHomes), eras: buildEraIndex(periods, "instant"),
         resolver: loadAccountResolver(db, context.accounts.subscriptions ?? []), homeConflict: null };
-      const response = await handler(ctx, url);
+      if (work.light) return { value: work.light.kind === "sync" ? syncReadRows(ctx, url) : cycleBatchRows(ctx, work.light, periods) };
+      const response = await handler!(ctx, url);
       // The version of the snapshot the rows were read from.
       if (!response.headers.has(DATA_VERSION_HEADER)) response.headers.set(DATA_VERSION_HEADER, dataVersion(db,{capacityCycles: url.pathname === "/api/capacity-cycles",contextPrices:contextRequested(url) ? url.pathname : false}));
       return { status: response.status, headers: [...response.headers] as Array<[string, string]>, body: await response.text() };
