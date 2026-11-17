@@ -31,6 +31,7 @@
       "First observed: GPT-6.1 Terra 2026-10-26; GPT-6.1 Sol 2026-09-30; GPT-6 Sol/Luna 2026-09-23; GPT-6 Astra 2026-09-04; GPT-5.6 Sol/Terra/Luna 2026-07-09; GPT-5.5 2026-04-24; GPT-5.4 2026-03-07. verified_at is the verification date, not the effective start.",
       "GPT-6 Sol and Luna rules start at their 2026-09-22 launch; OpenAI announced these launch prices as permanent, so no earlier vector is reconstructed. GPT-6.1 Sol rules start at its 2026-09-29 launch (API changelog). GPT-6.1 Terra rules start at its 2026-10-26 launch (API changelog), confirmed by the owner on 2026-10-27.",
       "All GPT-6 and GPT-5.6 models have separate Standard/Fast API rules and per-request long-context rates. Other unsupported API model/basis pairs remain unpriced.",
+      "GPT-6.2 Astra and Sol rules start at their 2026-11-17 launch. Ultrafast has distinct rates and is outside this Standard/Fast card.",
       "2026-09-11 audit: historical reference vectors split on 2026-07-30 (Terra/Luna API and credits) and 2026-08-21 (Sol API). Earlier vectors are reconstructed from documented reductions; historical mode/long-context premiums and Sol cache pricing remain reference assumptions (confidence=user). Day boundaries use UTC because official notices do not give an exact change time.",
       "Sol credit pricing: current 100/10/500 is confirmed, but its historical change date and prior vector are not established here. The existing retrospective credit reference is retained, not certified as historically billed. The Sol promotion has no confirmed end date; at least November 21 is not an end boundary."
     ],
@@ -110,6 +111,82 @@
           "out_total": 250
         },
         "multiplier": 2.5
+      },
+      {
+        "id": "gpt-6.2-astra-credits-standard-20261117",
+        "model": "gpt-6.2-astra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-11-17",
+        "verified_at": "2026-11-17",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing#token-rates",
+          "https://learn.chatgpt.com/docs/whats-new#november-17-2026"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 200,
+          "in_cache_read": 10,
+          "out_total": 1000
+        },
+        "multiplier": 1
+      },
+      {
+        "id": "gpt-6.2-astra-credits-fast-20261117",
+        "model": "gpt-6.2-astra",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-11-17",
+        "verified_at": "2026-11-17",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing#token-rates",
+          "https://learn.chatgpt.com/docs/whats-new#november-17-2026"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 200,
+          "in_cache_read": 10,
+          "out_total": 1000
+        },
+        "multiplier": 2
+      },
+      {
+        "id": "gpt-6.2-sol-credits-standard-20261117",
+        "model": "gpt-6.2-sol",
+        "billing_basis": "chatgpt_credits",
+        "speed": "standard",
+        "valid_from": "2026-11-17",
+        "verified_at": "2026-11-17",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing#token-rates",
+          "https://learn.chatgpt.com/docs/whats-new#november-17-2026"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 50,
+          "in_cache_read": 2.5,
+          "out_total": 250
+        },
+        "multiplier": 1
+      },
+      {
+        "id": "gpt-6.2-sol-credits-fast-20261117",
+        "model": "gpt-6.2-sol",
+        "billing_basis": "chatgpt_credits",
+        "speed": "fast",
+        "valid_from": "2026-11-17",
+        "verified_at": "2026-11-17",
+        "sources": [
+          "https://learn.chatgpt.com/docs/pricing#token-rates",
+          "https://learn.chatgpt.com/docs/whats-new#november-17-2026"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 50,
+          "in_cache_read": 2.5,
+          "out_total": 250
+        },
+        "multiplier": 2
       },
       {
         "id": "gpt-6.1-sol-credits-standard-20260929",
@@ -552,6 +629,130 @@
           }
         },
         "note": "The pricing page lists Fast short-context rates only; the model page prices Fast at 2x the applicable rate, so the long-context Fast rates are 2x the long-context Standard rates."
+      },
+      {
+        "id": "gpt-6.2-astra-api-standard-20261117",
+        "model": "gpt-6.2-astra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-11-17",
+        "verified_at": "2026-11-17",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6.2-astra",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog#november-2026"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 8,
+          "in_cache_read": 0.4,
+          "in_cache_write": 10,
+          "out_total": 40
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 16,
+            "in_cache_read": 0.8,
+            "in_cache_write": 20,
+            "out_total": 60
+          }
+        },
+        "note": "Cache writes use the 30-minute retention rate."
+      },
+      {
+        "id": "gpt-6.2-astra-api-fast-20261117",
+        "model": "gpt-6.2-astra",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-11-17",
+        "verified_at": "2026-11-17",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6.2-astra",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog#november-2026"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 16,
+          "in_cache_read": 0.8,
+          "in_cache_write": 20,
+          "out_total": 80
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 32,
+            "in_cache_read": 1.6,
+            "in_cache_write": 40,
+            "out_total": 120
+          }
+        },
+        "note": "Cache writes use the 30-minute retention rate."
+      },
+      {
+        "id": "gpt-6.2-sol-api-standard-20261117",
+        "model": "gpt-6.2-sol",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "standard",
+        "valid_from": "2026-11-17",
+        "verified_at": "2026-11-17",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6.2-sol",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog#november-2026"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 2,
+          "in_cache_read": 0.1,
+          "in_cache_write": 2.5,
+          "out_total": 10
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 4,
+            "in_cache_read": 0.2,
+            "in_cache_write": 5,
+            "out_total": 15
+          }
+        },
+        "note": "Cache writes use the 30-minute retention rate."
+      },
+      {
+        "id": "gpt-6.2-sol-api-fast-20261117",
+        "model": "gpt-6.2-sol",
+        "billing_basis": "api_equivalent_usd",
+        "speed": "fast",
+        "valid_from": "2026-11-17",
+        "verified_at": "2026-11-17",
+        "sources": [
+          "https://developers.openai.com/api/docs/models/gpt-6.2-sol",
+          "https://developers.openai.com/api/docs/pricing",
+          "https://developers.openai.com/api/docs/changelog#november-2026"
+        ],
+        "confidence": "official",
+        "rates": {
+          "in_uncached": 4,
+          "in_cache_read": 0.2,
+          "in_cache_write": 5,
+          "out_total": 20
+        },
+        "multiplier": 1,
+        "long_context": {
+          "above_input_tokens": 272000,
+          "rates": {
+            "in_uncached": 8,
+            "in_cache_read": 0.4,
+            "in_cache_write": 10,
+            "out_total": 30
+          }
+        },
+        "note": "Cache writes use the 30-minute retention rate."
       },
       {
         "id": "gpt-6.1-sol-api-standard-20260929",
@@ -2369,6 +2570,38 @@
           "verified_at": "2026-09-26",
           "note": "Standard API reference rates since the 2026-09-22 launch. >272K input: input/cache x2, output x1.5 per request."
         },
+        "gpt-6.2-astra": {
+          "in_uncached": 8,
+          "in_cache_read": 0.4,
+          "in_cache_write": 10,
+          "out_total": 40,
+          "fast": {
+            "in_uncached": 16,
+            "in_cache_read": 0.8,
+            "in_cache_write": 20,
+            "out_total": 80
+          },
+          "confidence": "official-standard-reference",
+          "source": "https://developers.openai.com/api/docs/models/gpt-6.2-astra",
+          "verified_at": "2026-11-17",
+          "note": "Standard API reference rates since the 2026-11-17 launch. Cache writes use 30-minute retention. Request-level long-context rates are in codex_accounting."
+        },
+        "gpt-6.2-sol": {
+          "in_uncached": 2,
+          "in_cache_read": 0.1,
+          "in_cache_write": 2.5,
+          "out_total": 10,
+          "fast": {
+            "in_uncached": 4,
+            "in_cache_read": 0.2,
+            "in_cache_write": 5,
+            "out_total": 20
+          },
+          "confidence": "official-standard-reference",
+          "source": "https://developers.openai.com/api/docs/models/gpt-6.2-sol",
+          "verified_at": "2026-11-17",
+          "note": "Standard API reference rates since the 2026-11-17 launch. Cache writes use 30-minute retention. Request-level long-context rates are in codex_accounting."
+        },
         "gpt-6.1-sol": {
           "in_uncached": 2,
           "in_cache_read": 0.1,
@@ -2446,6 +2679,17 @@
             "in_cache_read": 0.2,
             "out_total": 20.0
           }
+        },
+        "gemini-4-hydrogen": {
+          "in_uncached": 1.5,
+          "in_cache_read": 0.075,
+          "in_cache_write_5m": null,
+          "in_cache_write_1h": null,
+          "out_total": 7.5,
+          "confidence": "official-standard-reference",
+          "source": "https://aistudio.google.com/docs/pricing#gemini-4-hydrogen",
+          "verified_at": "2026-11-17",
+          "note": "Gemini API Standard paid tier from the 2026-11-12 release. Context caching is implicit only. Output includes thinking tokens."
         },
         "gemini-4-carbon": {
           "in_uncached": 2.0,
@@ -2811,6 +3055,16 @@
       "gpt-6-sol": {
         "input": 50,
         "cached_input": 5,
+        "output": 250
+      },
+      "gpt-6.2-astra": {
+        "input": 200,
+        "cached_input": 10,
+        "output": 1000
+      },
+      "gpt-6.2-sol": {
+        "input": 50,
+        "cached_input": 2.5,
         "output": 250
       },
       "gpt-6.1-sol": {
