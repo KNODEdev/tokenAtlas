@@ -26,4 +26,16 @@ if (!inherited || path.isAbsolute(relative) || relative.startsWith("..")
     process.env[key] = target;
   }
   process.env.TOKENATLAS_DB = path.join(root, "test.sqlite");
+  // Only the creator cleans up; inherited child processes share this sandbox.
+  process.on("exit", () => {
+    if (process.env.TOKENATLAS_KEEP_TEST_FIXTURES === "1") {
+      console.info(`[retained test environment] ${root}`);
+      return;
+    }
+    try {
+      fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+    } catch (error) {
+      console.warn(`[test environment cleanup failed] ${root}`, error);
+    }
+  });
 }

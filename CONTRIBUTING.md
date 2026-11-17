@@ -13,6 +13,14 @@ changes in an issue before implementing them. Do not submit private transcripts,
 account identifiers, email addresses, authentication material or database dumps.
 Use small, synthetic fixtures with an explicit expected result.
 
+Tests remove their shared temporary environment when its creating process exits.
+Set `TOKENATLAS_KEEP_TEST_FIXTURES=1` only for a deliberate investigation, then
+remove the retained fixtures when finished. Standalone profiling and acceptance
+scripts must close database handles and remove their scratch databases, including
+SQLite sidecars, in `finally`. Keep compact reports as evidence. A multi-step trial
+needs one owning runner that cleans up after its last consumer, including failures.
+Avoid copying the installation database for routine checks.
+
 For bugs, describe the app version/commit, system, reproduction steps, expected
 and actual behaviour, and which numbers are source readings versus estimates.
 A missing record is not proof of zero usage or a provider billing error.
