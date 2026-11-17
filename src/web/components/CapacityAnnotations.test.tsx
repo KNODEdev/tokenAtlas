@@ -2,8 +2,22 @@ import { expect, test } from "bun:test";
 import type { TimelineMarker, TimelineMarkersResponse } from "../../shared/codex-accounting";
 import { capacityMarkers, isPolicyMarker, isPromotionMarker, isProviderResetMarker, markerDisplayLabel, markerKindLabel, markerTimestamp, markerUtcLabel } from "./CapacityAnnotations";
 import { setLanguage } from "../lib/i18n";
+import { MODEL_RELEASE_MARKERS } from "../../shared/model-release-markers";
 
 const now = Date.parse("2026-10-20T07:00:00Z");
+
+test("official releases expose a publication date and stay separate from first use", () => {
+  setLanguage("en");
+  const release = MODEL_RELEASE_MARKERS.gemini!.find(m => m.label === "Gemini 4 Hydrogen")!;
+  const firstUse: TimelineMarker = { ...release, id: "model:gemini-4-hydrogen", day: "2026-11-13", observed_at: "2026-11-13T12:00:00Z" };
+  const markers = capacityMarkers({ revision: "fixture", automatic: [release, firstUse], markers: [] },
+    "2026-11-12", "2026-11-13", "gemini", Date.parse("2026-11-14"));
+  expect(markers).toEqual([release, firstUse]);
+  expect(markerKindLabel(release)).toBe("official model release");
+  expect(markerUtcLabel(release)).toBe("2026-11-12 · date only; time not published");
+  expect(markerKindLabel(firstUse)).toBe("first observed in archive");
+  expect(markerKindLabel({ ...release, day: "2026-11-13" })).toBe("model date (edited or manual)");
+});
 
 test("Pro usage cut is a timed policy announcement, not an account transition or promotion end", () => {
   setLanguage("en");

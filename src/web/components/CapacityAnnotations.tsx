@@ -1,6 +1,7 @@
 import type { CodexComparisonWindow, TimelineMarker, TimelineMarkersResponse } from "../../shared/codex-accounting";
 import { translate, useI18n } from "../lib/i18n";
 import { priceChangeFor } from "../../shared/codex-price-changes";
+import { isModelRelease } from "../../shared/model-release-markers";
 import { CodexPriceChangeDetails } from "./CodexPriceChangeDetails";
 import { ConfiguredPriceDetails } from "./ConfiguredPriceDetails";
 import { COMPLETED_PROVIDER_RESETS } from "../../shared/completed-provider-resets";
@@ -61,6 +62,7 @@ export function markerTimestamp(marker: TimelineMarker): number {
 
 export function markerUtcLabel(marker: TimelineMarker): string {
   if (isProviderResetMarker(marker) && marker.reset_boundary) return `${marker.reset_boundary.at.replace("T", " ").replace("Z", " UTC")} · ${translate("cycle start; public confirmation", "początek cyklu; publiczne potwierdzenie")}: ${marker.observed_at?.replace("T", " ").replace("Z", " UTC")}`;
+  if (isModelRelease(marker)) return `${marker.day} · ${translate("date only; time not published", "tylko data; godzina nieopublikowana")}`;
   if (isPromotionMarker(marker) && !marker.observed_at) return `${marker.day} UTC · ${translate("date only; time not published", "tylko data; godzina nieopublikowana")}`;
   if (marker.pricing?.length) {
     const boundary = `${marker.day} 00:00 UTC · ${translate("configured date boundary", "skonfigurowana granica daty")}`;
@@ -92,6 +94,7 @@ export function markerDisplayLabel(marker: TimelineMarker): string {
 }
 
 export function markerKindLabel(marker: TimelineMarker): string {
+  if (isModelRelease(marker)) return translate("official model release", "oficjalna premiera modelu");
   if (isPolicyMarker(marker)) return translate("plan change announcement; account transition unverified", "ogłoszenie zmiany planu; przejście konta niepotwierdzone");
   if (isProviderResetMarker(marker) && marker.reset_boundary === null) return translate("public reset confirmation; no matching observed cycle", "publiczne potwierdzenie resetu; brak dopasowanego cyklu");
   if (isProviderResetMarker(marker)) return translate("completed global provider reset", "wykonany globalny reset dostawcy");

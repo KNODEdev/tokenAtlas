@@ -8,6 +8,7 @@ import type { Database } from "bun:sqlite";
 import { CONFIG_ROOT } from "../config/paths";
 import { isAccountingDay } from "./codex-accounting-pricing";
 import { CODEX_PRICE_CHANGES } from "../shared/codex-price-changes";
+import { MODEL_RELEASE_MARKERS } from "../shared/model-release-markers";
 import { resolveCodexAccountingConfig } from "./codex-accounting-pricing";
 import type { RateCard } from "./pricing";
 import type { CodexAccountingRule, TimelinePriceTransition } from "../shared/codex-accounting";
@@ -105,7 +106,8 @@ export async function handleCodexTimelineMarkers(sqlite: Database, req: Request,
       return [{ id: `price:configured:${model}:${day}`, day, label: `${model} · API price change`.slice(0, 120), visible: true, color: "warn" as const,
         note: `Configured API rates per 1M tokens changed at this UTC day boundary. Before: ${JSON.stringify({ in_uncached: rate.in_uncached, in_cache_read: rate.in_cache_read, in_cache_write_5m: rate.in_cache_write_5m, in_cache_write_1h: rate.in_cache_write_1h, out_total: rate.out_total })}. After: ${JSON.stringify(rate.after)}. Impact on subscription allowance: unverified; an API price change alone does not establish a quota change.` }];
     }) : configuredPriceMarkers(card);
-    return response({ ...store, automatic: [...automatic, ...prices] } satisfies TimelineMarkersResponse);
+    const releases = MODEL_RELEASE_MARKERS[adapter?.id ?? "codex"] ?? [];
+    return response({ ...store, automatic: [...automatic, ...releases, ...prices] } satisfies TimelineMarkersResponse);
   } catch (e) { return response({ error: (e as Error).message }, 503); }
 }
 

@@ -18,13 +18,26 @@ test("provider markers isolate edits and derive dated API changes without assert
     const claude = await read("claude");
     expect(claude.automatic.some(m => m.id === "model:claude-model")).toBe(true);
     expect(claude.automatic.some(m => m.id === "model:gpt-model")).toBe(false);
+    expect(claude.automatic.find(m => m.id === "model:release:claude-fable-5-2"))
+      .toMatchObject({ day: "2026-11-09", visible: true });
+    const gemini = await read("google");
+    expect(gemini.automatic.map(m => [m.id, m.day, m.visible])).toEqual([
+      ["model:release:gemini-4-argon", "2026-10-13", true],
+      ["model:release:gemini-4-carbon", "2026-11-10", true],
+      ["model:release:gemini-4-hydrogen", "2026-11-12", true],
+    ]);
     const price = claude.automatic.find(m => m.id.startsWith("price:"))!;
     expect(price.day).toBe("2026-08-11"); expect(price.note).toContain("Impact on subscription allowance: unverified");
     const marker = { id: "custom:local", day: "2026-08-12", label: "Claude event", note: "User declaration", visible: true, color: "warn" };
     const request = new Request("http://local/markers", { method: "POST", body: JSON.stringify({ revision: claude.revision, marker }) });
     expect((await handleCodexTimelineMarkers(db, request, root, card, "claude")).status).toBe(200);
     expect((await read("claude")).markers).toHaveLength(1);
-    expect((await read("codex")).markers).toHaveLength(0);
+    const codex = await read("codex");
+    expect(codex.markers).toHaveLength(0);
+    expect(codex.automatic.filter(m => m.id.startsWith("model:release:")).map(m => [m.id, m.day, m.visible])).toEqual([
+      ["model:release:gpt-6.2-astra", "2026-11-17", true],
+      ["model:release:gpt-6.2-sol", "2026-11-17", true],
+    ]);
     expect((await read("grok")).automatic).toHaveLength(0);
   } finally { db.close(); fs.rmSync(root, { recursive: true, force: true }); }
 });
