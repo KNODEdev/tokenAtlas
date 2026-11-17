@@ -35,17 +35,10 @@ out of Git. Use synthetic fixtures and preserve third-party license notices.
 
 ## Local maintainer context
 
-When `.local-maintainer/AGENTS.md` exists, read it for retained owner decisions,
-pending activation notes and private verification evidence. This optional local
-context is ignored; do not commit or publish it. Historical branch names and
-repository locations in that archived context do not replace the active `main`
-repository described above. Other contributors need no private checkout.
-
-## Current source state
-
-The latest local window lifecycle, dated meter evidence and omitted Codex mode
-changes were carried into this working tree during the local cutover on
-2026-10-25. They remain local working changes. The owner subsequently authorized
-activation: the live database is through 0095, and the frontend/server include TTFT
-table/chart support and saved local settings. Historical TTFT backfill continues in
-the existing background writer. See `docs/verification/first-token-2026-10-25.md`.
+When `.local-maintainer/AGENTS.md` exists, read its concise private owner context
+and evidence index. Read linked historical records only when the task needs the
+relevant prior decision or verification. This optional local context is ignored;
+do not commit or publish it. Historical branches and repository locations do not
+replace the active `main` repository described above. Other contributors need no
+private checkout. Activation history is recorded in that local evidence index;
+verify the current runtime before treating a historical state as current.
