@@ -1,11 +1,10 @@
 import { BUCKET_NAME, BUCKET_ID, isBucket } from "../../projects/bucket";
-import type { Translate } from "./projects/assignment";
+import { filterRows, type Translate } from "./projects/assignment";
 import { type UnassignedRow, api } from "../lib/api";
-import { useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import type { ScreenProps } from "../lib/screens";
 import type { RosterCard } from "../lib/roster";
 import { useAsync } from "../lib/useAsync";
-import { useDebounced } from "../lib/useDebounced";
 import { useWriting } from "../lib/useWriting";
 import { ProjectUsage } from "./ProjectUsage";
 import { ProjectPlanPanel } from "./ProjectPlanPanel";
@@ -38,27 +37,33 @@ const manageTabs = (t: Translate, declared?: number, unassigned?: number, bucket
 ];
 
 const NO_ROWS = { project_id: null as string | null, total: 0, total_unfiltered: 0, query: "", rows: [] as UnassignedRow[] };
+/** The whole list is read once and searched in the browser: a search never waits for the server. */
+const ALL_ROWS = 100_000;
+/** Rows drawn at once (largest first); the search and the selection still cover the whole list. */
+const SHOWN_ROWS = 300;
+const NONE: UnassignedRow[] = [];
 
 export function Projects({ cards = [] }: ScreenProps & { cards?: RosterCard[] }) {
   const { t } = useI18n();
   const [tab, setTab] = useState("usage");
   const [query, setQuery] = useState("");
-  const settledQuery = useDebounced(query);
   const [bucketQuery, setBucketQuery] = useState("");
-  const settledBucketQuery = useDebounced(bucketQuery);
   const state = useAsync(() => api.projects(), []);
-  const unassigned = useAsync(
-    () => api.projectsUnassigned({ limit: 300, q: settledQuery || undefined }),
-    [settledQuery],
-  );
+  const unassigned = useAsync(() => api.projectsUnassigned({ limit: ALL_ROWS }), []);
   const hasBucket = (state.data?.projects ?? []).some((p) => isBucket(p.id));
   const bucket = useAsync(
     () =>
       hasBucket
-        ? api.projectsRows({ project_id: BUCKET_ID, limit: 300, q: settledBucketQuery || undefined })
+        ? api.projectsRows({ project_id: BUCKET_ID, limit: ALL_ROWS })
         : Promise.resolve({ ...NO_ROWS, project_id: BUCKET_ID }),
-    [hasBucket, settledBucketQuery],
+    [hasBucket],
   );
+  const unassignedAll = unassigned.data?.rows ?? NONE;
+  const bucketAll = bucket.data?.rows ?? NONE;
+  const deferredQuery = useDeferredValue(query);
+  const deferredBucketQuery = useDeferredValue(bucketQuery);
+  const unassignedFound = useMemo(() => filterRows(unassignedAll, deferredQuery), [unassignedAll, deferredQuery]);
+  const bucketFound = useMemo(() => filterRows(bucketAll, deferredBucketQuery), [bucketAll, deferredBucketQuery]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const writing = useWriting();
@@ -113,12 +118,14 @@ export function Projects({ cards = [] }: ScreenProps & { cards?: RosterCard[] })
       ) : tab === "bucket" ? (
         <AssignmentTable
           source={BUCKET_ID}
-          rows={bucket.data?.rows ?? []}
-          total={bucket.data?.total ?? 0}
+          rows={bucketFound.slice(0, SHOWN_ROWS)}
+          found={bucketFound}
+          allRows={bucketAll}
+          total={bucketFound.length}
           totalAll={bucket.data?.total_unfiltered ?? 0}
           query={bucketQuery}
           onQuery={setBucketQuery}
-          pending={settledBucketQuery !== bucketQuery || bucket.loading}
+          pending={deferredBucketQuery !== bucketQuery}
           loading={bucket.loading && !bucket.data}
           error={bucket.error}
           projects={data?.projects ?? []}
@@ -129,12 +136,14 @@ export function Projects({ cards = [] }: ScreenProps & { cards?: RosterCard[] })
       ) : (
         <AssignmentTable
           source={null}
-          rows={unassigned.data?.rows ?? []}
-          total={unassigned.data?.total ?? 0}
+          rows={unassignedFound.slice(0, SHOWN_ROWS)}
+          found={unassignedFound}
+          allRows={unassignedAll}
+          total={unassignedFound.length}
           totalAll={unassigned.data?.total_unfiltered ?? 0}
           query={query}
           onQuery={setQuery}
-          pending={settledQuery !== query || unassigned.loading}
+          pending={deferredQuery !== query}
           loading={unassigned.loading && !unassigned.data}
           error={unassigned.error}
           projects={data?.projects ?? []}

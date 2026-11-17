@@ -263,7 +263,9 @@ export function handleProjectsRows(ctx: AppContext, url: URL): Response {
 }
 
 interface AssignBody {
-  match: ProjectMatch;
+  match?: ProjectMatch;
+  /** Several rules for the same target, saved together (bulk assignment). */
+  matches?: ProjectMatch[];
   project_id?: string;
   new?: { id: string; name: string };
 }
@@ -286,33 +288,51 @@ function resolveTarget(
   return { error: "project_id not found and no `new` given", status: 404 };
 }
 
-export async function handleProjectsAssign(ctx: AppContext, req: Request): Promise<Response> {
+/** `matches` when given, otherwise the single `match`; null when neither is usable. */
+function requestedMatches(body: { match?: ProjectMatch; matches?: ProjectMatch[] }): ProjectMatch[] | null {
+  const list = Array.isArray(body.matches) ? body.matches : body.match ? [body.match] : [];
+  return list.length > 0 && list.every((m) => m && typeof m === "object") ? list : null;
+}
+
+function copyMatch(raw: ProjectMatch): ProjectMatch {
+  const m: ProjectMatch = {};
+  if (raw.store) m.store = raw.store;
+  if (raw.cwd) m.cwd = raw.cwd;
+  if (raw.repo) m.repo = raw.repo;
+  if (raw.project) m.project = raw.project;
+  if (raw.from) m.from = raw.from;
+  if (raw.until) m.until = raw.until;
+  return m;
+}
+
+export async function handleProjectsAssign(ctx: AppContext, req: Request, file?: string): Promise<Response> {
   let body: AssignBody;
   try {
     body = (await req.json()) as AssignBody;
   } catch {
     return Response.json({ error: "Body must be JSON" }, { status: 400 });
   }
-  if (!body.match || (!body.match.cwd && !body.match.project && !body.match.repo)) {
+  const wanted = requestedMatches(body);
+  if (!wanted || wanted.some((m) => !m.cwd && !m.project && !m.repo)) {
     return Response.json({ error: "match needs cwd, repo or project" }, { status: 400 });
   }
-  const cfg = loadProjects();
+  const cfg = loadProjects(file);
   const resolved = resolveTarget(cfg, body);
   if ("error" in resolved) return Response.json({ error: resolved.error }, { status: resolved.status });
   const target = resolved.project;
-  const m: ProjectMatch = {};
-  if (body.match.store) m.store = body.match.store;
-  if (body.match.cwd) m.cwd = body.match.cwd;
-  if (body.match.repo) m.repo = body.match.repo;
-  if (body.match.project) m.project = body.match.project;
-  if (body.match.from) m.from = body.match.from;
-  if (body.match.until) m.until = body.match.until;
-  target.matches.push(m);
+  let added = 0;
+  for (const raw of wanted) {
+    const m = copyMatch(raw);
+    // A repeated rule (a double click, an overlapping bulk selection) is kept once.
+    if (target.matches.some((t) => JSON.stringify(t) === JSON.stringify(m))) continue;
+    target.matches.push(m);
+    added++;
+  }
   const errors = validateProjects(cfg);
   if (errors.length) return Response.json({ error: errors.join("; ") }, { status: 400 });
   // Project rules apply at read time (projects/rules-now.ts): saving them is the whole change, nothing is written to the database.
-  saveProjects(cfg);
-  return Response.json({ ok: true, project: target, incremental: true, remap: null });
+  saveProjects(cfg, file);
+  return Response.json({ ok: true, project: target, added, incremental: true, remap: null });
 }
 
 function sameRuleValue(a: string | undefined, b: string | undefined): boolean {
@@ -347,12 +367,14 @@ interface ReassignBody {
   from: string;
   index?: number;
   match?: ProjectMatch;
+  /** Several exact rules moved together (bulk); nothing is saved when any of them is missing. */
+  matches?: ProjectMatch[];
   to?: string;
   new?: { id: string; name: string };
   drop_empty?: boolean;
 }
 
-export async function handleProjectsReassign(ctx: AppContext, req: Request): Promise<Response> {
+export async function handleProjectsReassign(ctx: AppContext, req: Request, file?: string): Promise<Response> {
   let body: ReassignBody;
   try {
     body = (await req.json()) as ReassignBody;
@@ -362,7 +384,7 @@ export async function handleProjectsReassign(ctx: AppContext, req: Request): Pro
   if (!body.from || typeof body.from !== "string") {
     return Response.json({ error: "`from` (project id) is required" }, { status: 400 });
   }
-  const cfg = loadProjects();
+  const cfg = loadProjects(file);
   const source = cfg.projects.find((p) => p.id === body.from);
   if (!source) return Response.json({ error: `project '${body.from}' not found` }, { status: 404 });
   source.matches = source.matches ?? [];
@@ -375,17 +397,20 @@ export async function handleProjectsReassign(ctx: AppContext, req: Request): Pro
       );
     }
     moved = source.matches.splice(body.index, 1);
-  } else if (body.match) {
-    const wanted = cleanMatch(body.match);
-    moved = source.matches.filter((m) => pointsExactlyAt(m, wanted));
-    if (moved.length === 0) {
-      const what = wanted.cwd ?? wanted.repo ?? wanted.project ?? "?";
+  } else if (body.match || Array.isArray(body.matches)) {
+    const wanted = (requestedMatches(body) ?? []).map(cleanMatch);
+    if (wanted.length === 0) return Response.json({ error: "give `index` or `match`" }, { status: 400 });
+    const missing = wanted.filter((w) => !source.matches.some((m) => pointsExactlyAt(m, w)));
+    if (missing.length) {
+      const what = missing.map((w) => w.cwd ?? w.repo ?? w.project ?? "?").join(", ");
       return Response.json(
         { error: `zadna regula projektu '${source.id}' nie wskazuje dokladnie ${what} - lapie go szersza regula, popraw ja w zakladce Reguly` },
         { status: 404 },
       );
     }
-    source.matches = source.matches.filter((m) => !pointsExactlyAt(m, wanted));
+    const hit = (m: ProjectMatch) => wanted.some((w) => pointsExactlyAt(m, w));
+    moved = source.matches.filter(hit);
+    source.matches = source.matches.filter((m) => !hit(m));
   } else {
     return Response.json({ error: "give `index` or `match`" }, { status: 400 });
   }
@@ -406,7 +431,7 @@ export async function handleProjectsReassign(ctx: AppContext, req: Request): Pro
   if (dropped) cfg.projects = cfg.projects.filter((p) => p.id !== source.id);
   const errors = validateProjects(cfg);
   if (errors.length) return Response.json({ error: errors.join("; ") }, { status: 400 });
-  saveProjects(cfg);
+  saveProjects(cfg, file);
   return Response.json({
     ok: true,
     moved,

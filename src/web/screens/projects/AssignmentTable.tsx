@@ -4,13 +4,16 @@ import { BUCKET_NAME } from "../../../projects/bucket";
 import type { RosterCard } from "../../lib/roster";
 import { useI18n } from "../../lib/i18n";
 import { EmptyState, ErrorState, GhostButton, HelpDot, LoadingCard, Table, TableRow, Th } from "../../components/ui";
-import { countLabel, rowKey, catches, type PathGroup, groupByPath, type Pending } from "./assignment";
+import { countLabel, rowKey, catches, type PathGroup, groupByPath, type Pending, type Track } from "./assignment";
+import { BulkAssignBar } from "./BulkAssignBar";
 import { type AssignmentRowProps, AssignmentRow } from "./AssignmentRow";
 
 export function AssignmentTable({
   source,
-  rows,
-  total,
+  rows: listed,
+  found,
+  allRows,
+  total: foundTotal,
   totalAll,
   query,
   onQuery,
@@ -23,7 +26,12 @@ export function AssignmentTable({
   onAssigned,
 }: {
   source: string | null;
+  /** The search results drawn in the table (the largest first). */
   rows: UnassignedRow[];
+  /** Every search result, drawn or not: "select all" covers them. */
+  found: UnassignedRow[];
+  /** The whole pool, unfiltered: what a rule's "+" count is taken from. */
+  allRows: UnassignedRow[];
   total: number;
   totalAll: number;
   query: string;
@@ -41,10 +49,10 @@ export function AssignmentTable({
   const [err, setErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<ProjectMatch | null>(null);
   const [writes, setWrites] = useState<Pending[]>([]);
-  // A finished write keeps its rows greyed until the reload that drops them arrives.
-  useEffect(() => setWrites((w) => (w.some((x) => x.done) ? w.filter((x) => !x.done) : w)), [rows]);
-  const track = async (rule: ProjectMatch, mark: Pending["mark"], write: () => Promise<unknown>) => {
-    const entry: Pending = { rule, mark, done: false };
+  // A saved rule takes its rows off the list at once; the reload that confirms it then replaces the pool.
+  useEffect(() => setWrites((w) => (w.some((x) => x.done) ? w.filter((x) => !x.done) : w)), [allRows]);
+  const track: Track = async (rule, mark, write) => {
+    const entry: Pending = { rules: Array.isArray(rule) ? rule : [rule], mark, done: false };
     setWrites((w) => [...w, entry]);
     try {
       await write();
@@ -54,13 +62,52 @@ export function AssignmentTable({
       throw e;
     }
   };
+  const saved = useMemo(() => writes.filter((w) => w.done).flatMap((w) => w.rules), [writes]);
+  const kept = (r: UnassignedRow) => !saved.some((rule) => catches(rule, r));
+  const rows = useMemo(() => (saved.length ? listed.filter(kept) : listed), [listed, saved]); // eslint-disable-line react-hooks/exhaustive-deps
+  const foundKept = useMemo(() => (saved.length ? found.filter(kept) : found), [found, saved]); // eslint-disable-line react-hooks/exhaustive-deps
+  const total = foundTotal - (found.length - foundKept.length);
   const markOf = (r: UnassignedRow): { mark: Pending["mark"]; saving: boolean } | null => {
-    const write = writes.find((w) => catches(w.rule, r));
+    const write = writes.find((w) => w.rules.some((rule) => catches(rule, r)));
     if (write) return { mark: write.mark, saving: true };
     return preview && catches(preview, r) ? { mark: "+", saving: false } : null;
   };
   const groups = useMemo(() => groupByPath(rows), [rows]);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  // Selected directories by group key; the selection outlives a search, so several searches can add to it.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const poolGroups = useMemo(() => groupByPath(allRows), [allRows]);
+  const foundKeys = useMemo(() => groupByPath(foundKept).map((g) => g.key), [foundKept]);
+  const chosen = useMemo(
+    () => poolGroups.filter((g) => selected.has(g.key) && g.members.some(kept)),
+    [poolGroups, selected, saved], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  // Directories that left the pool (assigned elsewhere, reloaded) leave the selection too.
+  useEffect(() => {
+    setSelected((s) => {
+      if (!s.size) return s;
+      const live = new Set(poolGroups.map((g) => g.key));
+      const next = new Set([...s].filter((k) => live.has(k)));
+      return next.size === s.size ? s : next;
+    });
+  }, [poolGroups]);
+  const toggle = (key: string) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  const allFound = foundKeys.length > 0 && foundKeys.every((k) => selected.has(k));
+  const someFound = !allFound && foundKeys.some((k) => selected.has(k));
+  const toggleAll = () =>
+    setSelected((s) => {
+      const next = new Set(s);
+      for (const k of foundKeys) {
+        if (allFound) next.delete(k);
+        else next.add(k);
+      }
+      return next;
+    });
   const groupMark = (g: PathGroup) => {
     const marks = g.members.map(markOf);
     return marks.find((m) => m?.saving) ?? marks.find((m) => m) ?? null;
@@ -104,10 +151,28 @@ export function AssignmentTable({
         <LoadingCard label={t("Loading directories…", "Wczytuję katalogi…")} shape="table" />
       </>
     );
+  const bulk = chosen.length > 0 && (
+    <BulkAssignBar
+      key={source ?? "unassigned"}
+      groups={chosen}
+      source={source}
+      projects={projects}
+      track={track}
+      onClear={() => setSelected(new Set())}
+      onDone={() => {
+        setSelected(new Set());
+        setOpen(null);
+        setPreview(null);
+        setErr(null);
+        onAssigned();
+      }}
+    />
+  );
   if (rows.length === 0) {
     return (
       <>
         {search}
+        {bulk}
         {query ? (
           <EmptyState
             title={`${t("Nothing matches “", "Nic nie pasuje do „")}${query}${t("”", "”")}`}
@@ -133,6 +198,7 @@ export function AssignmentTable({
   return (
     <>
       {search}
+      {bulk}
       {err && (
         <div className="mono" style={{ color: "var(--crit)", fontSize: "var(--fs-3)", padding: "0 0 8px" }}>
           {err}
@@ -141,7 +207,20 @@ export function AssignmentTable({
       <Table tableId="Projects:1">
         <thead>
           <TableRow header>
-            <Th columnId="c0">{t("vendor", "dostawca")}</Th>
+            <Th columnId="c0">
+              <input
+                type="checkbox"
+                className="projects-select"
+                checked={allFound}
+                ref={(el) => {
+                  if (el) el.indeterminate = someFound;
+                }}
+                onChange={toggleAll}
+                aria-label={query ? t("Select every search result", "Zaznacz wszystkie wyniki wyszukiwania") : t("Select every directory", "Zaznacz wszystkie katalogi")}
+                title={`${foundKeys.length} ${countLabel(t, foundKeys.length, "directory", "directories", "katalog", "katalogi", "katalogów")}`}
+              />
+              {t("vendor", "dostawca")}
+            </Th>
             <Th columnId="c1">{t("account / store", "konto / sklep")}</Th>
             <Th columnId="c2">cwd</Th>
             <Th columnId="c3" align="right">{t("calls", "wywołania")}</Th>
@@ -158,8 +237,8 @@ export function AssignmentTable({
               <AssignmentRow
                 key={key}
                 row={r}
-                rows={rows}
-                partial={!!query || total > rows.length}
+                rows={allRows}
+                partial={totalAll > allRows.length}
                 source={source}
                 projects={projects}
                 cards={cards}
@@ -181,10 +260,12 @@ export function AssignmentTable({
                 {...extra}
               />
             );
-            if (!grouped) return view(g.head, rowKey(g.head), {});
+            const pick = { selected: selected.has(g.key), onSelect: () => toggle(g.key) };
+            if (!grouped) return view(g.head, rowKey(g.head), pick);
             return (
               <Fragment key={g.key}>
                 {view(g.head, `g:${g.key}`, {
+                  ...pick,
                   members: g.members,
                   mark: groupMark(g),
                   expanded: isExpanded,

@@ -92,8 +92,8 @@ export function groupByPath(rows: UnassignedRow[]): PathGroup[] {
   return groups.sort((a, b) => b.head.tokens - a.head.tokens);
 }
 
-/** A rule being chosen (preview) or written; `done` waits for the reload that removes its rows. */
-export type Pending = { rule: ProjectMatch; mark: "+" | "↩"; done: boolean };
+/** Rules being written; once `done` their rows leave the list until the reload that confirms it. */
+export type Pending = { rules: ProjectMatch[]; mark: "+" | "↩"; done: boolean };
 
 export function idOf(s: string): string {
   return s
@@ -103,7 +103,28 @@ export function idOf(s: string): string {
     .slice(0, 40);
 }
 
-export type Track = (rule: ProjectMatch, mark: Pending["mark"], write: () => Promise<unknown>) => Promise<void>;
+export type Track = (rule: ProjectMatch | ProjectMatch[], mark: Pending["mark"], write: () => Promise<unknown>) => Promise<void>;
+
+/** The search the server used to run: every word must appear in the path, project, store, vendor or account. */
+export function filterRows(rows: UnassignedRow[], query: string): UnassignedRow[] {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return rows;
+  return rows.filter((r) => {
+    const hay = [(r.cwd ?? "").replace(/\\/g, "/"), r.project ?? "", r.store, r.vendor, ...(r.account_ids ?? [])].join(" ").toLowerCase();
+    return terms.every((t) => hay.includes(t));
+  });
+}
+
+/**
+ * One rule per selected directory. `dropNested` leaves out a directory a selected parent already catches
+ * (new rules); moving existing bucket rules keeps every one, since each is its own rule.
+ */
+export function bulkRules(groups: PathGroup[], dropNested: boolean): ProjectMatch[] {
+  const rules = groups.map((g) => ruleFor(g.head, basename(g.head.cwd, g.head.project)));
+  if (!dropNested) return rules;
+  return rules.filter((rule, i) => !rules.some((other, j) => j !== i && other.cwd && rule.cwd
+    && normCwd(other.cwd) !== normCwd(rule.cwd) && normCwd(rule.cwd).startsWith(normCwd(other.cwd) + "/")));
+}
 
 export function slugOf(s: string): string {
   return s

@@ -40,7 +40,9 @@ export interface UnassignedRow {
   last_ts: string;
 }
 export interface AssignRequest {
-  match: ProjectMatch;
+  match?: ProjectMatch;
+  /** Several rules for the same target in one save. */
+  matches?: ProjectMatch[];
   project_id?: string;
   new?: { id: string; name: string };
 }
@@ -48,6 +50,8 @@ export interface ReassignRequest {
   from: string;
   index?: number;
   match?: ProjectMatch;
+  /** Several exact rules moved together; nothing is saved when any is missing. */
+  matches?: ProjectMatch[];
   to?: string;
   new?: { id: string; name: string };
   drop_empty?: boolean;

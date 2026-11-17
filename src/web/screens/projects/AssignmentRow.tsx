@@ -37,6 +37,9 @@ export type AssignmentRowProps = {
   onExpand?: () => void;
   /** One vendor/account line under an expanded summary. */
   nested?: boolean;
+  /** Set on a directory's own line (not on its nested lines): the bulk selection. */
+  selected?: boolean;
+  onSelect?: () => void;
 };
 
 function groupStore(members: UnassignedRow[], cards: RosterCard[], t: Translate): { label: string; title?: string } {
@@ -64,6 +67,8 @@ export function AssignmentRow({
   expanded,
   onExpand,
   nested,
+  selected,
+  onSelect,
 }: AssignmentRowProps) {
   const { t } = useI18n();
   const store = members ? groupStore(members, cards, t) : storePresentation(row, cards, t);
@@ -94,11 +99,23 @@ export function AssignmentRow({
   return (
     <>
       <TableRow
-        className={`projects-assign-row${nested ? " is-nested" : ""}${saving ? " is-saving" : mark ? " is-caught" : ""}`}
+        className={`projects-assign-row${nested ? " is-nested" : ""}${saving ? " is-saving" : mark || selected ? " is-caught" : ""}`}
         aria-busy={saving || undefined}
       >
         <Td>
-          <div style={{ display: "flex", gap: 4 }}>
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            {onSelect ? (
+              <input
+                type="checkbox"
+                className="projects-select"
+                checked={!!selected}
+                onChange={onSelect}
+                disabled={saving}
+                aria-label={`${t("Select", "Zaznacz")} ${row.cwd ?? row.project ?? ""}`}
+              />
+            ) : (
+              <span className="projects-select" aria-hidden="true" />
+            )}
             {vendors.map((v) => (
               <Pill key={v} tone={vendorTone(v)}>
                 {v}
