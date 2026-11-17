@@ -21,7 +21,23 @@ export function repairDependencies(repo: string, install: Install = (args, cwd) 
   // An inherited dry-run or production-only configuration must not suppress a DEV installation.
   fs.writeFileSync(config, "[install]\ndryRun = false\nproduction = false\ndev = true\noptional = true\npeer = true\n");
   console.log(`[1] Repair files and previous dependencies: ${repair}`);
-  return install(["install", "--frozen-lockfile", "--backend=copyfile", `--cache-dir=${cache}`, `--config=${config}`], root);
+  let installed = false;
+  try {
+    const result = install(["install", "--frozen-lockfile", "--backend=copyfile", `--cache-dir=${cache}`, `--config=${config}`], root);
+    installed = result === 0 && fs.existsSync(modules);
+    return result;
+  } finally {
+    const remove = (entry: string) => {
+      // Unlink a junction itself; its target may belong to another installation.
+      if (fs.existsSync(entry) && fs.lstatSync(entry).isSymbolicLink()) fs.unlinkSync(entry);
+      else fs.rmSync(entry, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+    };
+    remove(cache);
+    fs.rmSync(config, { force: true });
+    if (installed) remove(backup);
+    if (fs.readdirSync(repair).length === 0) fs.rmdirSync(repair);
+    else console.log(`[1] Previous dependencies retained for recovery: ${backup}`);
+  }
 }
 
 if (import.meta.main) {
