@@ -4,7 +4,7 @@
  */
 export function preserveBrowserGlobals(): () => void {
   const names = [
-    "window", "self", "document", "navigator", "innerWidth", "innerHeight",
+    "window", "self", "document", "navigator", "location", "innerWidth", "innerHeight",
     "addEventListener", "removeEventListener", "HTMLIFrameElement", "HTMLElement",
     "Element", "Node", "SVGElement", "Event", "getComputedStyle",
     "requestAnimationFrame", "cancelAnimationFrame", "IS_REACT_ACT_ENVIRONMENT",

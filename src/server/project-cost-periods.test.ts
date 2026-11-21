@@ -97,8 +97,8 @@ test("internal review without an API price never blocks user-work calendar alloc
     insert.run("2026-09-12T02:00:00Z", "gpt-6-astra", "seven", 1);
     insert.run("2026-09-12T03:00:00Z", "gpt-6-astra", null, 2);
     insert.run("2026-09-12T04:00:00Z", "codex-auto-review", "seven", 3);
-    prepareCodexLedgerFixture(db, card, base.homeToSubId!);
     const rates = { ...card, subscriptions: { acct: { usd_per_month: 200 } } };
+    prepareCodexLedgerFixture(db, rates, base.homeToSubId!);
     const build = () => buildProjectCost(db, rates, base.homeToSubId!, { since: "2026-09-12", until: "2026-09-12" });
     const report = build(), slice = report.subjects.find(subject => subject.subject === "p:7")!.subscriptions.acct!;
     const fee = report.subscriptions.find(subscription => subscription.id === "acct")!.paid_usd!;

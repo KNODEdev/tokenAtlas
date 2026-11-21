@@ -285,7 +285,7 @@ export async function receive(root: string, producer: Alias) {
     if (receipt?.payload_hash !== expected.receipt_digest) throw new Error(`receipt-mismatch: expected ${expected.receipt_digest}, got ${receipt?.payload_hash ?? "absent"}`);
     const context = { sqlite: db, accounts, homeConflict: null, eraErrors: [], homeToSubId: new Map(),
       subIdToHomes: new Map(), claudeGauge: {}, grokGauge: {}, rateCards: { version: 1, currency: "USD", unit: "per_million_tokens", vendors: {} } } as unknown as AppContext;
-    const response = await createFetchHandler(context)(new Request("http://fixture/api/subscriptions/replica-synthetic/current"));
+    const response = await createFetchHandler(context)(new Request("http://localhost/api/subscriptions/replica-synthetic/current"));
     const body = await response.json();
     if (response.status !== 200) throw new Error("current-projection-mismatch");
     verifyCurrent(body, payload, journalText(file));

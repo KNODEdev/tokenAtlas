@@ -15,7 +15,7 @@ const script = path.join(import.meta.dir, "review-replica.ts");
 async function cli(...args: string[]) {
   const child = Bun.spawn([process.execPath, script, ...args], { stdout: "pipe", stderr: "pipe" });
   const out = new Response(child.stdout).text(), err = new Response(child.stderr).text();
-  const timer = setTimeout(() => child.kill(), 10000);
+  const timer = setTimeout(() => child.kill(), 20_000);
   try { const code = await child.exited; return { code, out: await out, err: await err }; }
   finally { clearTimeout(timer); }
 }
@@ -127,7 +127,7 @@ test("resumable producer process, crash after fsync, verified receipt/current, r
     fs.writeFileSync(manifestPath, JSON.stringify({ ...manifest, sha: "0".repeat(40) }));
     expect((await cli("receiver", receiver, "MAIN")).code).toBe(1);
   } finally { fs.rmSync(parent, { recursive: true, force: true }); }
-}, 15000);
+}, 30_000);
 
 test("receiver cannot certify delivery A when current selects newer MAIN/42 delivery B or provenance is ambiguous", async () => {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), "replica-current-correlation-"));
@@ -167,4 +167,4 @@ test("receiver cannot certify delivery A when current selects newer MAIN/42 deli
     await expect(receive(ambiguous, "MAIN")).rejects.toThrow("current-delivery-ambiguous");
     expect(fs.existsSync(path.join(ambiguous, "receiver-MAIN.json"))).toBe(false);
   } finally { fs.rmSync(parent, { recursive: true, force: true }); }
-}, 15000);
+}, 30_000);

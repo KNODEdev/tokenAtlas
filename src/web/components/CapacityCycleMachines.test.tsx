@@ -1,7 +1,10 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { CapacityCycleSource } from "../../shared/capacity-cycle";
 import { CapacityCycleMachines, cycleMachines, machineShares, sourceProfile } from "./CapacityCycleMachines";
+import { setLanguage } from "../lib/i18n";
+
+beforeEach(() => setLanguage("en"));
 
 const source = (name: string, machine: string | null, api: number | null, tokens: number): CapacityCycleSource => ({
   name, machine, first: "2026-10-11T05:25:04.000Z", last: "2026-10-12T10:38:00.000Z", events: 10, tokens, input: tokens, cached: 0, output: 0,

@@ -99,6 +99,7 @@ export function publishIncrementalDelta(
   beforeMutation: () => void = () => {},
   preserveUnchangedRows = false,
   report?: PublicationReport,
+  changedFacts = changedIdentities,
 ): void {
   const spec = DELTA_SPECS[vendor];
   const bookmarkRows: Array<Record<string, SQLQueryBindings>> = [];
@@ -116,7 +117,7 @@ export function publishIncrementalDelta(
   let attachedSource: string | undefined;
   const write = () => {
     beforeMutation();
-    const impactIdentities = sourceImpactIdentities(active, facts, vendor, changedIdentities);
+    const impactIdentities = sourceImpactIdentities(active, facts, vendor, changedFacts);
     const impact = beginSourceImpactObservation(active, vendor, {
       identityColumns: spec.identity,
       identities: impactIdentities,
@@ -186,11 +187,11 @@ export function publishIncrementalDelta(
         if (row) replace.run(key, row.value);
       }
     }
-    if (vendor === "codex" && changedIdentities.length) markCodexLedgerCopiesDirty(active,
-      changedIdentities.map(identity => ({ home: String(identity.home), path: String(identity.path) })));
+    if (vendor === "codex" && changedFacts.length) markCodexLedgerCopiesDirty(active,
+      changedFacts.map(identity => ({ home: String(identity.home), path: String(identity.path) })));
     // A changed transcript can change its session readings and the models that admit them.
-    if (vendor === "codex" && changedIdentities.length) markLimitWindowFilesDirty(active,
-      changedIdentities.map(identity => ({ home: String(identity.home), path: String(identity.path) })));
+    if (vendor === "codex" && changedFacts.length) markLimitWindowFilesDirty(active,
+      changedFacts.map(identity => ({ home: String(identity.home), path: String(identity.path) })));
     report?.("finalize");
     commitMetadata(impact);
     report?.("commit");

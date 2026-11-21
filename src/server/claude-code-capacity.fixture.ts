@@ -45,7 +45,7 @@ export const EXPECTED = {
   observation: { firstShare: 12, firstUtilization: 10, share: 12, utilization: 24 },
 } as const;
 
-export function createClaudeCodeAcceptanceFixture(options: { referenceDay?: string } = {}) {
+export function createClaudeCodeAcceptanceFixture(options: { referenceDay?: string; nowMs?: number } = {}) {
   const { directory, dbPath } = createTestDatabase();
   let db = new Database(dbPath);
   const probeSources = Object.values(ACCOUNTS).map(id => ({ id, vendor: "claude", machine: "synthetic", login: "fixture",
@@ -101,7 +101,7 @@ export function createClaudeCodeAcceptanceFixture(options: { referenceDay?: stri
   /** The maintenance worker publishes window sums after the ledger and the limit windows. */
   function publishSums(measurements: readonly ManualCapacityMeasurement[] = manualCapacity, referenceDay?: string) {
     manualCapacity = measurements;
-    prepareWindowUsageFixture(db, { rateCards: preparationRates, referenceDay: referenceDay ?? options.referenceDay, claudeGauge: {}, cycles: { windows: [] },
+    prepareWindowUsageFixture(db, { rateCards: preparationRates, referenceDay: referenceDay ?? options.referenceDay, nowMs: options.nowMs, claudeGauge: {}, cycles: { windows: [] },
       manualCapacity: provider => provider === "claude" ? manualCapacity : [] });
   }
   function prepareFacts(rates: RateCard = preparationRates, referenceDay?: string) {

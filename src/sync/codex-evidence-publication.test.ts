@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { Database } from "../db/sqlite";
+import { ensureRepoColumns } from "../db/derived-columns";
+import { ensureLimitWindowSchema } from "../db/limit-windows";
 import { SyncCoordinator } from "./coordinator";
 import type { VendorAdapter } from "./adapters";
 import { adaptersWith, createTestDatabase, importCodexHome, noMirror } from "./test-support";
@@ -20,6 +22,7 @@ async function fixture() {
   const file = path.join(home, "sessions", "synthetic.jsonl"); fs.mkdirSync(path.dirname(file), { recursive: true });
   const original = header + rich(); fs.writeFileSync(file, original); await importCodexHome(dbPath, home);
   const db = new Database(dbPath);
+  ensureRepoColumns(db, "events");
   let revision = 1;
   const adapter: VendorAdapter = async context => {
     const result = await importCodexHome(context.stageDbPath, home);
@@ -61,6 +64,31 @@ test("source-only raw metadata correction publishes proof and queues its copy wi
     expect(raw(f.db)).toEqual(before);
     expect(proof(f.db)).toEqual(accepted);
     expect(ledgerWork(f.db)).toEqual(acceptedWork);
+  } finally { f.close(); }
+}, 30_000);
+test("a moved bookmark alone is published without queueing ledger or limit-window work; a changed event queues both", async () => {
+  const f = await fixture();
+  try {
+    ensureLimitWindowSchema(f.db);
+    const windowWork = () => f.db.query("SELECT account,kind,sequence FROM limit_window_dirty WHERE provider='codex' ORDER BY account,kind").all();
+    const bookmark = () => (f.db.query("SELECT json_extract(first_token_json,'$.bookmark') AS b FROM codex_file_evidence WHERE path=?")
+      .get(f.file) as { b: string | null }).b;
+    const before = raw(f.db), beforeLedger = ledgerWork(f.db), beforeWindows = windowWork(), beforeBookmark = bookmark();
+    expect(beforeBookmark).not.toBeNull();
+    const coordinator = f.start(), moved = new Date(Date.parse("2026-09-09T00:00:00Z"));
+    fs.utimesSync(f.file, moved, moved); f.changed();
+    expect((await coordinator.enter(request).completion).status).toBe("success");
+    expect(bookmark()).not.toBe(beforeBookmark);
+    expect(JSON.parse(bookmark()!).mtime).toBe(moved.getTime() / 1000); // the parser bookmark stores seconds
+    expect(raw(f.db)).toEqual(before);
+    expect(ledgerWork(f.db)).toEqual(beforeLedger);
+    expect(windowWork()).toEqual(beforeWindows);
+
+    fs.appendFileSync(f.file, rich("synthetic-second", 20)); f.changed();
+    expect((await coordinator.enter(request).completion).status).toBe("success");
+    const file = JSON.stringify([f.home, f.file]);
+    expect(f.db.query("SELECT value FROM usage_ledger_dirty WHERE provider='codex' AND kind='copy'").all()).toContainEqual({ value: file });
+    expect(windowWork()).toContainEqual(expect.objectContaining({ account: file, kind: "file" }));
   } finally { f.close(); }
 }, 30_000);
 test("raw rows, source evidence, bookmark and durable ledger notification roll back on source publication failure", async () => {

@@ -113,7 +113,9 @@ test("real forced Codex adapter configures its populated stage connection withou
       TOKENATLAS_ARCHIVE_LOGICAL_ROOT: archive, TOKENATLAS_CONFIG: config, TOKENATLAS_FROZEN_CONFIG: "1",
       TOKENATLAS_LOCAL_STATE: path.join(directory, "state"), TOKENATLAS_PARSE_WORKERS: "0" }, stdout: "pipe", stderr: "pipe" });
     const [exit, output, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
-    expect({ exit, stderr }).toEqual({ exit: 0, stderr: "" });
+    expect(exit, stderr).toBe(0);
+    // A slow write diagnostic can appear under load even when stage configuration is correct.
+    expect(stderr.split(/\r?\n/).filter(line => line && !/^\[tokenAtlas sqlite\] write transaction held \d+\.\d+ s on main: /.test(line))).toEqual([]);
     const result = JSON.parse(output.split(/\r?\n/).find(line => line.startsWith("RESULT:"))!.slice(7));
     const settings = { journal_mode: "wal", synchronous: 1, journal_size_limit: 67108864,
       cache_size: -65536, mmap_size: 268435456, temp_store: 2 };

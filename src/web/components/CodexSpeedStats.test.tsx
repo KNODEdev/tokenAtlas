@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import type { CodexAccountingReport } from "../../server/codex-accounting";
 import type { CodexComparisonWindow, WindowUsage } from "../../server/codex-window-comparison";
 import { api } from "../lib/api";
-import { chooseOption, dropdownOptions, dropdowns, dropdownValue, flushUntil, installTestDom, invoke, type TestNode } from "../lib/test-dom-harness";
+import { chooseOption, dropdownOptions, dropdowns, dropdownValue, findByAttribute, flushUntil, installTestDom, invoke, type TestNode } from "../lib/test-dom-harness";
 import { setLanguage } from "../lib/i18n";
 import { capacityPeriodLabel } from "../lib/codex-capacity";
 import { CodexSpeedStats } from "./CodexSpeedStats";
@@ -209,6 +209,7 @@ async function withStats<T>(breakdownCount: number, callback: (host: TestNode, a
   const fixture = report(breakdownCount);
   const markerApi = spyOn(api, "codexTimelineMarkers").mockResolvedValue({ revision: "test", automatic: [], markers: [] });
   const accounting = spyOn(api, "codexAccounting").mockImplementation(async (options) => ({ ...fixture, scope: options }));
+  const capacity = spyOn(api, "codexCapacity").mockImplementation(async options => ({ ...fixture, scope: options, projection: true }));
   // The Models view reads its launch contexts and per-model cache counters separately.
   const contexts = spyOn(api, "breakdown").mockResolvedValue({ rows: [] });
   const cache = spyOn(api, "modelCacheHistory").mockImplementation(async range => ({ ...range, grain: "day", from: `${range.since}T00:00:00.000Z`, until: `${range.until}T00:00:00.000Z`, hours: [] }));
@@ -218,10 +219,11 @@ async function withStats<T>(breakdownCount: number, callback: (host: TestNode, a
       root.render(<CodexSpeedStats account="codex1" section={section} />);
     });
     await flushUntil(() => host.textContent.includes("Daily details") || host.textContent.includes("Capacity at 100% in successive cycles") || host.textContent.includes("No cycles meet the minimum observed usage filter"));
-    return await callback(host, () => accounting.mock.calls.length);
+    return await callback(host, () => section === "capacity" ? capacity.mock.calls.length : accounting.mock.calls.length);
   } finally {
     await act(async () => root.unmount());
     accounting.mockRestore();
+    capacity.mockRestore();
     contexts.mockRestore();
     cache.mockRestore();
     markerApi.mockRestore();
@@ -234,7 +236,7 @@ describe("CodexSpeedStats views", () => {
   it("switches Codex to its 5h API counter and keeps that choice across chart views", async () => {
     const { host, restore } = installTestDom(); setLanguage("en");
     const fixture = report(2);
-    const accounting = spyOn(api, "codexAccounting").mockImplementation(async options => ({ ...fixture, scope: options,
+    const accounting = spyOn(api, "codexCapacity").mockImplementation(async options => ({ ...fixture, scope: options, projection: true,
       provider: { id: "codex", label: "Codex", credits: true, speed: true, counter: options.window_minutes === 300 ? "five_hour" : "weekly", counter_reason: null,
         counters: [{ id: "weekly", label: "Weekly · 10080m" }, { id: "five_hour", label: "5h · 300m" }] } }));
     const markers = spyOn(api, "codexTimelineMarkers").mockResolvedValue({ revision: "test", automatic: [], markers: [] });
@@ -247,7 +249,7 @@ describe("CodexSpeedStats views", () => {
       await chooseOption((await findSelect(host, ["7 days", "30 days"]))!, "7");
       await flushUntil(() => accounting.mock.calls.length === 3);
       expect(accounting.mock.calls.at(-1)![0].window_minutes).toBe(300);
-      expect(host.textContent).toContain("5h and weekly limits have separate percentages");
+      expect(host.textContent).toContain("5h, weekly and 30-day limits have separate percentages");
     } finally { await act(async () => root.unmount()); accounting.mockRestore(); markers.mockRestore(); restore(); }
   });
 
@@ -257,7 +259,7 @@ describe("CodexSpeedStats views", () => {
     const range = { since: "2026-08-16", until: "2026-08-23" };
     const targets: DataSettingsTarget[] = [];
     const fixture = report(2);
-    const accounting = spyOn(api, "codexAccounting").mockImplementation(async options => ({ ...fixture, scope: options }));
+    const accounting = spyOn(api, "codexCapacity").mockImplementation(async options => ({ ...fixture, scope: options, projection: true }));
     const markers = spyOn(api, "codexTimelineMarkers").mockResolvedValue({ revision: "test", automatic: [], markers: [] });
     const root = createRoot(host as unknown as Element);
     try {
@@ -269,10 +271,14 @@ describe("CodexSpeedStats views", () => {
       expect(targets[1]).toEqual({ ...range, account: "codex1", area: "data", returnRange: range });
     } finally { await act(async () => root.unmount()); accounting.mockRestore(); markers.mockRestore(); restore(); }
   });
-  it("shows four capacity views and exposes the measurements controls directly", async () => {
+  it("shows the capacity tabs and exposes the measurements controls directly", async () => {
     await withStats(2, async (host) => {
       expect(allNodes(host).filter((node) => node.getAttribute("role") === "tab").map((node) => node.textContent)).toEqual([
-        "Capacity",
+        "Over time",
+        "Cycles",
+        "Token types",
+        "Comparison",
+        "Before / after",
         "By model",
         "Measurements",
         "Methodology",
@@ -281,8 +287,8 @@ describe("CodexSpeedStats views", () => {
 
       await invoke(findButton(host, "Measurements")!, "onClick");
 
-      const table = findTable(host, ["Measurement from → to (UTC)", "Details"]);
-      const chooseColumns = findButton(host, "Choose columns");
+      const table = findTable(host, ["Cycle (UTC)", "Details"]);
+      const chooseColumns = findByAttribute(host, "aria-label", "Choose table columns");
       expect(table).not.toBeNull();
       expect(chooseColumns).not.toBeNull();
       expect(findButton(host, "Download CSV")).not.toBeNull();
@@ -307,25 +313,22 @@ describe("CodexSpeedStats views", () => {
         const before = calls();
         await chooseOption(period, String(days));
         await flushUntil(() => calls() === before + 1);
-        const args = (api.codexAccounting as unknown as { mock: { calls: [{ since: string; until: string }][] } }).mock.calls.at(-1)![0];
+        const args = (api.codexCapacity as unknown as { mock: { calls: [{ since: string; until: string }][] } }).mock.calls.at(-1)![0];
         expect((Date.parse(args.until) - Date.parse(args.since)) / 86400000 + 1).toBe(days);
       }
     });
   });
 
   it("All fits the subscription's stored history instead of a rolling year", async () => {
-    const coverage = spyOn(api, "historyCoverage").mockResolvedValue({ generated_at: "2026-10-16T00:00:00Z", subscriptions: [{
-      subscription: "codex1", usage: { first_day: "2025-03-01", last_day: "2026-09-10" },
-      gauge: { first_at: "2025-02-01T00:00:00Z", last_at: "2026-10-15T20:00:00Z" },
-    }] } as Awaited<ReturnType<typeof api.historyCoverage>>);
+    const coverage = spyOn(api, "codexCapacityRange").mockResolvedValue({ range: { since: "2025-02-01", until: "2026-10-15" } });
     try {
       await withStats(2, async (host, calls) => {
         const period = allNodes(host).find(node => node.getAttribute("aria-label") === "Analysis period")!;
         await chooseOption(period, "-1");
         await flushUntil(() => calls() === 2);
-        const args = (api.codexAccounting as unknown as { mock: { calls: [{ since: string; until: string }][] } }).mock.calls.at(-1)![0];
+        const args = (api.codexCapacity as unknown as { mock: { calls: [{ since: string; until: string }][] } }).mock.calls.at(-1)![0];
         expect(args).toMatchObject({ since: "2025-02-01", until: "2026-10-15" });
-        expect(coverage.mock.calls[0]![0]).toBe("codex1");
+        expect(coverage.mock.calls[0]![0]).toEqual({ account: "codex1" });
       });
     } finally { coverage.mockRestore(); }
   });
@@ -339,14 +342,16 @@ describe("CodexSpeedStats views", () => {
       await chooseOption(preset, "1");
       await chooseOption(reference, "after");
 
-      await invoke(findButton(host, "Details")!, "onClick");
+      const details = findButton(host, "Details")!;
+      await invoke(details, "onClick", { currentTarget: details, stopPropagation() {} });
       expect(host.textContent).toContain("Computers and sources");
-      expect(host.textContent).toContain("EXAMPLE-MAIN");
+      expect(host.textContent).toContain("EXAMPLE-LAPTOP-A");
       expect(host.textContent).toContain("Models");
-      expect(host.textContent).toContain("gpt-5.6-luna");
+      expect(host.textContent).toContain("gpt-5.6-sol");
+      await invoke(findByAttribute(host, "aria-label", "Close measurement details")!, "onClick");
 
       await invoke(findButton(host, "Methodology")!, "onClick");
-      await invoke(findButton(host, "Capacity")!, "onClick");
+      await invoke(findButton(host, "Cycles")!, "onClick");
 
       const referenceSelect = (await findSelect(host, options))!;
       expect(await dropdownValue(referenceSelect)).toBe("after");
@@ -357,9 +362,9 @@ describe("CodexSpeedStats views", () => {
 
       await invoke(findButton(host, "Measurements")!, "onClick");
 
-      expect(accountingCalls()).toBe(2); // The cycle drawer requests its detailed timeline.
+      expect(accountingCalls()).toBe(1); // Changing tabs retains the prepared cycle report.
       expect(await findSelect(host, ["Capacity", "Tokens and mode", "Sources and quality", "All"])).not.toBeNull();
-      expect(findTable(host, ["Input + output tokens", "Million tokens / pp"])).not.toBeNull();
+      expect(findTable(host, ["Input + output tokens", "M tokens / 1%"])).not.toBeNull();
     });
   });
 
@@ -396,22 +401,24 @@ describe("CodexSpeedStats views", () => {
     });
     try {
       await withStats(2, async (host) => {
+        await invoke(findByAttribute(host, "aria-label", "Advanced filters")!, "onClick");
         const input = findInput(host, "Minimum observed usage percentage");
         expect(input).not.toBeNull();
         expect(inputValue(input!)).toBe("10");
         await invokeChange(input!, "31");
         expect(inputValue(input!)).toBe("31");
-        expect(host.textContent).toContain("2 cycles · 2 below minimum (< 31 pp)");
+        expect(host.textContent.match(/below minimum 30 < 31 pp/g)).toHaveLength(2);
         expect(host.textContent).toContain("tentative estimate");
         expect(host.textContent).not.toContain("No cycles meet the minimum observed usage filter");
-        expect(values.get("tokenatlas.codex-capacity-min-observed-percent.v1")).toBe("31");
+        expect([...values.values()].some(value => value.includes('"minimum":31'))).toBe(true);
       });
 
       await withStats(2, async (host) => {
+        await invoke(findByAttribute(host, "aria-label", "Advanced filters")!, "onClick");
         const input = findInput(host, "Minimum observed usage percentage");
         expect(input).not.toBeNull();
         expect(inputValue(input!)).toBe("31");
-        expect(host.textContent).toContain("2 cycles · 2 below minimum (< 31 pp)");
+        expect(host.textContent.match(/below minimum 30 < 31 pp/g)).toHaveLength(2);
       });
     } finally {
       if (previous) Object.defineProperty(globalThis, "localStorage", previous);

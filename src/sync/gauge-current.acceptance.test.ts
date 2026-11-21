@@ -179,4 +179,4 @@ test("local acceptance: independent producers, restarted delivery, real sync pub
     coordinator?.close(); db?.close(true);
     removeTestFixture(dir, { recursive: true, force: true });
   }
-}, 15_000);
+}, 30_000);

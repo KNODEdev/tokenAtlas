@@ -54,10 +54,11 @@ const plan = (from: string, until: string | null, value = "pro"): DatedPeriod =>
   from, until, value, origin: "declared", firstSeen: null, lastSeen: null, readings: 0, evidence: "fixture" });
 
 test("ending a plan removes only reconstructed intervals; measured windows, valid empty weeks and sums survive correction and restart", () => {
-  const f = createClaudeCodeAcceptanceFixture();
+  const clock = { referenceDay: "2026-10-25", nowMs: Date.parse("2026-10-25") };
+  const f = createClaudeCodeAcceptanceFixture(clock);
   try {
     const options: WindowUsageProducerOptions = { rateCards: f.rates, manualCapacity: () => [], claudeGauge: {},
-      grokGauge: {}, cycles: { windows: [] }, nowMs: Date.parse("2026-10-25"), budgetMs: 1e9 };
+      grokGauge: {}, cycles: { windows: [] }, ...clock, budgetMs: 1e9 };
     for (let turn = 0; turn < 20 && advanceWindowUsage(f.db, options).pending; turn++) { /* settle */ }
     const sums = () => f.db.query("SELECT * FROM window_usage ORDER BY provider,account,counter,window_id").all() as Array<Record<string, string>>;
     const measured = () => f.db.query("SELECT * FROM limit_windows ORDER BY provider,account,counter,window_id").all();

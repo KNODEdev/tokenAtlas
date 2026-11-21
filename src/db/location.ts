@@ -3,7 +3,10 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 export const databaseSelectionMarker = "# tokenAtlas: selected local database";
-export const databaseEnvFile = path.resolve(import.meta.dir, "../../.env");
+// The Bun preload gives tests and their child processes a disposable installation root.
+const testRoot = process.env.NODE_ENV === "test" ? process.env.TOKENATLAS_TEST_ROOT : undefined;
+export const databaseEnvFile = testRoot && path.isAbsolute(testRoot) && path.basename(testRoot).startsWith("tokenatlas-tests-")
+  ? path.join(testRoot, ".env") : path.resolve(import.meta.dir, "../../.env");
 export const localSettingsFile = (envFile = databaseEnvFile): string => path.join(path.dirname(envFile), "tokenatlas.local.json");
 export const databaseLocalStateRoot = (database: string): string => path.join(path.dirname(path.resolve(database)), "local-state");
 
