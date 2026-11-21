@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { bustApiMemo } from "./lib/api";
-import { findByAttribute, installTestDom, invoke } from "./lib/test-dom-harness";
+import { chooseOption, findByAttribute, installTestDom } from "./lib/test-dom-harness";
 
 test("Overview exposes persisted rebuild progress while account and report reads remain pending", async () => {
   const dom = installTestDom(), root = createRoot(dom.host as unknown as HTMLElement);
@@ -66,10 +66,7 @@ test("indexed Codex history starts without waiting for roster and switching acco
     expect(dom.host.textContent).not.toContain("Elapsed");
     expect(findByAttribute(dom.host, "aria-label", "Loading subscription history and charts")?.getAttribute("role")).toBe("progressbar");
     // The subscription picker opens a listbox; picking an option switches the subscription.
-    const pick = async (value: string) => {
-      await invoke(findByAttribute(dom.host, "aria-haspopup", "listbox")!, "onClick");
-      await invoke(findByAttribute(dom.host, "data-value", value)!, "onClick");
-    };
+    const pick = (value: string) => chooseOption(findByAttribute(dom.host, "aria-label", "Subscription")!, value);
     await pick("codex2");
     expect(requested).toEqual(["codex1", "codex2"]);
     expect(dom.host.textContent).toContain("Loading subscription history and charts");

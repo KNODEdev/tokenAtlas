@@ -114,7 +114,7 @@ export function prepareCodexLedgerFixture(db: Database, card: RateCard, homes: M
   if (!db.query("SELECT 1 FROM sqlite_master WHERE name='codex_price_ledger_events'").get()) createCodexLedgerSchema(db);
   else {
     ensureUsageLedgerSchema(db);
-    for (const table of ["codex_price_ledger_aggregates","codex_price_ledger_file_models","codex_price_ledger_events","codex_price_ledger_dims","codex_price_ledger_copies","codex_price_ledger_bands"])
+    for (const table of ["codex_stamp_days","codex_stamp_dirty","codex_price_ledger_aggregates","codex_price_ledger_file_models","codex_price_ledger_events","codex_price_ledger_dims","codex_price_ledger_copies","codex_price_ledger_bands"])
       db.exec(`DELETE FROM ${table}`);
     for (const table of ["usage_ledger_state","usage_ledger_dirty","usage_ledger_keys"])
       db.query(`DELETE FROM ${table} WHERE provider=?`).run(CODEX_LEDGER_PROVIDER);

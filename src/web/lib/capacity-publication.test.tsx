@@ -9,7 +9,7 @@ import { registerFreshness, registersOfSources } from "../../db/read-freshness";
 import { DATA_VIEWS } from "../../server/data-views";
 import { api, bustApiMemo, refreshApiData, syncRevisionDecision, type SyncStatus } from "./api";
 import { useAsync } from "./useAsync";
-import { installTestDom } from "./test-dom-harness";
+import { flushUntil, installTestDom } from "./test-dom-harness";
 
 test("Capacity publication alone wakes a mounted consumer through the real sync status handler", async () => {
   const fixture = createClaudeCodeAcceptanceFixture();
@@ -18,12 +18,11 @@ test("Capacity publication alone wakes a mounted consumer through the real sync 
     rateCards: fixture.rates, plans: {}, plansCatalog: { provider_groups: [] }, cycles: {} } as unknown as AppContext;
   const handle = createFetchHandler(ctx);
   const dom = installTestDom(), root = createRoot(dom.host as unknown as HTMLElement);
-  Object.defineProperty(window, "location", { configurable: true, value: { origin: "http://fixture.local" } });
   const calls: string[] = [];
   const mocked = spyOn(globalThis, "fetch").mockImplementation(Object.assign(async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init); calls.push(new URL(request.url).pathname); return handle(request);
   }, { preconnect() {} }) as typeof fetch);
-  const status = async () => (await handle(new Request("http://fixture.local/api/sync"))).json() as Promise<SyncStatus>;
+  const status = async () => (await handle(new Request("http://localhost/api/sync"))).json() as Promise<SyncStatus>;
   function Reader() {
     const state = useAsync(signal => api.capacityCycles({ since: "2026-09-13", until: "2026-09-19", window_minutes: 10080 }, signal), []);
     return <span>{state.data?.accounts.some(account => account.preparing) ? "pending" : state.data?.accounts.reduce((sum, account) => sum + account.windows.length, 0) ?? "loading"}</span>;
@@ -31,7 +30,7 @@ test("Capacity publication alone wakes a mounted consumer through the real sync 
   try {
     bustApiMemo();
     await act(async () => { root.render(<Reader />); });
-    expect(dom.host.textContent).toBe("pending");
+    await flushUntil(() => dom.host.textContent === "pending");
     const before = await status(), version = dataVersion(fixture.db), other = dataVersion(fixture.db, { capacityCycles: false });
     for (let i = 0; i < 200; i++) {
       const result = advanceCapacityCycleResults(ctx, { budgetMs: 1000 });
@@ -49,7 +48,7 @@ test("Capacity publication alone wakes a mounted consumer through the real sync 
     const decision = syncRevisionDecision(syncRevisionDecision(undefined, before).revision, after);
     expect(decision.refresh).toBe(true);
     await act(async () => { if (decision.refresh) refreshApiData(); });
-    expect(dom.host.textContent).not.toBe("pending");
+    await flushUntil(() => Number(dom.host.textContent) > 0);
     expect(Number(dom.host.textContent)).toBeGreaterThan(0);
     expect(calls.filter(path => path === "/api/capacity-cycles")).toHaveLength(2);
     const settled = await status();

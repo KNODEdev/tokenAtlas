@@ -97,16 +97,15 @@ import path from "node:path";
 // first-import mockup: while the first import runs, that notice says the history is still being counted.
 // 2026-11-01: owner approved TALK-001 D8 (UR-015 REQ-065): the subscription rail gets a collapse/expand control
 // beside its settings; App resolves the rail from the window width and the saved choice (useBreakpoint), so a
-// narrow window still compacts or hides it. No other layout, navigation or token changed. Only useBreakpoint's hash
-// moves here: App.tsx, main.tsx and AppHeader.tsx already differed from their recorded hashes on main@9250aa6,
-// and re-baselining those earlier changes is the owner's call.
+// narrow window still compacts or hides it. No other layout, navigation or token changed.
 // 2026-11-01: owner approved bundling the IBM Plex fonts (UR-015 review finding 1, "Rekomendowane"): tokens.css
 // imports the local fonts.css instead of Google Fonts, so no font request leaves the computer before the first-run
 // consent. Same families and weights; no token, layout or control changed.
+// 2026-11-18: owner approved the current App, entry point and header as the layout baseline.
 const baseline = [
-  ["src/web/App.tsx", "a5f51ca61cc564e1e84816fa4d14bf038373cb14"],
-  ["src/web/main.tsx", "70d74c18d6c784da3aca991d787a36348bc8efc0"],
-  ["src/web/components/AppHeader.tsx", "45ebafbcd646a4711896241c81328b370150a290"],
+  ["src/web/App.tsx", "69db52fc48bf4ee90b618814f259d748714237bc"],
+  ["src/web/main.tsx", "9edc3ac8514ce0a8d236c08c247f81986db7a603"],
+  ["src/web/components/AppHeader.tsx", "998b67cd5b19e1e1b7bd941801675f34a7c7b843"],
   ["src/web/components/VendorOverview.tsx", "54945167afb87db2c69e6bebe96802bab272e56d"],
   ["src/web/lib/useBreakpoint.ts", "6eaa84f0639726bc4f9fa9c4b6746c605d738e41"],
   ["src/web/index.css", "1454091035a126c654f1c0494685f0e3de2b87c4"],

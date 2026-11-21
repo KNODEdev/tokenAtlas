@@ -256,6 +256,7 @@ export function installTestDom(): TestDom {
   globalThis.removeEventListener = (() => {}) as typeof globalThis.removeEventListener;
   Object.defineProperty(globalThis, "window", { configurable: true, value: globalThis });
   Object.defineProperty(globalThis, "self", { configurable: true, value: globalThis });
+  Object.defineProperty(globalThis, "location", { configurable: true, value: documentLike.location });
   globalThis.navigator = { userAgent: "bun-test" } as Navigator;
   globalThis.HTMLIFrameElement = HTMLIFrameElement as unknown as typeof globalThis.HTMLIFrameElement;
   globalThis.HTMLElement = HTMLElement as unknown as typeof globalThis.HTMLElement;

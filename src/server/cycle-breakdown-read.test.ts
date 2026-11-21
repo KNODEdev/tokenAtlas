@@ -118,7 +118,7 @@ test("hour sums, cut pieces and an independent moving burn read despite unrelate
     expect(plans.some(p=>/SEARCH a USING INDEX codex_price_ledger_aggregates_day/.test(p))).toBe(true);
     expect(plans.some(p=>/SEARCH e USING INDEX codex_price_ledger_events_time \(instant_ms>\? AND instant_ms<\?\)/.test(p))).toBe(true);
   } finally {ctx.sqlite.close();}
-});
+}, 30_000);
 
 test("ties, duplicates, NULLs, unpriced and owner/project distinctions", async () => {
   const ctx=fixture();

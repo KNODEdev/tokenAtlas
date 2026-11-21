@@ -967,10 +967,12 @@ describe("ProjectDrawer views", () => {
     expect(compactHtml).toContain("$419.14");
     expect(compactHtml).toContain("$9,000.00");
     expect(compactHtml).toContain("2.5M");
-    expect(compactHtml).toContain(">48%<");
-    // Plan as one chip; the change history only in its tooltip.
+    // Mixed plans have no common utilization denominator; the known monetary total still appears.
+    expect(compactHtml).not.toContain(">48%<");
+    const single = renderToStaticMarkup(<SubscriptionSplitTable lines={[{ ...line, plan: "pro", planHistory: null }]} />);
+    expect(single).toContain(">48%<");
     expect(compactHtml).toContain('title="plus → pro"');
-    expect(compactHtml).toContain(">pro<");
+    expect(compactHtml).toContain(">plan history<");
     expect(compactHtml).not.toContain(">plus → pro<");
     expect(compactHtml).not.toContain("not summed");
     expect(compactHtml).not.toContain("≈ 4.5");

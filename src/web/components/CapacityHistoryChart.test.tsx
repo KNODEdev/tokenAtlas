@@ -196,8 +196,8 @@ describe("capacity chart value labels", () => {
       cycle("b", "2026-08-02T00:00:00Z", "2026-08-03T00:00:00Z"),
       cycle("c", "2026-08-10T00:00:00Z", "2026-08-11T00:00:00Z"),
     ]);
-    expect(html.match(/>\$2,000<\/text>/g)).toHaveLength(2);
-    expect(html.match(/font-weight="600"[^>]*>\$2,000<\/text>/g)).toHaveLength(1);
+    expect(html.match(/>Pro · ×20 \$2,000<\/text>/g)).toHaveLength(2);
+    expect(html.match(/font-weight="600"[^>]*>Pro · ×20 \$2,000<\/text>/g)).toHaveLength(1);
   });
   it("leaves out a segment's 100% mark under a neighbour's value label", () => {
     setLanguage("en");
@@ -208,7 +208,7 @@ describe("capacity chart value labels", () => {
     const next = cycle("next", "2026-08-04T00:00:00Z", "2026-08-04T12:00:00Z");
     next.usage = { ...next.usage, api_standard: 1244 };
     const html = chart([full, next]);
-    expect(html).toContain(">$1,777</text>");
+    expect(html).toContain(">Pro · ×20 $1,777</text>");
     expect(html).not.toContain(">100%</text>");
   });
 });

@@ -37,9 +37,12 @@ async function startOnce(root: string, consent?: { limit_readings: boolean; clou
       headers: { "content-type": "application/json" }, body: JSON.stringify(consent) })).json()).locations_confirmed;
     // Probes are first scheduled 3 and 4 seconds after the start.
     await new Promise(resolve => setTimeout(resolve, 6500));
-    running.close?.();
+    // Accepted consent may have started the first import in another process.
+    const sync = await import(${JSON.stringify(path.join(import.meta.dir, "server-sync.ts"))});
+    await sync.activeSyncCompletion;
+    running.close();
     process.stdout.write(JSON.stringify({ outbound, codexPolls, login, confirmed, preview }));
-    process.exit(0);`);
+  `);
   const profile = path.join(root, "profile");
   const child = Bun.spawn([process.execPath, script], {
     env: { ...process.env, TOKENATLAS_CONFIG: path.join(root, "config"), TOKENATLAS_ARCHIVE: path.join(root, "archive"),

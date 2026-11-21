@@ -13,6 +13,7 @@ import {
   type CadenceEditorState,
 } from "./CyclesPanel";
 import { groupRhythmRows, WindowRhythmsPanel } from "./WindowRhythmsPanel";
+import { CadenceChange, DeclaredOverObserved, LegacyOrigin, MissingCadence, ServerRefusal } from "./WindowRhythmsPanel.fixture";
 
 const groups = [{ id: "anthropic", label: "Anthropic", aliases: ["claude", "anthropic"] }];
 
@@ -273,13 +274,13 @@ describe("WindowRhythmsPanel", () => {
     expect(SCREEN_TITLES.sources).toBe("Data sources");
   });
 
-  it("ships all five design-sync fixtures without hand-wrapping ThemeSurface", async () => {
-    const preview = await Bun.file(".design-sync/previews/WindowRhythmsPanel.tsx").text();
-    for (const fixture of ["LegacyOrigin", "DeclaredOverObserved", "CadenceChange", "MissingCadence", "ServerRefusal"]) {
-      expect(preview).toContain(`export const ${fixture}`);
+  it("renders all five preview fixtures without requiring the private design-sync checkout", () => {
+    for (const [Preview, subscription] of [
+      [LegacyOrigin, "claude-legacy"], [DeclaredOverObserved, "claude-pro"], [CadenceChange, "claude-change"],
+      [MissingCadence, "claude-missing"], [ServerRefusal, "claude-change"],
+    ] as const) {
+      expect(renderToStaticMarkup(<Preview />)).toContain(subscription);
     }
-    expect(preview).not.toContain("<ThemeSurface");
-    const config = await Bun.file(".design-sync/config.json").json();
-    expect(config.overrides.WindowRhythmsPanel.primaryStory).toBe("CadenceChange");
+    expect(renderToStaticMarkup(<ServerRefusal />)).toContain("duplicate from");
   });
 });

@@ -55,9 +55,16 @@ const drain = () => {
   }
   throw new Error("fixture ledger did not settle");
 };
+const evidence = () => db.query("SELECT * FROM codex_file_evidence ORDER BY home,path").all() as Array<
+  Record<string, unknown> & { first_token_json: string | null }>;
 const snapshot = () => ({
   raw: db.query("SELECT rowid,* FROM events ORDER BY home,path,source_offset").all(),
-  proof: db.query("SELECT * FROM codex_file_evidence ORDER BY home,path").all(),
+  proof: evidence().map(({ first_token_json, ...row }) => {
+    // The parser bookmark follows physical bytes. The observed first-token measurements must survive the codec change.
+    if (first_token_json === null) return { ...row, firstToken: null };
+    const { bookmark: _bookmark, ...firstToken } = JSON.parse(first_token_json);
+    return { ...row, firstToken };
+  }),
   ledger: db.query("SELECT * FROM codex_price_ledger_events ORDER BY id").all(),
   copies: db.query("SELECT * FROM codex_price_ledger_copies ORDER BY id").all(),
 });
@@ -84,6 +91,7 @@ try {
   assert.equal(fs.readFileSync(source, "utf8"), text, "archive compression must leave provider originals untouched");
   assert.equal(fs.existsSync(archived), false); assert.equal(fs.existsSync(`${archived}.zst`), true);
   const archiveConversion = await run(), archiveWork = drain();
+  assert.equal(JSON.parse(evidence()[0]!.first_token_json!).bookmark.size, fs.statSync(`${archived}.zst`).size);
   assert.deepEqual(snapshot(), accepted); assert.equal(archiveConversion.vendors[0]!.dataChanged, false);
   assert.deepEqual(archiveWork, { processed: 0, repricedApi: 0, repricedCredits: 0, aggregatePartitions: 0 });
   // An unchanged plain provider must not undo the explicit archive compression.

@@ -63,7 +63,7 @@ function fixture(file = ":memory:") {
     eras: buildEraIndex(subscriptions), eraErrors: [], homeConflict: null, claudeGauge: {}, grokGauge: {}, rateCards,
   } as unknown as AppContext;
   const fetch = createFetchHandler(ctx);
-  const get = (url: string, headers?: HeadersInit) => fetch(new Request(`http://fixture${url}`, { headers }));
+  const get = (url: string, headers?: HeadersInit) => fetch(new Request(`http://localhost${url}`, { headers }));
   return { sqlite, ctx, subscriptions, get };
 }
 

@@ -50,7 +50,7 @@ try {
       if (typeof ts === "string" && isAccountingDay(ts.slice(0, 10)) && Number.isFinite(Date.parse(ts))) saveTimestamp.run(ts);
     }
   })());
-  db.exec(`PRAGMA journal_mode=WAL;
+  db.exec(`PRAGMA main.journal_mode=WAL;
     CREATE TABLE copies(id TEXT PRIMARY KEY,home TEXT NOT NULL,path TEXT NOT NULL,UNIQUE(home,path)) STRICT;
     CREATE TABLE price_rules(id TEXT NOT NULL,band TEXT NOT NULL,slot TEXT NOT NULL,denominator INTEGER NOT NULL,
       evidence TEXT NOT NULL,PRIMARY KEY(id,band)) STRICT;

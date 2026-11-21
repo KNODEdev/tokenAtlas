@@ -15,6 +15,7 @@ import { measureTimestampDifferences } from "./timestamp-difference";
 import type { BookmarkState, BookmarkOutcome } from "./stage-bookmarks";
 import { readBookmarkState, nullableTableColumns, hasReadBookmark, writeBookmarkState, unreadBookmark } from "./stage-bookmarks";
 import { publishIncrementalDelta } from "./incremental-publication";
+import { changedCodexFacts } from "./codex-publication-changes";
 import { saveAcceptedFacts } from "./accepted-facts";
 import type { StagePublicationServices, StagePublicationWork, PreparedPublicationFacts } from "./vendor-stage-publication";
 
@@ -115,10 +116,11 @@ export function publishVendorDelta(
   }
   const activeFacts = preparedFacts?.active ?? vendorIdentityFingerprints(sqlite, outcome.vendor, identities, true, true);
   const stagedFacts = preparedFacts?.staged ?? vendorIdentityFingerprints(stage, outcome.vendor, identities);
-  const changedIdentities=identities.filter(identity=> {
+  const changedRows=identities.filter(identity=> {
     const key=identityKey(DELTA_SPECS[outcome.vendor],identity);
     return activeFacts.byIdentity.get(key)!==stagedFacts.byIdentity.get(key);
   });
+  const changedIdentities = outcome.vendor === "codex" ? changedCodexFacts(sqlite, stage, changedRows) : changedRows;
   const changedTimestamps:string[]=[];
   const changedRanges = measureTimestampDifferences(sqlite,stage,{
     identity:DELTA_SPECS[outcome.vendor].identity,tables:VENDOR_TABLES[outcome.vendor].data,
@@ -196,7 +198,7 @@ export function publishVendorDelta(
     stage,
     outcome.vendor,
     identities,
-    changedIdentities,
+    changedRows,
     (impact) => {
       // Invalidation triggers removed changed proofs. Read only those identities,
       // then persist acceptance together with facts, bookmarks and the receipt.
@@ -249,7 +251,7 @@ export function publishVendorDelta(
         acceptedFacts = currentFacts;
       }
     }, bounded || queuedFiles || ROW_DIFF_VENDORS.has(outcome.vendor),
-    publicationProgress.report);
+    publicationProgress.report, changedIdentities);
   finishComparison();
   options.beforeIncrementalPublish?.();
   const publicationStarted = timingStart();

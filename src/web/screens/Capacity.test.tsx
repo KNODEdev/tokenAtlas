@@ -37,14 +37,14 @@ test("Capacity loads its prepared report while the shell's cycle history is stil
     spyOn(api,"usageSeries").mockImplementation(()=>new Promise(()=>{})),
     spyOn(api,"codexTimelineMarkers").mockResolvedValue({revision:"empty",markers:[],automatic:[]}),
   ];
-  const accounting=spyOn(api,"codexAccounting").mockImplementation(async options=>{
+  const accounting=spyOn(api,"codexCapacity").mockImplementation(async options=>{
     const result=buildSubscriptionAccountingReport({sqlite:db,rateCards:{version:1,currency:"USD",unit:"per 1M",vendors:{}},plans:{},plansCatalog:{provider_groups:[]}},"claude",{...options,account:"codex1"});
-    result.provider={...result.provider!,id:"codex"};return result;
+    result.provider={...result.provider!,id:"codex"};return {...result,scope:options,projection:true};
   });
   setLanguage("en");bustApiMemo();
   try {
     await act(async()=>root.render(<App/>));
-    await invoke(findByAttribute(dom.host,"aria-label","Capacity")!,"onClick");
+    await invoke(findByAttribute(dom.host,"data-nav","limits")!,"onClick");
     await flushUntil(()=>accounting.mock.calls.length===1 && !dom.host.textContent.includes("Loading subscription analysis"));
     expect(dom.host.textContent).toContain("codex1");
     expect(dom.host.textContent).toContain("No cycles with a usable meter reading");
@@ -83,7 +83,7 @@ for (const global of [false, true]) test(`${global ? "global" : "selected"} capa
       return Response.json({ since: url.searchParams.get("since"), until: url.searchParams.get("until"), window_minutes: 10080,
         accounts: [{ account: "a", provider: "codex", counter: "weekly", counter_label: "Weekly", windows: [window] }] });
     }
-    if (global || url.pathname !== "/api/codex-accounting") throw new Error("Unexpected request " + url.pathname);
+    if (global || url.pathname !== "/api/codex-capacity") throw new Error("Unexpected request " + url.pathname);
     accountingReads++;
     if (published) await refreshing;
     const scope = { since: url.searchParams.get("since")!, until: url.searchParams.get("until")!, account: url.searchParams.get("account") ?? undefined };
@@ -91,7 +91,7 @@ for (const global of [false, true]) test(`${global ? "global" : "selected"} capa
     report.scope = scope;
     report.provider = { ...report.provider!, id: "codex", counter: "weekly", counters: [{ id: "weekly", label: "Weekly" }] };
     report.windows = [window];
-    return Response.json(report);
+    return Response.json({ ...report, projection: true });
   }) as typeof fetch;
   const render = (revision: number) => root.render(<Capacity {...props} cards={[card]} sync={{ running: true, revisions: { data: revision, config: 1, derived: 1 } } as SyncStatus} />);
   setLanguage("en"); bustApiMemo();

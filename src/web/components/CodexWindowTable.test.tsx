@@ -113,7 +113,7 @@ test("clicking a measurement row opens its drawer and closing restores the row o
   const nodes = (node: TestNode): TestNode[] => [node, ...node.children.flatMap(nodes)];
   try {
     await act(async () => root.render(<CodexWindowTable windows={[row]} view="measurements" />));
-    const opener = findByAttribute(dom.host, "aria-label", "Measurement details: 2026-09-01 00:00 → 2026-09-03 00:00")!;
+    const opener = findByAttribute(dom.host, "aria-label", "Details: 2026-09-01 00:00 → 2026-09-03 00:00")!;
     const focus = spyOn(opener, "focus");
     const tableRow = nodes(dom.host).find(node => node.tagName === "TR" && node.className === "ui-open-row")!;
     await invoke(tableRow, "onClick", { currentTarget: { querySelector: () => opener } });

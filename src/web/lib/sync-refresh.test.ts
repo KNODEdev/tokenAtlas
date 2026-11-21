@@ -13,6 +13,7 @@ import {
   type SyncStatus,
 } from "./api";
 import { staleSignalTime } from "./report-freshness";
+import plansCatalog from "../../../plans-catalog.json";
 
 function status(over: Partial<SyncStatus> = {}): SyncStatus {
   return {
@@ -138,8 +139,9 @@ describe("sync revision refresh", () => {
     const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
     Object.defineProperty(globalThis, "window", { configurable: true, value: { location: { origin: "http://fixture.local" } } });
     let calls = 0;
-    const fetchMock = spyOn(globalThis, "fetch").mockImplementation(Object.assign(async () => {
-      calls++; return Response.json({});
+    const fetchMock = spyOn(globalThis, "fetch").mockImplementation(Object.assign(async (input: RequestInfo | URL) => {
+      calls++;
+      return Response.json(new URL(String(input)).pathname === "/api/plans-catalog" ? { catalog: plansCatalog } : {});
     }, { preconnect() {} }) as typeof fetch);
     try {
       await Promise.all([api.projects(), api.rateCards(), api.plansCatalog(), api.setupStatus(), api.windows({ account: "seat" }, new AbortController().signal)]);

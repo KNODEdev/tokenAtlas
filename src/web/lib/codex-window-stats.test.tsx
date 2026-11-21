@@ -340,7 +340,7 @@ describe("selected window dates", () => {
     expect(markup).not.toContain('dateTime="' + c.resetIso + '"');
     expect(markup).toContain("Window result");
     expect(markup).toContain("Pro · ×20");
-    expect(markup).toContain("closed");
+    expect(markup).toContain("ended ");
   });
   it("labels the active window end as scheduled reset and ignores a superseded cutoff", () => {
     const cutoff = new Date(start + 24 * hour).toISOString();
