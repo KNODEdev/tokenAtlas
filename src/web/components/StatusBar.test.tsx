@@ -228,6 +228,25 @@ test("an expired sign-in is a warning line per account and computer, before a mi
   expect(render()).not.toContain("data-probe-notices");
 });
 
+test("an expired sign-in stays named in the bar's row while a synchronization or rebuild owns the line", async () => {
+  const { setProbeNotices } = await import("../lib/probe-notices");
+  const notice = { provider: "claude", subject: "claude-1", account: null, machine: "EXAMPLE-MAIN", code: "login-expired" as const,
+    since: "2026-09-18T08:00:00Z", failed_at: "2026-09-18T10:00:00Z" };
+  const running = { running: true, started_at: "2026-09-18T10:00:00Z", progress: [],
+    run: { progress: null, scope: { kind: "all" }, mode: "full", vendors: [], trigger: "manual" } } as unknown as SyncStatus;
+  setProbeNotices([notice, { ...notice, machine: "EXAMPLE-LAPTOP-A" }]);
+  try {
+    const syncing = render({ sync: running });
+    expect(syncing).toContain("data-probe-notice-flag");
+    expect(syncing).toMatch(/data-probe-notice-flag[^>]*>Claude on EXAMPLE-MAIN: sign-in expired \+1 more</);
+    expect(syncing).toContain("run `claude` in a terminal and sign in (/login)");
+    expect(render({ rebuild: { job, unavailable: false } })).toContain("data-probe-notice-flag");
+    // An idle bar already leads with the notice, so the row does not repeat it.
+    expect(render()).not.toContain("data-probe-notice-flag");
+  } finally { setProbeNotices(null); }
+  expect(render({ sync: running })).not.toContain("data-probe-notice-flag");
+});
+
 test("a sign-in notice of this computer offers Connect Claude; another computer's does not", async () => {
   const { setProbeNotices } = await import("../lib/probe-notices");
   const { resetClaudeLogins, setClaudeLogins } = await import("../lib/claude-login");

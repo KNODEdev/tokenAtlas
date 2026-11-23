@@ -209,6 +209,19 @@ export function CreditNotices({ notices, now, onOpenAccount, onRead }: { notices
   );
 }
 
+/**
+ * An expired sign-in loses readings for good, so the bar's row names it even while running work owns the line;
+ * the remedy is in the tooltip and the details.
+ */
+function ProbeNoticeFlag({ notices }: { notices: ReturnType<typeof probeNoticeLines> }) {
+  const { t } = useI18n();
+  const first = notices[0];
+  if (!first) return null;
+  const more = notices.length - 1;
+  return <span data-probe-notice-flag className="status-notice-flag" title={notices.map(notice => notice.text).join("\n")}>
+    {first.head}{more > 0 ? ` ${t("+{0} more", `+${more} więcej`, [more])}` : ""}</span>;
+}
+
 /** Models listed by name in the details; the rest are counted. */
 const MISSING_RATE_ROWS = 5;
 
@@ -254,6 +267,7 @@ export function StatusBar(props: StatusBarProps) {
     ? { ...baseLine, detail: `${t("first import took {0} min", `pierwszy import trwał ${took} min`, [took])} · ${baseLine.detail}` } : baseLine;
   const alert = missingRateAlert(missingRates);
   const notices = probeNoticeLines(probeNotices);
+  const flag = notices.length ? <ProbeNoticeFlag notices={notices} /> : null;
   // The details panel closes when its button leaves for Settings, so it does not cover the opened tab.
   const alertRef = useRef<HTMLDivElement>(null);
   const elapsed = useElapsed(line.startedAt, line.tone === "busy" && !!line.startedAt);
@@ -324,12 +338,12 @@ export function StatusBar(props: StatusBarProps) {
       ? `${t("Data rebuild", "Przebudowa danych")} · 1/${REBUILD_PHASES} ${t("Source files", "Pliki źródłowe")}` : undefined;
     // Pause holds every source pass, an analysis rebuild's included (TALK-001 D12).
     return <SyncStatusBar sync={sync} context={context} compact={compact} stickyTop={stickyTop} state={state} events={events}
-      action={<ImportPauseButton paused={false} />}
+      action={<>{flag}<ImportPauseButton paused={false} /></>}
       firstImport={importing ? { progress: first!, startedAt: sync.first_import!.started_at } : undefined} />;
   }
   if (importing) return <StatusShell label={t("First history import", "Pierwszy import historii")} expand={t("Expand details", "Rozwiń szczegóły")}
     stickyTop={stickyTop} state={state} events={events}
-    summary={<FirstImportSummary progress={first!} startedAt={sync!.first_import!.started_at} current={t("preparing views", "przygotowuję widoki")} />} />;
+    summary={<FirstImportSummary progress={first!} startedAt={sync!.first_import!.started_at} current={t("preparing views", "przygotowuję widoki")} action={flag} />} />;
   const measured = line.progress && line.progress !== "indeterminate" ? line.progress : null;
   return (
     <StatusShell label={t("Application status", "Stan aplikacji")} expand={t("Expand details", "Rozwiń szczegóły")} stickyTop={stickyTop}
@@ -346,6 +360,8 @@ export function StatusBar(props: StatusBarProps) {
               {line.detail}{line.tone === "busy" && line.startedAt ? ` · ${elapsed}` : ""}
             </span>
           </div>
+          {/* Not repeated when the line already leads with the notice. */}
+          {line.title !== notices[0]?.head && flag}
           <DetailsChevron />
         </div>
         <div role="progressbar" aria-label={line.title}
