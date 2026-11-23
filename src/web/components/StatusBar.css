@@ -9,6 +9,10 @@
 .status-details-events > * + * + * { padding-top: var(--s-6); border-top: var(--rule); }
 .status-details-empty { margin: 0; font-size: var(--fs-3); color: var(--muted); }
 
+/* An expired sign-in named in the bar's row while other work owns the line; it never pushes the chevron away. */
+.status-notice-flag { flex: 0 1 auto; min-width: 0; max-width: 40%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  color: var(--warn); font-size: var(--fs-3); font-weight: var(--fw-semibold); }
+
 /* One event group: a head row with its action on the right, then its lines. */
 .status-event { display: grid; gap: var(--s-4); font-size: var(--fs-4); }
 .status-event-head { display: flex; justify-content: space-between; align-items: center; gap: var(--s-4); min-height: 28px; }
